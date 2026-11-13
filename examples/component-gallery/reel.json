@@ -1,0 +1,305 @@
+{
+  "title": "Component gallery",
+  "brand": {
+    "name": "YOUR BRAND",
+    "accent": "#C8302A"
+  },
+  "scenes": [
+    {
+      "id": "mystery",
+      "theme": "paper",
+      "section": "Mystery stat",
+      "duration": 3,
+      "headline": [
+        "THE DEADLIEST",
+        "ANIMAL"
+      ],
+      "punch_at": 1.2,
+      "visual": {
+        "type": "stat",
+        "value": "7,00,000",
+        "label": "deaths · every year",
+        "y": 600,
+        "art": {
+          "svg_file": "../hypnic-jerk/art/coffee.svg",
+          "y": 1300,
+          "w": 520,
+          "mystery": true,
+          "reveal_at": 2.2
+        }
+      }
+    },
+    {
+      "id": "bars",
+      "theme": "paper",
+      "section": "Comparison",
+      "duration": 3.4,
+      "headline": [
+        "DEADLIEST",
+        "ANIMAL"
+      ],
+      "visual": {
+        "type": "bars",
+        "y": 620,
+        "rows": [
+          {
+            "label": "Shark",
+            "value": 6,
+            "display": "~6 deaths / year",
+            "svg_file": "../hypnic-jerk/art/coffee.svg"
+          },
+          {
+            "label": "Snake",
+            "value": 100000,
+            "display": "~1,00,000 deaths / year",
+            "svg_file": "../hypnic-jerk/art/brain.svg"
+          },
+          {
+            "label": "???",
+            "value": 650000,
+            "display": "~6,50,000 deaths / year",
+            "svg_file": "../hypnic-jerk/art/tree.svg",
+            "mystery": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "lab",
+      "theme": "paper",
+      "section": "The experiment",
+      "duration": 3,
+      "headline": [
+        "2022",
+        "EXPERIMENT"
+      ],
+      "visual": {
+        "type": "art",
+        "svg_file": "../hypnic-jerk/art/brain.svg",
+        "x": 330,
+        "y": 1100,
+        "w": 520
+      },
+      "overlays": [
+        {
+          "type": "labfile",
+          "kicker": "Lab file · 2022",
+          "title": "Subject 33",
+          "rows": [
+            [
+              "Test",
+              "skin smell vs mosquitoes"
+            ],
+            [
+              "Result",
+              "up to 100x more attractive",
+              true
+            ]
+          ],
+          "x": 700,
+          "y": 1450,
+          "at": 0.8
+        },
+        {
+          "type": "tag",
+          "kicker": "DAY",
+          "text": "06",
+          "x": 230,
+          "y": 1640,
+          "rot": -3,
+          "at": 1.4
+        }
+      ]
+    },
+    {
+      "id": "question",
+      "theme": "dark",
+      "section": "The question",
+      "duration": 2.6,
+      "headline": [
+        "THEN WHY"
+      ],
+      "visual": {
+        "type": "question",
+        "art": {
+          "svg_file": "../hypnic-jerk/art/coffee.svg",
+          "w": 380,
+          "y": 1160
+        }
+      },
+      "overlays": [
+        {
+          "type": "counter",
+          "value": "x 4",
+          "x": 820,
+          "y": 1700,
+          "at": 1.2,
+          "size": 120
+        }
+      ]
+    },
+    {
+      "id": "photo",
+      "theme": "photo",
+      "duration": 2.6,
+      "bg_image": "photo.png",
+      "headline": [
+        "4 PEOPLE.",
+        "1 TARGET."
+      ],
+      "punch_at": 1.0
+    },
+    {
+      "id": "news",
+      "theme": "paper",
+      "section": "Records",
+      "duration": 3,
+      "headline": [
+        "ALL OF",
+        "HUMAN HISTORY"
+      ],
+      "visual": {
+        "type": "newspaper",
+        "masthead": "The Daily Record",
+        "date": "1781",
+        "issue": "Vol. 24",
+        "headline": "The Nightmare goes on display",
+        "y": 1150,
+        "highlight": [
+          1,
+          2,
+          10
+        ],
+        "highlight_at": 1.4
+      }
+    },
+    {
+      "id": "compare",
+      "theme": "paper",
+      "section": "Head to head",
+      "duration": 3.2,
+      "headline": [
+        "WHICH IS",
+        "WORSE?"
+      ],
+      "visual": {
+        "type": "compare",
+        "left": {
+          "svg_file": "@lib/virus.svg",
+          "label": "Virus",
+          "value": "~20 nm"
+        },
+        "right": {
+          "svg_file": "@lib/neuron.svg",
+          "label": "Neuron",
+          "value": "~100 µm",
+          "w": 220
+        },
+        "winner": "right",
+        "winner_at": 2.2,
+        "y": 1050
+      }
+    },
+    {
+      "id": "timeline",
+      "theme": "dark",
+      "section": "Through history",
+      "duration": 3.4,
+      "headline": [
+        "EVERY CULTURE",
+        "NAMED IT"
+      ],
+      "visual": {
+        "type": "timeline",
+        "y": 640,
+        "items": [
+          {
+            "year": "1664",
+            "text": "Dutch doctor: 'the devil lay upon her'"
+          },
+          {
+            "year": "1781",
+            "text": "Fuseli paints The Nightmare"
+          },
+          {
+            "year": "1928",
+            "text": "Japan: kanashibari"
+          },
+          {
+            "year": "2011",
+            "text": "7.6% of people, worldwide review"
+          }
+        ]
+      }
+    },
+    {
+      "id": "lens",
+      "theme": "paper",
+      "section": "Closer",
+      "duration": 3,
+      "headline": [
+        "LOOK",
+        "CLOSER"
+      ],
+      "visual": {
+        "type": "art",
+        "svg_file": "@lib/brain.svg",
+        "x": 420,
+        "y": 1050,
+        "w": 620
+      },
+      "overlays": [
+        {
+          "type": "lens",
+          "fx": 0.5,
+          "fy": 0.82,
+          "x": 800,
+          "y": 1450,
+          "r": 180,
+          "zoom": 2.6,
+          "at": 0.6,
+          "text": "BRAINSTEM"
+        }
+      ]
+    },
+    {
+      "id": "pins",
+      "theme": "paper",
+      "section": "Around the world",
+      "duration": 3,
+      "headline": [
+        "EVERY",
+        "CONTINENT"
+      ],
+      "visual": {
+        "type": "art",
+        "svg_file": "@lib/eye.svg",
+        "y": 1150,
+        "w": 900
+      },
+      "overlays": [
+        {
+          "type": "pins",
+          "at": 0.3,
+          "items": [
+            {
+              "x": 300,
+              "y": 1100,
+              "label": "Newfoundland"
+            },
+            {
+              "x": 640,
+              "y": 1040,
+              "label": "Japan"
+            },
+            {
+              "x": 760,
+              "y": 1230,
+              "label": "China"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

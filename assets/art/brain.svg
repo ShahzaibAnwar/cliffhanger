@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 500">
+  <!-- Technique: base gradient -> clipped shadow hatching -> highlight -> detail strokes (class=draw) -> weighted ink outline -->
+  <defs>
+    <clipPath id="cer"><path d="M108 250 C 86 150, 178 58, 302 60 C 426 62, 524 130, 516 240 C 510 312, 452 334, 382 326 C 332 322, 302 344, 252 344 C 170 344, 120 314, 108 250 Z"/></clipPath>
+    <clipPath id="cbl"><path d="M358 300 C 422 286, 478 318, 464 364 C 452 402, 382 410, 336 384 Z"/></clipPath>
+  </defs>
+  <circle cx="300" cy="400" r="120" fill="url(#kit-glow-red)" opacity=".7"/>
+  <!-- brainstem -->
+  <path d="M300 330 C 322 362, 334 406, 326 482 L 282 482 C 288 428, 280 386, 258 348 Z" fill="url(#kit-blood)"/>
+  <path d="M300 330 C 322 362, 334 406, 326 482 L 282 482 C 288 428, 280 386, 258 348 Z" fill="url(#kit-hatch-red)"/>
+  <path d="M300 330 C 322 362, 334 406, 326 482 L 282 482 C 288 428, 280 386, 258 348 Z" fill="none" stroke="#2b2420" stroke-width="5" stroke-linejoin="round"/>
+  <!-- cerebellum -->
+  <g clip-path="url(#cbl)">
+    <rect x="320" y="280" width="160" height="140" fill="url(#kit-flesh)"/>
+    <ellipse cx="430" cy="390" rx="90" ry="50" fill="url(#kit-hatch)"/>
+    <g fill="none" stroke="#9a524b" stroke-width="3">
+      <path d="M350 318 C 390 312, 430 322, 458 342"/><path d="M346 336 C 386 332, 426 344, 456 362"/>
+      <path d="M342 354 C 382 352, 420 364, 448 382"/><path d="M344 372 C 376 374, 404 384, 426 398"/>
+    </g>
+  </g>
+  <path d="M358 300 C 422 286, 478 318, 464 364 C 452 402, 382 410, 336 384 Z" fill="none" stroke="#2b2420" stroke-width="5" stroke-linejoin="round"/>
+  <!-- cerebrum -->
+  <g clip-path="url(#cer)">
+    <rect x="90" y="50" width="440" height="300" fill="url(#kit-flesh)"/>
+    <ellipse cx="350" cy="330" rx="260" ry="110" fill="url(#kit-hatch)"/>
+    <ellipse cx="420" cy="300" rx="140" ry="70" fill="url(#kit-hatch-r)"/>
+    <ellipse cx="220" cy="120" rx="120" ry="48" fill="#fff" opacity=".35"/>
+    <!-- lateral (Sylvian) fissure + central sulcus -->
+    <path class="draw" d="M180 262 C 230 236, 290 226, 352 238 C 384 244, 404 232, 420 214" fill="none" stroke="#7a3a35" stroke-width="7" stroke-linecap="round"/>
+    <path class="draw" d="M318 64 C 300 110, 330 150, 306 196 C 292 222, 300 240, 296 258" fill="none" stroke="#7a3a35" stroke-width="6" stroke-linecap="round"/>
+    <g fill="none" stroke="#a5574f" stroke-width="4.5" stroke-linecap="round">
+      <path class="draw" d="M150 170 C 172 150, 196 176, 222 156 C 246 138, 270 160, 288 142"/>
+      <path class="draw" d="M134 220 C 160 204, 182 228, 208 210 C 232 194, 254 214, 278 200"/>
+      <path class="draw" d="M176 120 C 200 100, 228 122, 254 102 C 270 92, 290 100, 300 92"/>
+      <path class="draw" d="M150 296 C 186 282, 214 304, 250 290 C 286 276, 312 300, 348 288"/>
+      <path class="draw" d="M340 104 C 366 120, 392 98, 420 118 C 444 134, 466 120, 486 146"/>
+      <path class="draw" d="M334 160 C 362 176, 388 152, 418 170 C 446 188, 470 170, 500 194"/>
+      <path class="draw" d="M430 250 C 452 238, 476 260, 500 244"/>
+      <path class="draw" d="M400 286 C 424 272, 446 296, 476 280"/>
+    </g>
+    <g fill="none" stroke="#c88078" stroke-width="2" opacity=".8">
+      <path d="M160 186 C 186 170, 206 192, 232 176"/><path d="M350 136 C 376 150, 400 130, 430 146"/>
+      <path d="M190 246 C 214 232, 240 250, 266 236"/><path d="M450 214 C 470 204, 488 220, 506 210"/>
+    </g>
+  </g>
+  <path d="M108 250 C 86 150, 178 58, 302 60 C 426 62, 524 130, 516 240 C 510 312, 452 334, 382 326 C 332 322, 302 344, 252 344 C 170 344, 120 314, 108 250 Z" fill="none" stroke="#2b2420" stroke-width="6" stroke-linejoin="round" filter="url(#kit-rough)"/>
+</svg>

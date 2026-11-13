@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 500">
+  <defs>
+    <radialGradient id="g" cx=".45" cy=".4" r=".75"><stop offset="0" stop-color="#F4D2C8"/><stop offset="1" stop-color="#D69890"/></radialGradient>
+    <radialGradient id="glow" r=".5"><stop offset="0" stop-color="#E0362C" stop-opacity=".6"/><stop offset="1" stop-color="#E0362C" stop-opacity="0"/></radialGradient>
+    <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(-35)">
+      <line x1="0" y1="0" x2="0" y2="8" stroke="#5a2a26" stroke-width="1.4" opacity=".28"/>
+    </pattern>
+  </defs>
+  <circle cx="300" cy="392" r="130" fill="url(#glow)"/>
+  <path d="M360 300 C 422 288, 474 320, 460 364 C 448 400, 380 406, 338 382 Z" fill="#DBA49B" stroke="#3a2622" stroke-width="5"/>
+  <path d="M372 320 C 400 318, 430 330, 446 350 M362 344 C 392 346, 420 360, 436 378" fill="none" stroke="#8a4a44" stroke-width="3.5"/>
+  <path d="M300 330 C 322 362, 332 404, 324 476 L 284 476 C 288 424, 282 384, 260 346 Z" fill="#C8302A" stroke="#3a2622" stroke-width="5"/>
+  <path d="M110 252 C 90 150, 180 60, 302 62 C 424 64, 522 132, 514 242 C 508 312, 452 332, 382 324 C 332 320, 302 342, 252 342 C 172 342, 122 312, 110 252 Z" fill="url(#g)" stroke="#3a2622" stroke-width="6"/>
+  <path d="M110 252 C 122 312, 172 342, 252 342 C 302 342, 332 320, 382 324 C 452 332, 508 312, 514 242 C 470 300, 380 290, 300 300 C 220 310, 150 300, 110 252 Z" fill="url(#hatch)"/>
+  <g fill="none" stroke="#8a4a44" stroke-width="5" stroke-linecap="round">
+    <path class="draw" d="M168 142 C 200 120, 230 152, 262 130 C 292 110, 322 142, 352 120"/>
+    <path class="draw" d="M148 202 C 190 180, 212 222, 252 202 C 292 182, 302 232, 342 212 C 382 192, 402 232, 444 212"/>
+    <path class="draw" d="M162 272 C 202 252, 222 292, 262 272 C 302 252, 322 292, 362 277"/>
+    <path class="draw" d="M382 110 C 412 130, 442 110, 474 152"/>
+    <path class="draw" d="M422 262 C 452 252, 472 272, 494 252"/>
+    <path class="draw" d="M302 72 C 290 122, 322 162, 302 202 C 286 232, 302 262, 292 302"/>
+  </g>
+</svg>

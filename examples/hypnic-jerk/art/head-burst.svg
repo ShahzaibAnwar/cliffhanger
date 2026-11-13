@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 620">
+  <defs>
+    <radialGradient id="boom" r=".5"><stop offset="0" stop-color="#FFE08A"/><stop offset=".35" stop-color="#FF6A3D"/><stop offset=".7" stop-color="#C8302A" stop-opacity=".7"/><stop offset="1" stop-color="#C8302A" stop-opacity="0"/></radialGradient>
+    <clipPath id="headclip"><path d="M200 560 L 200 470 C 140 450 116 380 126 316 C 130 206 204 128 316 128 C 430 128 494 210 484 302 L 514 364 C 520 376 508 382 496 382 L 484 382 L 488 424 C 490 446 470 454 450 452 L 412 448 L 412 560 Z"/></clipPath>
+  </defs>
+  <g fill="none" stroke="#FF4A3A" stroke-width="7" stroke-linecap="round">
+    <path class="draw" d="M316 290 L 316 40"/><path class="draw" d="M316 290 L 140 90"/><path class="draw" d="M316 290 L 500 80"/>
+    <path class="draw" d="M316 290 L 600 230"/><path class="draw" d="M316 290 L 40 240"/><path class="draw" d="M316 290 L 70 420"/>
+  </g>
+  <path d="M200 560 L 200 470 C 140 450 116 380 126 316 C 130 206 204 128 316 128 C 430 128 494 210 484 302 L 514 364 C 520 376 508 382 496 382 L 484 382 L 488 424 C 490 446 470 454 450 452 L 412 448 L 412 560 Z" fill="#2E2B27" stroke="#EFEAE0" stroke-width="5"/>
+  <g clip-path="url(#headclip)">
+    <circle cx="316" cy="290" r="170" fill="url(#boom)"/>
+    <path d="M316 200 L 336 262 L 400 250 L 352 296 L 396 350 L 330 322 L 300 384 L 294 318 L 230 330 L 278 288 L 236 236 L 300 258 Z" fill="#FFF3C4"/>
+  </g>
+</svg>

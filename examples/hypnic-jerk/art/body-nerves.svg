@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 800">
+  <defs>
+    <linearGradient id="xr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9FD0FF" stop-opacity=".42"/><stop offset="1" stop-color="#4E86C8" stop-opacity=".16"/></linearGradient>
+    <radialGradient id="hd" r=".6"><stop offset="0" stop-color="#FF5A4A" stop-opacity=".95"/><stop offset="1" stop-color="#FF5A4A" stop-opacity="0"/></radialGradient>
+  </defs>
+  <g fill="url(#xr)" stroke="#A9D6FF" stroke-width="4" stroke-linejoin="round">
+    <circle cx="200" cy="80" r="52"/>
+    <path d="M182 132 L182 158 C150 162 118 170 106 196 L 74 330 L 62 440 C60 452 78 456 82 444 L 104 340 L 128 250 L 132 420 L 140 600 L 146 770 C146 784 176 784 176 770 L 190 560 L 200 470 L 210 560 L 224 770 C224 784 254 784 254 770 L 260 600 L 268 420 L 272 250 L 296 340 L 318 444 C322 456 340 452 338 440 L 326 330 L 294 196 C 282 170 250 162 218 158 L 218 132 Z"/>
+  </g>
+  <circle cx="200" cy="96" r="58" fill="url(#hd)"/>
+  <g fill="none" stroke="#FF4A3A" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path class="draw" d="M200 110 L200 450"/>
+    <path class="draw" d="M200 176 C 160 180, 128 200, 112 260 L 92 340 L 74 442"/>
+    <path class="draw" d="M200 176 C 240 180, 272 200, 288 260 L 308 340 L 326 442"/>
+    <path class="draw" d="M200 450 C 184 520, 168 640, 160 772"/>
+    <path class="draw" d="M200 450 C 216 520, 232 640, 240 772"/>
+    <path class="draw" d="M200 240 C 176 250, 160 270, 150 300 M200 240 C 224 250, 240 270, 250 300"/>
+  </g>
+  <g fill="#FF4A3A">
+    <circle cx="74" cy="442" r="9"/><circle cx="326" cy="442" r="9"/><circle cx="160" cy="772" r="9"/><circle cx="240" cy="772" r="9"/>
+  </g>
+</svg>

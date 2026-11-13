@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560">
+  <defs>
+    <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="8" stroke="#2b2420" stroke-width="1.5" opacity=".35"/>
+    </pattern>
+    <radialGradient id="fur" cx=".4" cy=".35" r=".8"><stop offset="0" stop-color="#7A5A44"/><stop offset="1" stop-color="#3E2C20"/></radialGradient>
+  </defs>
+  <g stroke="#2b2420" stroke-width="4" stroke-linejoin="round">
+    <g fill="#7E9A66">
+      <ellipse cx="120" cy="150" rx="120" ry="70"/><ellipse cx="300" cy="96" rx="140" ry="72"/><ellipse cx="520" cy="110" rx="150" ry="76"/>
+      <ellipse cx="740" cy="150" rx="150" ry="74"/><ellipse cx="860" cy="250" rx="90" ry="60"/>
+    </g>
+    <g fill="url(#hatch)">
+      <ellipse cx="120" cy="150" rx="120" ry="70"/><ellipse cx="520" cy="110" rx="150" ry="76"/><ellipse cx="740" cy="150" rx="150" ry="74"/>
+    </g>
+    <path d="M0 330 C 200 310, 420 300, 640 286 C 760 278, 840 268, 900 262 L 900 300 C 820 306, 720 320, 620 330 C 420 346, 200 370, 0 384 Z" fill="#6B4A33"/>
+    <path d="M0 330 C 200 310, 420 300, 640 286 C 760 278, 840 268, 900 262 L 900 300 C 820 306, 720 320, 620 330 C 420 346, 200 370, 0 384 Z" fill="url(#hatch)"/>
+    <path d="M640 290 C 700 240, 740 220, 800 210" fill="none" stroke-width="16" stroke="#6B4A33"/>
+    <!-- sleeping primate -->
+    <path d="M500 312 C 540 350, 560 420, 534 470 C 520 494, 494 490, 498 468 C 502 450, 520 452, 520 462" fill="none" stroke="#3E2C20" stroke-width="12" stroke-linecap="round"/>
+    <ellipse cx="430" cy="286" rx="96" ry="50" fill="url(#fur)"/>
+    <circle cx="326" cy="276" r="42" fill="url(#fur)"/>
+    <circle cx="300" cy="248" r="13" fill="#5A4030"/>
+    <path d="M300 286 q 16 8 30 -2" fill="none" stroke-width="3"/>
+    <path d="M384 322 C 380 360, 378 400, 386 436" fill="none" stroke="#3E2C20" stroke-width="16" stroke-linecap="round"/>
+    <path d="M384 322 C 380 360, 378 400, 386 436" fill="none" stroke-width="3"/>
+  </g>
+  <g font-family="Anton, Impact, sans-serif" fill="#2b2420" opacity=".5"><text x="250" y="210" font-size="40">z</text><text x="220" y="176" font-size="52">Z</text></g>
+</svg>

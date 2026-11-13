@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 620">
+  <defs>
+    <clipPath id="sk"><path d="M260 30 C 400 30, 470 130, 466 250 C 464 310, 440 350, 420 380 C 410 400, 412 430, 400 460 L 380 520 C 340 560, 180 560, 140 520 L 120 460 C 108 430, 110 400, 100 380 C 80 350, 56 310, 54 250 C 50 130, 120 30, 260 30 Z"/></clipPath>
+  </defs>
+  <g clip-path="url(#sk)">
+    <rect x="40" y="20" width="440" height="560" fill="url(#kit-bone)"/>
+    <ellipse cx="380" cy="420" rx="200" ry="260" fill="url(#kit-hatch)"/>
+    <ellipse cx="190" cy="140" rx="110" ry="70" fill="#fff" opacity=".4"/>
+    <path class="draw" d="M150 100 C 200 140, 210 70, 260 110 C 300 140, 330 90, 370 120" fill="none" stroke="#9c8a68" stroke-width="3"/>
+  </g>
+  <path d="M260 30 C 400 30, 470 130, 466 250 C 464 310, 440 350, 420 380 C 410 400, 412 430, 400 460 L 380 520 C 340 560, 180 560, 140 520 L 120 460 C 108 430, 110 400, 100 380 C 80 350, 56 310, 54 250 C 50 130, 120 30, 260 30 Z" fill="none" stroke="#2b2420" stroke-width="6" stroke-linejoin="round" filter="url(#kit-rough)"/>
+  <!-- eye sockets -->
+  <g stroke="#2b2420" stroke-width="5">
+    <path d="M118 262 C 120 214, 170 196, 214 210 C 240 220, 246 260, 232 292 C 214 330, 160 336, 132 314 C 120 302, 118 284, 118 262 Z" fill="#231E1A"/>
+    <path d="M402 262 C 400 214, 350 196, 306 210 C 280 220, 274 260, 288 292 C 306 330, 360 336, 388 314 C 400 302, 402 284, 402 262 Z" fill="#231E1A"/>
+    <path d="M260 330 L 232 400 C 240 412, 252 408, 260 398 C 268 408, 280 412, 288 400 Z" fill="#231E1A"/>
+  </g>
+  <ellipse cx="190" cy="250" rx="22" ry="14" fill="#fff" opacity=".08"/>
+  <!-- cheek lines and teeth -->
+  <g fill="none" stroke="#2b2420" stroke-width="3.5" stroke-linecap="round">
+    <path class="draw" d="M100 360 C 130 380, 170 384, 200 372 M420 360 C 390 380, 350 384, 320 372"/>
+  </g>
+  <path d="M160 440 C 220 452, 300 452, 360 440 L 360 500 C 300 512, 220 512, 160 500 Z" fill="#F4ECDA" stroke="#2b2420" stroke-width="4"/>
+  <g stroke="#2b2420" stroke-width="3.5"><path d="M190 444 L 190 506 M220 448 L 220 510 M250 450 L 250 512 M280 450 L 280 512 M310 448 L 310 510 M338 444 L 338 506 M160 472 C 220 482, 300 482, 360 472"/></g>
+</svg>

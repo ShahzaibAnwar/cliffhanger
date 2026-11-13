@@ -1,0 +1,26 @@
+{
+  "name": "cliffhanger",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Curiosity reel studio skill for Claude: story, voiceover, animated reel, captions",
+  "scripts": {
+    "doctor": "node doctor.mjs",
+    "test": "node test.mjs",
+    "settings": "node settings.mjs",
+    "check-secrets": "node check-secrets.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "playwright-core": "^1.49.1"
+  },
+  "author": "Shahzaib Anwar <shahzaib@dareecha.pk> (https://dareecha.pk)",
+  "license": "MIT",
+  "homepage": "https://github.com/ShahzaibAnwar/cliffhanger",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ShahzaibAnwar/cliffhanger.git"
+  }
+}

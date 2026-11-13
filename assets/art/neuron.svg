@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 900">
+  <defs>
+    <radialGradient id="soma" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#F6B48A"/><stop offset="1" stop-color="#C0603A"/></radialGradient>
+    <linearGradient id="my" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FBF1DC"/><stop offset="1" stop-color="#D9C39A"/></linearGradient>
+  </defs>
+  <!-- dendrites -->
+  <g fill="none" stroke="#2b2420" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke-width="14"><path d="M260 190 C 230 140, 180 120, 140 70"/><path d="M260 190 C 290 130, 340 110, 380 60"/><path d="M220 230 C 160 220, 110 240, 60 210"/><path d="M300 230 C 360 214, 410 236, 460 200"/><path d="M240 280 C 190 300, 150 330, 110 370"/><path d="M290 280 C 340 300, 380 330, 420 372"/></g>
+    <g stroke-width="7"><path d="M140 70 L 110 30 M140 70 L 170 30 M380 60 L 350 22 M380 60 L 420 30 M60 210 L 24 180 M60 210 L 30 250 M460 200 L 500 170 M460 200 L 492 240 M110 370 L 70 380 M110 370 L 100 412 M420 372 L 460 384 M420 372 L 428 414"/></g>
+  </g>
+  <g fill="none" stroke="#E08A5E" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke-width="8"><path class="draw" d="M260 190 C 230 140, 180 120, 140 70"/><path class="draw" d="M260 190 C 290 130, 340 110, 380 60"/><path class="draw" d="M220 230 C 160 220, 110 240, 60 210"/><path class="draw" d="M300 230 C 360 214, 410 236, 460 200"/><path class="draw" d="M240 280 C 190 300, 150 330, 110 370"/><path class="draw" d="M290 280 C 340 300, 380 330, 420 372"/></g>
+    <g stroke-width="3"><path d="M140 70 L 110 30 M140 70 L 170 30 M380 60 L 350 22 M380 60 L 420 30 M60 210 L 24 180 M60 210 L 30 250 M460 200 L 500 170 M460 200 L 492 240 M110 370 L 70 380 M110 370 L 100 412 M420 372 L 460 384 M420 372 L 428 414"/></g>
+  </g>
+  <!-- axon -->
+  <path d="M260 300 C 262 450, 250 600, 262 780" fill="none" stroke="#2b2420" stroke-width="16" stroke-linecap="round"/>
+  <path class="draw" d="M260 300 C 262 450, 250 600, 262 780" fill="none" stroke="#E08A5E" stroke-width="9" stroke-linecap="round"/>
+  <g stroke="#2b2420" stroke-width="4" fill="url(#my)">
+    <rect x="238" y="340" width="44" height="66" rx="20"/><rect x="236" y="424" width="44" height="66" rx="20"/>
+    <rect x="234" y="508" width="44" height="66" rx="20"/><rect x="236" y="592" width="44" height="66" rx="20"/><rect x="240" y="676" width="44" height="66" rx="20"/>
+  </g>
+  <g fill="url(#kit-hatch)"><rect x="260" y="340" width="22" height="66" rx="10"/><rect x="258" y="424" width="22" height="66" rx="10"/><rect x="256" y="508" width="22" height="66" rx="10"/><rect x="258" y="592" width="22" height="66" rx="10"/><rect x="262" y="676" width="22" height="66" rx="10"/></g>
+  <!-- terminals -->
+  <g fill="none" stroke="#2b2420" stroke-width="7" stroke-linecap="round"><path d="M262 780 C 230 810, 200 830, 180 860 M262 780 C 262 820, 262 840, 262 870 M262 780 C 296 810, 324 830, 344 860"/></g>
+  <g fill="url(#soma)" stroke="#2b2420" stroke-width="4"><circle cx="180" cy="862" r="14"/><circle cx="262" cy="872" r="14"/><circle cx="344" cy="862" r="14"/></g>
+  <!-- soma -->
+  <path d="M260 160 C 320 160, 330 220, 322 262 C 314 306, 206 310, 198 262 C 190 214, 200 160, 260 160 Z" fill="url(#soma)" stroke="#2b2420" stroke-width="6" filter="url(#kit-rough)"/>
+  <path d="M290 270 C 280 300, 220 296, 206 262" fill="url(#kit-hatch)"/>
+  <circle cx="262" cy="232" r="24" fill="#8E3A24" stroke="#2b2420" stroke-width="4"/>
+  <ellipse cx="240" cy="190" rx="20" ry="10" fill="#fff" opacity=".4"/>
+</svg>

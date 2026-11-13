@@ -1,0 +1,585 @@
+{
+  "title": "Why your body jerks awake",
+  "slug": "hypnic-jerk",
+  "series": {
+    "name": "Body Glitches",
+    "part": 1,
+    "next": "The exploding head"
+  },
+  "brand": {
+    "name": "CURIO FILES",
+    "handle": "@curiofiles",
+    "accent": "#C8302A"
+  },
+  "format": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30
+  },
+  "voice": {
+    "edge": {
+      "voice": "en-US-AndrewMultilingualNeural",
+      "rate": "+8%"
+    }
+  },
+  "audio": {
+    "bed": "drone",
+    "bed_volume": 0.07,
+    "sfx": true,
+    "lufs": -14
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "theme": "paper",
+      "section": "The fall",
+      "vo": "You're drifting off to sleep. Eyes heavy. And then... you fall.",
+      "headline": [
+        "ALMOST ASLEEP",
+        "THEN YOU FALL"
+      ],
+      "visual": {
+        "type": "art",
+        "svg_file": "art/sleeper.svg",
+        "w": 900,
+        "y": 1130,
+        "image_prompt": "a person asleep in a wooden bed under a blanket, side view, head on a pillow",
+        "image_seed": 3
+      },
+      "overlays": [
+        {
+          "type": "chip",
+          "text": "STAGE 1 · LIGHT SLEEP",
+          "x": 540,
+          "y": 1470,
+          "at": "word:eyes"
+        },
+        {
+          "type": "arrow",
+          "x1": 540,
+          "y1": 1560,
+          "x2": 540,
+          "y2": 1770,
+          "at": "word:fall",
+          "dur": 0.3
+        },
+        {
+          "type": "flash",
+          "at": "word:fall",
+          "max": 0.5
+        }
+      ]
+    },
+    {
+      "id": "jolt",
+      "theme": "dark",
+      "section": "The jolt",
+      "vo": "Your whole body jerks awake. Heart pounding.",
+      "headline": [
+        "YOUR BODY",
+        "JERKS AWAKE"
+      ],
+      "overlays": [
+        {
+          "type": "ecg",
+          "x": 540,
+          "y": 1100,
+          "w": 880,
+          "beats": 4,
+          "at": 0.1,
+          "dur": 1.6
+        },
+        {
+          "type": "stamp",
+          "text": "JOLT",
+          "size": "big",
+          "x": 720,
+          "y": 1460,
+          "rot": -9,
+          "at": "word:jerks"
+        },
+        {
+          "type": "chip",
+          "text": "HEART RATE ▲",
+          "style": "red",
+          "x": 330,
+          "y": 1500,
+          "at": "word:heart"
+        }
+      ],
+      "camera": "crash",
+      "ambience": {
+        "type": "heartbeat",
+        "vol": 0.35
+      }
+    },
+    {
+      "id": "common",
+      "theme": "paper",
+      "section": "How common",
+      "vo": "Up to seventy percent of people get this.",
+      "headline": [
+        "IT'S NOT",
+        "JUST YOU"
+      ],
+      "punch_at": "word:people",
+      "visual": {
+        "type": "stat",
+        "value": "70%",
+        "label": "of people · at some point",
+        "y": 640
+      },
+      "overlays": [
+        {
+          "type": "art",
+          "svg_file": "art/people.svg",
+          "x": 540,
+          "y": 1290,
+          "w": 880,
+          "at": "word:percent",
+          "enter": "wipe",
+          "dur": 0.8
+        },
+        {
+          "type": "caption",
+          "text": "*commonly cited estimate",
+          "x": 540,
+          "y": 1560,
+          "at": "word:people"
+        }
+      ],
+      "headline_fx": "marker"
+    },
+    {
+      "id": "myth",
+      "theme": "paper",
+      "section": "What people think",
+      "vo": "Most people think it's just a weird dream.",
+      "headline": [
+        "PEOPLE THINK"
+      ],
+      "visual": {
+        "type": "notepad",
+        "y": 660,
+        "lines": [
+          {
+            "text": "just a weird dream",
+            "at": "word:just"
+          }
+        ]
+      }
+    },
+    {
+      "id": "truth",
+      "theme": "paper",
+      "section": "What people think",
+      "vo": "The truth is way stranger.",
+      "headline": [
+        "THE TRUTH",
+        "IS STRANGER"
+      ],
+      "visual": {
+        "type": "notepad",
+        "y": 660,
+        "enter": "none",
+        "at": 0,
+        "lines": [
+          {
+            "text": "just a weird dream",
+            "at": 0,
+            "write_dur": 0.01,
+            "strike": true,
+            "strike_at": "word:truth",
+            "replace": "a survival reflex",
+            "replace_at": "word:stranger"
+          }
+        ]
+      }
+    },
+    {
+      "id": "misfire",
+      "theme": "dark",
+      "section": "The misfire",
+      "vo": "For a split second, your brain thinks you're falling. For real.",
+      "headline": [
+        "YOUR BRAIN THINKS",
+        "YOU'RE FALLING"
+      ],
+      "visual": {
+        "type": "art",
+        "svg_file": "@lib/brain.svg",
+        "w": 740,
+        "y": 1150,
+        "enter": "sketch",
+        "sketch_dur": 1.5,
+        "image_prompt": "a human brain in side view with the brainstem and cerebellum, the brainstem glowing red",
+        "image_seed": 2
+      },
+      "overlays": [
+        {
+          "type": "callout",
+          "x": 605,
+          "y": 1400,
+          "r": 100,
+          "at": "word:real",
+          "text": "BRAINSTEM",
+          "ty": 1560
+        }
+      ],
+      "headline_fx": "underline"
+    },
+    {
+      "id": "limp",
+      "theme": "dark",
+      "section": "The mechanism",
+      "vo": "As you drift off, your muscles go limp. Fast.",
+      "headline": [
+        "MUSCLES",
+        "GO LIMP"
+      ],
+      "visual": {
+        "type": "art",
+        "svg_file": "art/body.svg",
+        "w": 430,
+        "y": 1110,
+        "shadow": false,
+        "image_prompt": "a full human body standing, front view, arms relaxed at the sides",
+        "image_style": "xray"
+      },
+      "overlays": [
+        {
+          "type": "progress",
+          "text": "MUSCLE TONE",
+          "x": 540,
+          "y": 1560,
+          "from": 1,
+          "value": 0.08,
+          "color": "#C8302A",
+          "at": 0.1,
+          "fill_at": "word:limp",
+          "fill_dur": 0.9
+        }
+      ]
+    },
+    {
+      "id": "misread",
+      "theme": "paper",
+      "section": "The misread",
+      "vo": "But your brainstem is still on guard. It reads that sudden drop as a fall.",
+      "headline": [
+        "THE BRAINSTEM",
+        "MISREADS IT"
+      ],
+      "punch_at": "word:reads",
+      "visual": {
+        "type": "art",
+        "svg_file": "@lib/brain.svg",
+        "w": 600,
+        "y": 1010,
+        "image_prompt": "a human brain in side view with the brainstem and cerebellum, the brainstem coloured red",
+        "image_seed": 2
+      },
+      "overlays": [
+        {
+          "type": "terminal",
+          "prompt": "SIGNAL",
+          "text": "FALLING",
+          "x": 540,
+          "y": 1500,
+          "at": "word:reads",
+          "progress": 1
+        },
+        {
+          "type": "stamp",
+          "text": "DANGER",
+          "x": 790,
+          "y": 760,
+          "rot": 11,
+          "at": "word:fall"
+        }
+      ]
+    },
+    {
+      "id": "signal",
+      "theme": "dark",
+      "section": "Emergency",
+      "vo": "So it fires an emergency signal to every muscle at once.",
+      "headline": [
+        "EMERGENCY",
+        "SIGNAL"
+      ],
+      "punch_at": "word:signal",
+      "visual": {
+        "type": "art",
+        "svg_file": "art/body-nerves.svg",
+        "w": 470,
+        "y": 1130,
+        "shadow": false,
+        "draw_dur": 0.8,
+        "draw_stagger": 0.12,
+        "motion": "shiver",
+        "image_prompt": "a full human body standing, front view, with bright red nerve pathways running from the brain down the spine into the arms and legs",
+        "image_style": "xray"
+      },
+      "overlays": [
+        {
+          "type": "flash",
+          "at": "word:fires",
+          "max": 0.6
+        },
+        {
+          "type": "chip",
+          "text": "ALL MUSCLES · AT ONCE",
+          "style": "red",
+          "x": 540,
+          "y": 1590,
+          "at": "word:every"
+        }
+      ]
+    },
+    {
+      "id": "theory",
+      "theme": "paper",
+      "section": "One theory",
+      "vo": "One theory goes back millions of years. Our ancestors slept in trees.",
+      "headline": [
+        "MILLIONS",
+        "OF YEARS AGO"
+      ],
+      "punch_at": "word:millions",
+      "visual": {
+        "type": "art",
+        "svg_file": "art/tree.svg",
+        "w": 1000,
+        "y": 1150,
+        "enter": "slideR",
+        "image_prompt": "a small monkey sleeping curled up on a thick horizontal tree branch, leaves above, its tail hanging down",
+        "image_seed": 3
+      },
+      "overlays": [
+        {
+          "type": "chip",
+          "text": "THEORY · NOT PROVEN",
+          "style": "light",
+          "x": 540,
+          "y": 1560,
+          "at": "word:ancestors"
+        }
+      ]
+    },
+    {
+      "id": "survive",
+      "theme": "paper",
+      "section": "One theory",
+      "vo": "One slip meant death. The ones whose brains jerked them awake... survived.",
+      "headline": [
+        "ONE SLIP",
+        "MEANT DEATH"
+      ],
+      "punch_at": "word:death",
+      "visual": {
+        "type": "art",
+        "svg_file": "art/tree.svg",
+        "w": 1000,
+        "y": 1150,
+        "enter": "none",
+        "at": 0,
+        "image_prompt": "a small monkey sleeping curled up on a thick horizontal tree branch, leaves above, its tail hanging down",
+        "image_seed": 3
+      },
+      "overlays": [
+        {
+          "type": "arrow",
+          "x1": 430,
+          "y1": 1260,
+          "x2": 430,
+          "y2": 1520,
+          "at": "word:slip",
+          "dashed": true
+        },
+        {
+          "type": "stamp",
+          "text": "SURVIVED",
+          "size": "big",
+          "x": 560,
+          "y": 1470,
+          "rot": -6,
+          "at": "word:survived"
+        }
+      ]
+    },
+    {
+      "id": "triggers",
+      "theme": "paper",
+      "section": "Triggers",
+      "vo": "That's why it hits harder when you're stressed, wired on caffeine, or exhausted.",
+      "headline": [
+        "IT HITS",
+        "HARDER"
+      ],
+      "punch_at": "word:harder",
+      "visual": {
+        "type": "notepad",
+        "y": 640,
+        "lines": [
+          {
+            "text": "stressed",
+            "box": true,
+            "at": "word:stressed-0.3",
+            "write_dur": 0.4,
+            "mark": "check",
+            "mark_at": "word:wired"
+          },
+          {
+            "text": "caffeine",
+            "box": true,
+            "at": "word:caffeine-0.3",
+            "write_dur": 0.4,
+            "mark": "check",
+            "mark_at": "word:caffeine+0.3"
+          },
+          {
+            "text": "exhausted",
+            "box": true,
+            "at": "word:exhausted-0.3",
+            "write_dur": 0.4,
+            "mark": "check",
+            "mark_at": "word:exhausted+0.25"
+          }
+        ]
+      },
+      "overlays": [
+        {
+          "type": "art",
+          "svg_file": "art/coffee.svg",
+          "x": 540,
+          "y": 1440,
+          "w": 280,
+          "rot": 6,
+          "at": "word:caffeine",
+          "enter": "pop",
+          "motion": "float",
+          "image_prompt": "a cup of black coffee on a saucer with steam rising"
+        }
+      ],
+      "sfx": [
+        {
+          "at": "end-1.6",
+          "type": "riser",
+          "vol": 0.3
+        }
+      ]
+    },
+    {
+      "id": "twist",
+      "theme": "dark",
+      "section": "The strange one",
+      "vo": "But for some people, it's not a jolt. It's a gunshot. Inside their head.",
+      "headline": [
+        "NOT A JOLT",
+        "A GUNSHOT"
+      ],
+      "punch_at": "word:gunshot",
+      "visual": {
+        "type": "art",
+        "svg_file": "art/head-burst.svg",
+        "w": 760,
+        "y": 1200,
+        "enter": "fadeUp",
+        "at": 0.1,
+        "draw_at": "word:gunshot",
+        "shadow": false,
+        "draw_dur": 0.35,
+        "draw_stagger": 0.03
+      },
+      "overlays": [
+        {
+          "type": "flash",
+          "at": "word:gunshot",
+          "max": 0.9
+        },
+        {
+          "type": "stamp",
+          "text": "BANG",
+          "size": "big",
+          "x": 800,
+          "y": 820,
+          "rot": 12,
+          "at": "word:gunshot+0.05"
+        }
+      ],
+      "camera": "crash",
+      "headline_fx": "shake",
+      "sfx": [
+        {
+          "at": "word:gunshot",
+          "prompt": "single gunshot inside a small room, sharp and close",
+          "dur": 1.2,
+          "fallback": "boom",
+          "vol": 0.6
+        }
+      ]
+    },
+    {
+      "id": "unsolved",
+      "theme": "dark",
+      "section": "Unsolved",
+      "vo": "It's real. It's harmless. And nobody fully knows why.",
+      "headline": [
+        "REAL. HARMLESS.",
+        "UNEXPLAINED"
+      ],
+      "punch_at": "word:nobody",
+      "visual": {
+        "type": "terminal",
+        "prompt": "SEARCH",
+        "text": "CAUSE",
+        "y": 1060,
+        "progress": 0.34,
+        "progress_dur": 2.2
+      },
+      "overlays": [
+        {
+          "type": "chip",
+          "text": "EXPLODING HEAD SYNDROME",
+          "style": "red",
+          "x": 540,
+          "y": 1330,
+          "at": "word:harmless"
+        },
+        {
+          "type": "big",
+          "text": "?",
+          "style": "red",
+          "size": 300,
+          "x": 540,
+          "y": 1480,
+          "at": "word:why"
+        }
+      ],
+      "ambience": {
+        "type": "clock",
+        "vol": 0.25
+      }
+    },
+    {
+      "id": "end",
+      "theme": "dark",
+      "chrome": false,
+      "vo": "I'll decode that one in part two. One body glitch, every day. Follow, so you don't miss it.",
+      "visual": {
+        "type": "endcard",
+        "kicker": "DECODED IN",
+        "title": "PART 2",
+        "sub": "1 body glitch · every day",
+        "next": "The exploding head",
+        "cta": "Follow",
+        "y": 560
+      }
+    }
+  ],
+  "cover": {
+    "scene": "twist",
+    "at": 3.6
+  }
+}

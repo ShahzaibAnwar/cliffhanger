@@ -1,0 +1,9 @@
+{
+ "prompt": "a full human body standing, front view, with bright red nerve pathways running from the brain down the spine into the arms and legs",
+ "style": "xray",
+ "bg": "dark",
+ "provider": "cloudflare",
+ "seed": 96768,
+ "ref": null,
+ "full_prompt": "Glowing translucent blue x-ray radiograph of a full human body standing, front view, with bright red nerve pathways running from the brain down the spine into the arms and legs, fine medical detail, soft cyan glow. Isolated and centred on a pure solid black background with a generous empty margin. No text, no letters, no labels, no watermark, no border, no frame."
+}

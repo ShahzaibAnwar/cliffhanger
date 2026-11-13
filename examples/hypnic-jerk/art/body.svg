@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 800">
+  <defs>
+    <linearGradient id="xr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9FD0FF" stop-opacity=".42"/><stop offset="1" stop-color="#4E86C8" stop-opacity=".16"/></linearGradient>
+    <radialGradient id="hd" r=".6"><stop offset="0" stop-color="#FFF6D8" stop-opacity=".9"/><stop offset="1" stop-color="#9FD0FF" stop-opacity="0"/></radialGradient>
+  </defs>
+  <g fill="url(#xr)" stroke="#A9D6FF" stroke-width="4" stroke-linejoin="round">
+    <circle cx="200" cy="80" r="52"/>
+    <path d="M182 132 L182 158 C150 162 118 170 106 196 L 74 330 L 62 440 C60 452 78 456 82 444 L 104 340 L 128 250 L 132 420 L 140 600 L 146 770 C146 784 176 784 176 770 L 190 560 L 200 470 L 210 560 L 224 770 C224 784 254 784 254 770 L 260 600 L 268 420 L 272 250 L 296 340 L 318 444 C322 456 340 452 338 440 L 326 330 L 294 196 C 282 170 250 162 218 158 L 218 132 Z"/>
+  </g>
+  <g fill="none" stroke="#CFE8FF" stroke-width="2" opacity=".55">
+    <path d="M200 160 L200 450"/><path d="M160 200 C 180 215, 220 215, 240 200 M156 236 C 180 252, 220 252, 244 236 M156 272 C 180 288, 220 288, 244 272 M160 306 C 182 320, 218 320, 240 306"/>
+    <path d="M150 420 C 180 440, 220 440, 250 420"/>
+  </g>
+  <circle cx="200" cy="80" r="40" fill="url(#hd)"/>
+</svg>

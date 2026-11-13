@@ -1,0 +1,22 @@
+# ---- secrets & personal settings: NEVER publish ----
+.env
+.env.*
+!.env.example
+settings.json
+*.pem
+*.key
+
+# ---- caches, builds, generated ----
+node_modules/
+sfx-cache/
+**/build/
+**/variants/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+
+# ---- large rendered media (the repo keeps small previews only) ----
+**/out/*.mp4
+!examples/hypnic-jerk/out/hypnic-jerk-preview.mp4
+examples/*.wav

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 400">
+  <defs>
+    <clipPath id="ey"><path d="M60 200 C 170 70, 530 70, 640 200 C 530 330, 170 330, 60 200 Z"/></clipPath>
+    <radialGradient id="scl" cx=".5" cy=".45" r=".6"><stop offset=".55" stop-color="#FBF7F0"/><stop offset="1" stop-color="#E9B9AE"/></radialGradient>
+    <radialGradient id="iris" r=".5"><stop offset=".25" stop-color="#2F5C4E"/><stop offset=".7" stop-color="#5F8F6A"/><stop offset="1" stop-color="#2A3B2C"/></radialGradient>
+  </defs>
+  <!-- lid skin -->
+  <path d="M20 200 C 150 20, 550 20, 680 200 C 550 380, 150 380, 20 200 Z" fill="url(#kit-skin-r)"/>
+  <path d="M20 200 C 150 20, 550 20, 680 200 C 600 120, 480 70, 350 70 C 220 70, 100 120, 20 200 Z" fill="url(#kit-hatch-fine)"/>
+  <path class="draw" d="M80 150 C 190 40, 510 40, 620 150" fill="none" stroke="#8a5a40" stroke-width="4" stroke-linecap="round"/>
+  <g clip-path="url(#ey)">
+    <rect x="50" y="60" width="600" height="280" fill="url(#scl)"/>
+    <circle cx="350" cy="200" r="118" fill="url(#iris)"/>
+    <g stroke="#9CC0A0" stroke-width="2.5" opacity=".7">
+      <path d="M350 82 L350 150 M350 250 L350 318 M232 200 L300 200 M400 200 L468 200 M266 116 L314 164 M386 236 L434 284 M434 116 L386 164 M314 236 L266 284"/>
+      <path d="M300 92 L326 152 M400 92 L374 152 M300 308 L326 248 M400 308 L374 248 M242 150 L304 178 M458 150 L396 178 M242 250 L304 222 M458 250 L396 222"/>
+    </g>
+    <circle cx="350" cy="200" r="54" fill="#0E0D0C"/>
+    <ellipse cx="350" cy="100" rx="300" ry="60" fill="#000" opacity=".16"/>
+    <ellipse cx="392" cy="158" rx="26" ry="18" fill="#fff" opacity=".9"/>
+    <circle cx="318" cy="238" r="8" fill="#fff" opacity=".6"/>
+    <g fill="none" stroke="#C0574E" stroke-width="2" opacity=".55">
+      <path class="draw" d="M80 200 C 120 190, 150 210, 190 196 M 90 230 C 130 222, 160 240, 200 226"/>
+      <path class="draw" d="M620 200 C 580 190, 550 210, 510 196 M 610 170 C 570 166, 540 182, 500 172"/>
+    </g>
+  </g>
+  <path d="M60 200 C 170 70, 530 70, 640 200 C 530 330, 170 330, 60 200 Z" fill="none" stroke="#2b2420" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M60 200 C 170 70, 530 70, 640 200" fill="none" stroke="#2b2420" stroke-width="11" stroke-linecap="round"/>
+  <g stroke="#2b2420" stroke-width="5" stroke-linecap="round" fill="none">
+    <path d="M150 128 l-22 -38 M200 102 l-14 -42 M260 86 l-6 -44 M320 80 l0 -44 M380 80 l6 -44 M440 86 l14 -42 M500 102 l22 -38 M550 128 l30 -32"/>
+  </g>
+</svg>

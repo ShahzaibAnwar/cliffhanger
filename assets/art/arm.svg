@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 320">
+  <!-- Arm reaching from the left, palm down. Mirror with "rot": 180 or scaleX(-1) via a second copy for two reaching arms. -->
+  <defs>
+    <clipPath id="ar"><path d="M0 120 C 200 110, 380 116, 500 124 C 540 126, 570 120, 600 112 C 640 100, 700 92, 760 96 C 800 98, 830 104, 860 112 C 882 118, 884 136, 862 140 C 820 146, 780 142, 744 144 C 770 150, 800 160, 820 170 C 840 180, 832 200, 810 196 C 776 190, 740 178, 700 176 C 680 190, 650 212, 620 220 C 596 226, 586 210, 600 198 C 616 186, 630 176, 636 166 C 600 172, 560 186, 500 196 C 380 210, 200 218, 0 222 Z"/></clipPath>
+  </defs>
+  <g clip-path="url(#ar)">
+    <rect x="0" y="80" width="900" height="160" fill="url(#kit-skin)"/>
+    <rect x="0" y="176" width="900" height="60" fill="url(#kit-hatch)"/>
+    <rect x="0" y="196" width="700" height="40" fill="url(#kit-hatch-r)"/>
+    <path d="M40 140 C 200 132, 380 134, 520 140" fill="none" stroke="#fff" stroke-width="16" opacity=".25" stroke-linecap="round"/>
+  </g>
+  <g fill="none" stroke="#2b2420" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M0 120 C 200 110, 380 116, 500 124 C 540 126, 570 120, 600 112 C 640 100, 700 92, 760 96 C 800 98, 830 104, 860 112 C 882 118, 884 136, 862 140 C 820 146, 780 142, 744 144 C 770 150, 800 160, 820 170 C 840 180, 832 200, 810 196 C 776 190, 740 178, 700 176 C 680 190, 650 212, 620 220 C 596 226, 586 210, 600 198 C 616 186, 630 176, 636 166 C 600 172, 560 186, 500 196 C 380 210, 200 218, 0 222" stroke-width="6" filter="url(#kit-rough)"/>
+    <g stroke-width="3" opacity=".7">
+      <path class="draw" d="M744 144 C 720 140, 700 132, 690 124"/><path class="draw" d="M760 120 C 790 120, 820 124, 846 126"/>
+      <path class="draw" d="M700 176 C 690 168, 676 160, 660 158"/><path d="M640 118 q 8 -6 16 0 M690 106 q 8 -6 16 0"/>
+      <path d="M520 150 C 470 160, 420 160, 380 156" opacity=".5"/>
+    </g>
+    <path d="M846 112 q 12 8 2 22" stroke="#B88A70" stroke-width="3"/>
+  </g>
+</svg>

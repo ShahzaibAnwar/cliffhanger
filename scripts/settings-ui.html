@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cliffhanger Settings</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;600&display=swap">
+<style>
+:root{--paper:#ECE8DF;--card:#F7F4EE;--ink:#1B1A18;--muted:#7D776C;--line:rgba(0,0,0,.14);--accent:#C8302A;--ok:#2F7D4A}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif;
+  background-image:repeating-linear-gradient(0deg,transparent 0 31px,rgba(70,90,130,.07) 31px 32px)}
+.wrap{max-width:920px;margin:0 auto;padding:28px 16px 120px}
+.meta{display:flex;justify-content:space-between;font:500 11px 'JetBrains Mono',monospace;letter-spacing:.2em;color:var(--muted);text-transform:uppercase;border-bottom:1.5px solid var(--line);padding-bottom:8px}
+.brandtag{font:400 15px Anton,Impact,sans-serif;color:var(--accent);text-align:right;margin-top:6px}
+.brandtag::before{content:'';display:inline-block;width:9px;height:9px;background:var(--accent);margin-right:6px}
+h1{font:400 clamp(40px,8vw,64px)/1 Anton,Impact,sans-serif;margin:14px 0 4px;text-transform:uppercase}
+h1 span{color:var(--accent)}
+.sub{color:var(--muted);margin:0 0 22px}
+nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
+nav button{font:700 12px 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;border:2px solid var(--ink);background:transparent;padding:9px 14px;cursor:pointer}
+nav button.on{background:var(--ink);color:#F2EEE6}
+section{display:none}section.on{display:block}
+.card{background:var(--card);padding:20px;margin-bottom:16px;box-shadow:0 8px 22px rgba(0,0,0,.09)}
+.card h2{font:400 26px Anton,Impact,sans-serif;text-transform:uppercase;margin:0 0 4px}
+.card p.hint{color:var(--muted);margin:0 0 14px;font-size:14px}
+label.f{display:block;margin:12px 0 4px;font:700 11px 'JetBrains Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:#4a463f}
+input[type=text],input[type=password],input[type=number],select,textarea{width:100%;padding:10px 12px;border:2px solid #CFC8BA;background:#fff;font:15px Inter,system-ui,sans-serif;color:var(--ink)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--ink)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.row{grid-template-columns:1fr}}
+.check{display:flex;gap:10px;align-items:flex-start;margin:10px 0;cursor:pointer}
+.check input{width:20px;height:20px;accent-color:var(--accent);margin-top:2px;flex:none}
+.btn{font:700 12px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;border:2px solid var(--ink);background:#fff;padding:9px 14px;cursor:pointer;white-space:nowrap}
+.btn.red{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.dark{background:var(--ink);color:#fff}
+.btn:disabled{opacity:.4;cursor:default}
+.voice{border:2px solid #DDD6C8;background:#fff;padding:12px;margin:10px 0;display:grid;grid-template-columns:auto 1fr;gap:10px 12px;align-items:start}
+.voice.def{border-color:var(--accent)}
+.voice .rad{padding-top:8px}.voice .rad input{width:20px;height:20px;accent-color:var(--accent)}
+.voice .id{font:500 12px 'JetBrains Mono',monospace;color:var(--muted);word-break:break-all}
+.voice .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center}
+.voice .grid3{display:grid;grid-template-columns:1.2fr .8fr 1.5fr;gap:8px}
+@media(max-width:640px){.voice .grid3{grid-template-columns:1fr}}
+.chip{display:inline-block;font:700 10px 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;padding:3px 7px;background:var(--accent);color:#fff}
+.msg{font-size:13px;margin-top:6px}.msg.ok{color:var(--ok)}.msg.err{color:var(--accent)}
+.add{display:grid;grid-template-columns:2fr 1fr auto;gap:8px;align-items:end}
+@media(max-width:640px){.add{grid-template-columns:1fr}}
+.range{display:flex;gap:10px;align-items:center}.range input{flex:1;accent-color:var(--accent)}.range output{font:500 13px 'JetBrains Mono',monospace;width:44px;text-align:right}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--ink);color:#F2EEE6;padding:12px 16px;display:flex;justify-content:center}
+.bar .in{max-width:920px;width:100%;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.bar .st{font:500 12px 'JetBrains Mono',monospace;letter-spacing:.08em}
+.keyst{font:700 12px 'JetBrains Mono',monospace;letter-spacing:.08em}
+.plats{display:flex;flex-wrap:wrap;gap:4px 18px}
+code{font:500 12px 'JetBrains Mono',monospace;background:#EAE4D8;padding:1px 5px}
+.swatch{display:flex;gap:10px;align-items:center}.swatch input[type=color]{width:46px;height:42px;border:2px solid #CFC8BA;padding:2px;background:#fff}
+</style></head>
+<body><div class="wrap">
+  <div class="meta"><span>Settings</span><span>Fig. 0</span></div>
+  <div class="brandtag" id="bt">CLIFFHANGER</div>
+  <h1>Studio <span>Settings</span></h1>
+  <p class="sub">These are the defaults the skill uses for every reel. A single reel can still override them in its <code>reel.json</code>.</p>
+  <nav id="tabs">
+    <button data-t="voice" class="on">Voice</button><button data-t="brand">Brand</button>
+    <button data-t="content">Content</button><button data-t="images">Images</button><button data-t="audio">Audio</button><button data-t="animation">Animation</button><button data-t="video">Subtitles &amp; QA</button><button data-t="captions">Captions</button><button data-t="about">About</button>
+  </nav>
+
+  <section id="voice" class="on">
+    <div class="card">
+      <h2>My ElevenLabs voices</h2>
+      <p class="hint">Paste a voice ID or an ElevenLabs voice link. The red border marks the default.</p>
+      <div class="add">
+        <div><label class="f">Voice ID or link</label><input type="text" id="newId" placeholder="AbCdEfGhIjKlMnOpQrSt or https://elevenlabs.io/…"></div>
+        <div><label class="f">Name</label><input type="text" id="newName" placeholder="Deep narrator"></div>
+        <button class="btn dark" id="addBtn">Add voice</button>
+      </div>
+      <div class="msg" id="addMsg"></div>
+      <div id="voices"></div>
+      <label class="check"><input type="checkbox" data-p="voice.ask_each_reel"><span><b>Ask me which voice before each reel.</b> Claude shows your voice list and waits for your pick.</span></label>
+      <label class="check"><input type="checkbox" data-p="voice.only_my_voices"><span><b>Use only these voices.</b> The voiceover step refuses any ElevenLabs voice that isn't on this list.</span></label>
+    </div>
+    <div class="card">
+      <h2>ElevenLabs API key</h2>
+      <p class="hint">Saved to <code>.env</code> in the skill folder, which git ignores and never commits. After saving, the key is never shown again.</p>
+      <div class="keyst" id="keySt">…</div>
+      <div class="add" style="grid-template-columns:1fr auto auto;margin-top:8px">
+        <input type="password" id="keyIn" placeholder="Paste new key to replace" autocomplete="off">
+        <button class="btn dark" id="keyBtn">Save key</button><button class="btn" id="keyDel">Remove</button>
+      </div>
+      <div class="msg" id="keyMsg"></div>
+    </div>
+    <div class="card">
+      <h2>Voice engine</h2>
+      <div class="row">
+        <div><label class="f">Provider</label><select data-p="voice.provider">
+          <option value="auto">Auto (ElevenLabs if a key is set, else free Edge)</option>
+          <option value="elevenlabs">ElevenLabs only</option><option value="edge">Edge (free) only</option></select></div>
+        <div><label class="f">ElevenLabs model</label><select id="modelSel">
+          <option value="eleven_multilingual_v2">Multilingual v2 (balanced, reliable)</option>
+          <option value="eleven_v4">v4 (newest, most emotive)</option>
+          <option value="eleven_v3">v3 (expressive, audio tags)</option>
+          <option value="eleven_turbo_v2_5">Turbo v2.5 (fast)</option>
+          <option value="eleven_flash_v2_5">Flash v2.5 (cheapest)</option>
+          <option value="__custom">Custom model ID…</option></select>
+          <input type="text" id="modelCustom" placeholder="e.g. eleven_v4_turbo" style="display:none;margin-top:6px"></div>
+      </div>
+      <div class="row">
+        <div><label class="f">Stability (lower = more dramatic)</label><div class="range"><input type="range" min="0" max="1" step="0.01" data-p="voice.elevenlabs.stability"><output></output></div></div>
+        <div><label class="f">Similarity</label><div class="range"><input type="range" min="0" max="1" step="0.01" data-p="voice.elevenlabs.similarity_boost"><output></output></div></div>
+        <div><label class="f">Style</label><div class="range"><input type="range" min="0" max="1" step="0.01" data-p="voice.elevenlabs.style"><output></output></div></div>
+        <div><label class="f">Speed</label><div class="range"><input type="range" min="0.7" max="1.2" step="0.01" data-p="voice.elevenlabs.speed"><output></output></div></div>
+      </div>
+      <div class="row">
+        <div><label class="f">Free fallback voice (Edge)</label><input type="text" data-p="voice.edge.voice"></div>
+        <div><label class="f">Edge speed</label><input type="text" data-p="voice.edge.rate" placeholder="+8%"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="brand"><div class="card">
+    <h2>Brand</h2><p class="hint">Shown as the red tag on every scene and on the end card.</p>
+    <div class="row">
+      <div><label class="f">Brand name</label><input type="text" data-p="brand.name"></div>
+      <div><label class="f">Handle</label><input type="text" data-p="brand.handle" placeholder="@yourhandle"></div>
+    </div>
+    <label class="f">Accent colour</label>
+    <div class="swatch"><input type="color" id="accPick"><input type="text" data-p="brand.accent" style="max-width:160px"></div>
+  </div></section>
+
+  <section id="content"><div class="card">
+    <h2>Content defaults</h2><p class="hint">Used when you ask for ideas or a reel without saying otherwise.</p>
+    <div class="row">
+      <div><label class="f">Voiceover language</label><input type="text" data-p="content.vo_language" placeholder="English / Hinglish / Urdu"></div>
+      <div><label class="f">On-screen headline language</label><input type="text" data-p="content.headline_language"></div>
+      <div><label class="f">Target length (seconds)</label><input type="number" min="20" max="90" data-p="content.target_seconds"></div>
+      <div><label class="f">Niche / topics</label><input type="text" data-p="content.niche" placeholder="human body, animals, history mysteries"></div>
+      <div><label class="f">Series name</label><input type="text" data-p="content.series_name" placeholder="Body Glitches"></div>
+      <div><label class="f">Series promise (end card)</label><input type="text" data-p="content.series_promise"></div>
+      <div><label class="f">End-card button</label><input type="text" data-p="content.end_cta"></div>
+      <div><label class="f">Projects folder</label><input type="text" data-p="output.projects_dir" placeholder="D:\Reels"></div>
+    </div>
+  </div></section>
+
+  <section id="audio"><div class="card">
+    <h2>Audio</h2>
+    <label class="check"><input type="checkbox" data-p="audio.sfx"><span><b>Sound effects</b>: 21 built-in sounds placed automatically (whooshes, impacts, horror hits, typing, pencil, dings…)</span></label>
+    <label class="check"><input type="checkbox" data-p="audio.ai_music"><span><b>AI music (ElevenLabs, paid plans).</b> Uses the prompt below instead of the generated background, and is saved after the first use. If it fails, the background chosen above plays instead.</span></label>
+    <label class="f">AI music prompt</label><input type="text" data-p="audio.music_prompt" placeholder="dark ambient cello drone, slow, suspenseful">
+    <label class="check"><input type="checkbox" data-p="audio.ai_sfx"><span><b>AI sound effects (ElevenLabs).</b> Scenes can ask for any sound in words ("glass shattering", "heartbeat in a quiet room"). Each new sound costs credits once, then it's cached and reused for free. When this is off, those cues use the closest built-in sound.</span></label>
+    <label class="f">Sound effects volume</label><div class="range"><input type="range" min="0" max="2" step="0.05" data-p="audio.sfx_volume"><output></output></div>
+    <div class="row">
+      <div><label class="f">Background music (generated, free)</label><select data-p="audio.bed">
+          <option value="drone">Drone: low suspense (default)</option><option value="tension">Tension: slow heartbeat + thin string</option>
+          <option value="mystery">Mystery: music-box arpeggio</option><option value="pulse">Pulse: ticking investigation</option>
+          <option value="calm">Calm: gentle documentary</option><option value="none">None</option></select></div>
+      <div><label class="f">Drone volume</label><div class="range"><input type="range" min="0" max="0.25" step="0.01" data-p="audio.bed_volume"><output></output></div></div>
+      <div><label class="f">Music file (optional, replaces drone)</label><input type="text" data-p="audio.music" placeholder="D:\Music\tension.mp3"></div>
+      <div><label class="f">Music volume</label><div class="range"><input type="range" min="0" max="0.6" step="0.01" data-p="audio.music_volume"><output></output></div></div>
+      <div><label class="f">Loudness target (LUFS)</label><input type="number" min="-24" max="-9" data-p="audio.lufs"></div>
+    </div>
+  </div></section>
+
+  <section id="images">
+    <div class="card">
+      <h2>AI illustrations</h2>
+      <p class="hint">Free image generation for the drawings in your reels. Images are made once per project and reused. Without a key, the skill uses its hand-drawn vector art instead.</p>
+      <div class="row">
+        <div><label class="f">Provider</label><select data-p="images.provider">
+          <option value="auto">Auto (Cloudflare first; Gemini for consistent edits) (recommended)</option>
+          <option value="cloudflare">Cloudflare only</option><option value="gemini">Gemini only</option><option value="off">Off (hand-drawn art only)</option></select></div>
+        <div><label class="f">Default look</label><select data-p="images.style">
+          <option value="auto">Auto (engraving; black-background version on dark scenes)</option>
+          <option value="engraving">Vintage medical engraving</option><option value="diagram">Anatomical cutaway (ink + watercolour)</option>
+          <option value="photo">Photoreal cutout</option><option value="xray">Glowing x-ray</option></select></div>
+      </div>
+      <label class="check"><input type="checkbox" data-p="images.feather"><span><b>Soft oval edges</b> on generated images (usually not needed, because backgrounds are cut out automatically)</span></label>
+    </div>
+    <div class="card">
+      <h2>Cloudflare Workers AI <span class="chip" style="vertical-align:middle">free ~170 images/day</span></h2>
+      <p class="hint">Uses FLUX.1 schnell. In the Cloudflare dashboard, go to AI → Workers AI → "Use REST API". Copy your <b>Account ID</b> and create an <b>API token</b> with the "Workers AI" permission.</p>
+      <div class="keyst" id="st-CLOUDFLARE_ACCOUNT_ID"></div>
+      <div class="add" style="grid-template-columns:1fr auto"><input type="password" data-env="CLOUDFLARE_ACCOUNT_ID" placeholder="Account ID" autocomplete="off"><button class="btn dark" data-envsave="CLOUDFLARE_ACCOUNT_ID">Save</button></div>
+      <div class="keyst" id="st-CLOUDFLARE_API_TOKEN" style="margin-top:10px"></div>
+      <div class="add" style="grid-template-columns:1fr auto"><input type="password" data-env="CLOUDFLARE_API_TOKEN" placeholder="API token" autocomplete="off"><button class="btn dark" data-envsave="CLOUDFLARE_API_TOKEN">Save</button></div>
+    </div>
+    <div class="card">
+      <h2>Google Gemini <span class="chip" style="vertical-align:middle">paid · billing required</span></h2>
+      <p class="hint">"Nano Banana" (Gemini Flash Image) is best for keeping one object consistent across scenes. Image models currently have <b>no free quota</b>, so turn on billing in <code>aistudio.google.com</code>. The cost is a few cents per image. Use Cloudflare for free images.</p>
+      <div class="keyst" id="st-GEMINI_API_KEY"></div>
+      <div class="add" style="grid-template-columns:1fr auto"><input type="password" data-env="GEMINI_API_KEY" placeholder="Gemini API key" autocomplete="off"><button class="btn dark" data-envsave="GEMINI_API_KEY">Save</button></div>
+      <div class="msg" id="envMsg"></div>
+    </div>
+    <div class="card">
+      <h2>Try it</h2>
+      <div class="add" style="grid-template-columns:2fr 1fr 1fr auto">
+        <input type="text" id="tiPrompt" value="a human heart, anatomical">
+        <select id="tiStyle"><option value="engraving">Engraving</option><option value="diagram">Diagram</option><option value="photo">Photo</option><option value="xray">X-ray</option></select>
+        <select id="tiProv"><option value="">Auto</option><option value="cloudflare">Cloudflare</option><option value="gemini">Gemini</option></select>
+        <button class="btn red" id="tiGo">Generate</button>
+      </div>
+      <div class="msg" id="tiMsg"></div>
+      <img id="tiImg" alt="" style="display:none;max-width:100%;margin-top:12px;background:var(--paper)">
+    </div>
+  </section>
+
+  <section id="animation"><div class="card">
+    <h2>Animation</h2><p class="hint">Defaults for every reel. A single scene can still choose its own.</p>
+    <div class="row">
+      <div><label class="f">Scene transitions</label><select data-p="animation.transition">
+        <option value="auto">Auto (glitch into dark scenes, whip back to paper, hard cuts otherwise)</option>
+        <option value="cut">Hard cuts only</option><option value="whip">Whip pan</option><option value="glitch">Glitch</option>
+        <option value="zoom">Zoom through</option><option value="slide">Paper slide up</option><option value="page">Page flip</option><option value="flash">Flash</option></select></div>
+      <div><label class="f">Camera</label><select data-p="animation.camera">
+        <option value="push">Slow push-in (default)</option><option value="pull">Slow pull-out</option><option value="pan">Pan</option>
+        <option value="tilt">Tilt</option><option value="drift">Handheld drift</option><option value="none">Locked off</option></select></div>
+      <div><label class="f">Punch-word emphasis</label><select data-p="animation.headline_fx">
+        <option value="">None (red pop only)</option><option value="underline">Hand-drawn underline</option><option value="marker">Highlighter swipe</option><option value="shake">Screen shake</option></select></div>
+    </div>
+    <label class="check"><input type="checkbox" data-p="animation.film_fx"><span><b>Film texture on dark scenes</b>: dust specks, scratches and a light flicker</span></label>
+    <label class="check"><input type="checkbox" data-p="animation.sketch_art"><span><b>Draw illustrations in by hand</b>: each drawing's outlines draw themselves on, then the colour fills in (a whiteboard-style effect)</span></label>
+  </div></section>
+
+  <section id="video"><div class="card">
+    <h2>Burned-in subtitles</h2><p class="hint">Words appear on the video as they're spoken. Many people watch on mute. Subtitles move up automatically when a chip or stamp sits at the bottom.</p>
+    <label class="check"><input type="checkbox" data-p="subtitles.burn"><span><b>Burn subtitles into the video</b></span></label>
+    <div class="row">
+      <div><label class="f">Style</label><select data-p="subtitles.style"><option value="word">Word by word (current word yellow)</option><option value="line">Plain lines</option><option value="tape">Tape label (case-file look)</option></select></div>
+      <div><label class="f">Language</label><select data-p="subtitles.lang"><option value="auto">Auto (Roman for Urdu/Hindi cuts)</option><option value="vo">Same script as the voice</option></select></div>
+      <div><label class="f">Height on screen (px from top, of 1920)</label><input type="number" min="900" max="1640" data-p="subtitles.y"></div>
+      <div><label class="f">Words per line group</label><input type="number" min="2" max="8" data-p="subtitles.max_words"></div>
+      <div><label class="f">Text size</label><input type="number" min="40" max="90" data-p="subtitles.size"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Quality checks</h2><p class="hint">These run on every stills check.</p>
+    <div class="row">
+      <div><label class="f">Longest scene on one visual (seconds)</label><input type="number" min="3" max="10" step="0.5" data-p="content.max_scene_seconds"></div>
+      <div><label class="f">AI image re-rolls when a check fails</label><input type="number" min="0" max="5" data-p="images.max_rerolls"></div>
+    </div>
+    <p class="hint">Safe zones: the stills check warns about anything under Instagram/TikTok's buttons (right edge) or caption area (bottom 260 px).</p>
+  </div></section>
+
+  <section id="captions"><div class="card">
+    <h2>Captions</h2><p class="hint">Which platforms get a caption block in <code>captions.md</code>.</p>
+    <div class="plats" id="plats"></div>
+    <div class="row">
+      <div><label class="f">Always include hashtags</label><input type="text" id="tags" placeholder="#bodyglitches #curiofiles"></div>
+      <div><label class="f">Emoji</label><select data-p="captions.emoji"><option value="none">None</option><option value="light">Light (0–3)</option><option value="heavy">Heavy</option></select></div>
+    </div>
+  </div></section>
+
+  <section id="about"><div class="card">
+    <h2>About</h2>
+    <div style="display:flex;gap:18px;align-items:center;background:#fff;border:2px solid #DDD6C8;padding:18px;margin:10px 0 16px">
+      <div style="font:400 54px/1 Anton,Impact,sans-serif;color:#fff;background:var(--ink);width:78px;height:78px;display:flex;align-items:center;justify-content:center">C</div>
+      <div><div style="font:400 30px Anton,Impact,sans-serif;text-transform:uppercase">Cliffhanger</div>
+        <div class="hint" style="margin:2px 0">A curiosity reel studio for Claude: story, voice, animation, captions.</div>
+        <div>Created with <span style="color:var(--accent)">❤</span> by <b>Shahzaib Anwar</b></div></div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <a class="btn" target="_blank" rel="noopener" href="https://github.com/ShahzaibAnwar">GitHub · ShahzaibAnwar</a>
+      <a class="btn" target="_blank" rel="noopener" href="https://www.youtube.com/@m.shahzaibanwar">YouTube · @m.shahzaibanwar</a>
+      <a class="btn" target="_blank" rel="noopener" href="https://www.linkedin.com/in/shahzaibanwar">LinkedIn · shahzaibanwar</a>
+      <a class="btn" target="_blank" rel="noopener" href="https://dareecha.pk">dareecha.pk</a>
+      <a class="btn" href="mailto:shahzaib@dareecha.pk">shahzaib@dareecha.pk</a>
+    </div>
+    <p class="hint" style="margin-top:16px">License: MIT, free and open source. Copyright © 2026 Shahzaib Anwar.<br>
+      Source: <a href="https://github.com/ShahzaibAnwar/cliffhanger" target="_blank" rel="noopener">github.com/ShahzaibAnwar/cliffhanger</a><br>
+      Built with Node.js, Playwright, FFmpeg, ElevenLabs, Edge neural voices, Cloudflare Workers AI and Claude.</p>
+  </div></section>
+</div>
+
+<div class="bar"><div class="in"><span class="st" id="st">Loading…</span>
+  <span><button class="btn red" id="save">Save settings</button> <button class="btn" id="quit" style="background:transparent;color:#F2EEE6;border-color:#F2EEE6">Close</button></span></div></div>
+
+<script>
+const TOKEN = '__TOKEN__';
+const api = (p, body) => fetch(p, { method: body ? 'POST' : 'GET', headers: { 'x-token': TOKEN, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(r => r.json());
+let S = null, dirty = false;
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const get = p => p.split('.').reduce((o, k) => o?.[k], S);
+const set = (p, v) => { const ks = p.split('.'); let o = S; ks.slice(0, -1).forEach(k => o = o[k] ??= {}); o[ks.at(-1)] = v; };
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function mark(d = true) { dirty = d; $('#st').textContent = d ? '● Unsaved changes' : 'All changes saved'; }
+const PLATS = { instagram: 'Instagram Reels', tiktok: 'TikTok', youtube: 'YouTube Shorts', facebook: 'Facebook Reels', x: 'X', linkedin: 'LinkedIn', threads: 'Threads', pinterest: 'Pinterest' };
+
+$$('#tabs button').forEach(b => b.onclick = () => { $$('#tabs button').forEach(x => x.classList.toggle('on', x === b)); $$('section').forEach(s => s.classList.toggle('on', s.id === b.dataset.t)); });
+
+function bind() {
+  $$('[data-p]').forEach(el => {
+    const p = el.dataset.p, v = get(p);
+    if (el.type === 'checkbox') el.checked = !!v; else el.value = v ?? '';
+    const out = el.parentElement.querySelector('output'); if (out) out.textContent = el.value;
+    el.oninput = () => {
+      let val = el.type === 'checkbox' ? el.checked : (el.type === 'range' || el.type === 'number') ? parseFloat(el.value) : el.value;
+      set(p, val); if (out) out.textContent = el.value;
+      if (p === 'brand.accent' && /^#[0-9a-f]{6}$/i.test(val)) { $('#accPick').value = val; document.documentElement.style.setProperty('--accent', val); }
+      if (p === 'brand.name') $('#bt').textContent = val || 'CLIFFHANGER';
+      mark();
+    };
+  });
+  $('#accPick').value = /^#[0-9a-f]{6}$/i.test(S.brand.accent) ? S.brand.accent : '#C8302A';
+  document.documentElement.style.setProperty('--accent', $('#accPick').value);
+  $('#accPick').oninput = e => { set('brand.accent', e.target.value); $('[data-p="brand.accent"]').value = e.target.value; document.documentElement.style.setProperty('--accent', e.target.value); mark(); };
+  $('#bt').textContent = S.brand.name || 'CLIFFHANGER';
+  const ms = $('#modelSel'), mc = $('#modelCustom'), cur = S.voice.elevenlabs.model_id || 'eleven_multilingual_v2';
+  const known = [...ms.options].some(o => o.value === cur);
+  ms.value = known ? cur : '__custom'; mc.style.display = known ? 'none' : 'block'; mc.value = known ? '' : cur;
+  ms.onchange = () => { const c = ms.value === '__custom'; mc.style.display = c ? 'block' : 'none'; if (!c) set('voice.elevenlabs.model_id', ms.value); else mc.focus(); mark(); };
+  mc.oninput = () => { set('voice.elevenlabs.model_id', mc.value.trim()); mark(); };
+  $('#plats').innerHTML = Object.entries(PLATS).map(([k, n]) => `<label class="check"><input type="checkbox" data-plat="${k}" ${S.captions.platforms.includes(k) ? 'checked' : ''}><span>${n}</span></label>`).join('');
+  $$('[data-plat]').forEach(c => c.onchange = () => { S.captions.platforms = $$('[data-plat]').filter(x => x.checked).map(x => x.dataset.plat); mark(); });
+  $('#tags').value = (S.captions.always_hashtags || []).join(' ');
+  $('#tags').oninput = e => { S.captions.always_hashtags = e.target.value.split(/[\s,]+/).filter(Boolean).map(t => t.startsWith('#') ? t : '#' + t); mark(); };
+  renderVoices();
+}
+
+function renderVoices() {
+  const el = S.voice.elevenlabs, list = el.voices;
+  if (!list.length) { $('#voices').innerHTML = '<p class="hint" style="margin-top:14px">No voices yet. Without any, the skill uses ElevenLabs\' default narrator (or the free Edge voice).</p>'; return; }
+  $('#voices').innerHTML = list.map((v, i) => `
+    <div class="voice ${el.default_voice_id === v.voice_id ? 'def' : ''}">
+      <div class="rad"><input type="radio" name="def" ${el.default_voice_id === v.voice_id ? 'checked' : ''} data-def="${i}" title="Make default"></div>
+      <div>
+        <div class="grid3">
+          <input type="text" value="${esc(v.name)}" data-vf="name" data-i="${i}" placeholder="Name">
+          <input type="text" value="${esc(v.language)}" data-vf="language" data-i="${i}" placeholder="Language">
+          <input type="text" value="${esc(v.notes)}" data-vf="notes" data-i="${i}" placeholder="Notes (tone, best for…)">
+        </div>
+        <div class="acts"><span class="id">${esc(v.voice_id)}</span>
+          ${el.default_voice_id === v.voice_id ? '<span class="chip">Default</span>' : ''}
+          <button class="btn" data-ver="${i}">Check on ElevenLabs</button>
+          <button class="btn" data-del="${i}">Remove</button></div>
+        <div class="msg" id="vm${i}"></div>
+      </div>
+    </div>`).join('');
+  $$('[data-def]').forEach(r => r.onchange = () => { el.default_voice_id = list[+r.dataset.def].voice_id; renderVoices(); mark(); });
+  $$('[data-vf]').forEach(inp => inp.oninput = () => { list[+inp.dataset.i][inp.dataset.vf] = inp.value; mark(); });
+  $$('[data-del]').forEach(b => b.onclick = () => {
+    const [gone] = list.splice(+b.dataset.del, 1);
+    if (el.default_voice_id === gone.voice_id) el.default_voice_id = list[0]?.voice_id || '';
+    renderVoices(); mark();
+  });
+  $$('[data-ver]').forEach(b => b.onclick = () => checkVoice(+b.dataset.ver));
+}
+
+const isPlaceholder = n => !n || /^Voice \d+$/.test(n);
+const audioTag = u => u ? `<audio controls src="${esc(u)}" style="height:30px;vertical-align:middle;margin-left:6px"></audio>` : '';
+async function checkVoice(i) {
+  const list = S.voice.elevenlabs.voices, v = list[i], m = $('#vm' + i);
+  if (!m) return;
+  m.className = 'msg'; m.textContent = 'Checking…';
+  const r = await api('/api/verify', { voice_id: v.voice_id });
+  if (r.ok) {
+    const lab = Object.values(r.labels || {}).filter(Boolean).join(' · ');
+    let changed = false;
+    if (isPlaceholder(v.name)) { v.name = r.name; changed = true; }
+    if (!v.language && r.labels?.language) { v.language = r.labels.language; changed = true; }
+    if (changed) { renderVoices(); mark(); }
+    const m2 = $('#vm' + i); m2.className = 'msg ok';
+    m2.innerHTML = `✓ Ready to use: <b>${esc(r.name)}</b>${lab ? ' · ' + esc(lab) : ''} ${audioTag(r.preview_url)}`;
+    return;
+  }
+  if (r.library) {
+    const L = r.library;
+    let changed = false;
+    if (isPlaceholder(v.name)) { v.name = L.name; changed = true; }
+    if (!v.language && L.language) { v.language = L.language; changed = true; }
+    if (changed) { renderVoices(); mark(); }
+    const m2 = $('#vm' + i) || m;
+    m2.className = 'msg err';
+    m2.innerHTML = `⚠ <b>${esc(L.name)}</b> is in the public Voice Library but not in your My Voices yet, so the API can't use it.
+      ${audioTag(L.preview_url)}<br><button class="btn red" style="margin-top:8px" id="addlib${i}">Add to My Voices</button>`;
+    $('#addlib' + i).onclick = async () => {
+      m2.className = 'msg'; m2.textContent = 'Adding to your ElevenLabs account…';
+      const a = await api('/api/add-library', { voice_id: v.voice_id, name: v.name });
+      if (!a.ok) { m2.className = 'msg err'; m2.textContent = a.error; return; }
+      if (a.voice_id && a.voice_id !== v.voice_id) {           // ElevenLabs may assign a new ID to the copy
+        if (S.voice.elevenlabs.default_voice_id === v.voice_id) S.voice.elevenlabs.default_voice_id = a.voice_id;
+        v.voice_id = a.voice_id;
+      }
+      renderVoices(); mark(); checkVoice(i);
+    };
+    return;
+  }
+  m.className = 'msg err'; m.textContent = r.error;
+}
+
+$('#addBtn').onclick = async () => {
+  const m = $('#addMsg'); m.className = 'msg';
+  const r = await api('/api/parse-voice', { input: $('#newId').value });
+  if (r.error) { m.className = 'msg err'; m.textContent = r.error; return; }
+  const list = S.voice.elevenlabs.voices;
+  if (list.some(v => v.voice_id === r.voice_id)) { m.className = 'msg err'; m.textContent = 'That voice is already in your list.'; return; }
+  list.push({ voice_id: r.voice_id, name: $('#newName').value.trim() || `Voice ${list.length + 1}`, language: '', notes: '' });
+  if (!S.voice.elevenlabs.default_voice_id) S.voice.elevenlabs.default_voice_id = r.voice_id;
+  $('#newId').value = ''; $('#newName').value = ''; m.className = 'msg ok'; m.textContent = `Added ${r.voice_id}. Save to keep it.`;
+  renderVoices(); mark();
+  if (KEY.has_key) checkVoice(list.length - 1);                // fill name/language, offer library add
+};
+
+let KEY = { has_key: false };
+function showKey(k) { KEY = k; $('#keySt').innerHTML = k.has_key ? `<span style="color:var(--ok)">● Key set</span> (${esc(k.source)})` : '<span style="color:var(--accent)">● No key set.</span> Voiceovers use the free Edge voice until you add one.'; }
+$('#keyBtn').onclick = async () => {
+  const r = await api('/api/key', { key: $('#keyIn').value }); $('#keyIn').value = '';
+  const m = $('#keyMsg'); if (r.error) { m.className = 'msg err'; m.textContent = r.error; return; }
+  m.className = 'msg ok'; m.textContent = 'Saved.'; showKey(r.key);
+};
+$('#keyDel').onclick = async () => { const r = await api('/api/key', { key: '' }); showKey(r.key); $('#keyMsg').textContent = 'Key removed from .env (an environment variable, if set, still applies).'; };
+
+$('#save').onclick = async () => { const r = await api('/api/settings', { settings: S }); if (r.ok) mark(false); else $('#st').textContent = 'Save failed: ' + r.error; };
+$('#quit').onclick = async () => { if (dirty && !confirm('You have unsaved changes. Close anyway?')) return; await api('/api/quit', {}); document.body.innerHTML = '<div class="wrap"><h1>Settings <span>closed</span></h1><p class="sub">You can close this tab.</p></div>'; };
+window.onbeforeunload = e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } };
+
+function showEnv(env) {
+  for (const [n, s] of Object.entries(env || {})) {
+    const el = $('#st-' + n); if (!el) continue;
+    const label = { CLOUDFLARE_ACCOUNT_ID: 'Account ID', CLOUDFLARE_API_TOKEN: 'API token', GEMINI_API_KEY: 'Gemini key' }[n];
+    el.innerHTML = s.has_key ? `<span style="color:var(--ok)">● ${label} set</span> (${esc(s.source)})` : `<span style="color:var(--muted)">● ${label} not set</span>`;
+  }
+}
+$$('[data-envsave]').forEach(b => b.onclick = async () => {
+  const n = b.dataset.envsave, inp = $(`[data-env="${n}"]`), m = $('#envMsg');
+  const r = await api('/api/env', { name: n, value: inp.value }); inp.value = '';
+  if (r.error) { m.className = 'msg err'; m.textContent = r.error; return; }
+  m.className = 'msg ok'; m.textContent = 'Saved to .env.'; showEnv(r.env);
+});
+$('#tiGo').onclick = async () => {
+  const m = $('#tiMsg'), img = $('#tiImg'), b = $('#tiGo');
+  b.disabled = true; m.className = 'msg'; m.textContent = 'Generating… (5–20 s)'; img.style.display = 'none';
+  const r = await api('/api/test-image', { prompt: $('#tiPrompt').value, style: $('#tiStyle').value, provider: $('#tiProv').value });
+  b.disabled = false;
+  if (!r.ok) { m.className = 'msg err'; m.textContent = r.error; return; }
+  m.className = 'msg ok'; m.textContent = `✓ ${r.provider} · ${r.style} (background cut out; shown on paper)`; img.src = r.data; img.style.display = 'block';
+};
+
+api('/api/settings').then(r => { S = r.settings; showKey(r.key); showEnv(r.env); bind(); mark(false); $('#st').textContent = 'Saves to ' + r.path; });
+</script>
+</body></html>

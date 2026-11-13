@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 260">
+  <defs>
+    <g id="p"><circle cx="40" cy="34" r="26"/><path d="M4 230 L 4 120 C 4 84 24 70 40 70 C 56 70 76 84 76 120 L 76 230 Z"/></g>
+  </defs>
+  <g fill="#C8302A" stroke="#2b2420" stroke-width="3">
+    <use href="#p" x="0"/><use href="#p" x="100"/><use href="#p" x="200"/><use href="#p" x="300"/><use href="#p" x="400"/><use href="#p" x="500"/><use href="#p" x="600"/>
+  </g>
+  <g fill="#B9B3A6" stroke="#2b2420" stroke-width="3">
+    <use href="#p" x="700"/><use href="#p" x="800"/><use href="#p" x="900"/>
+  </g>
+</svg>

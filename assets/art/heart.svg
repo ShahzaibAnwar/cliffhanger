@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 640">
+  <defs>
+    <clipPath id="hb"><path d="M292 200 C 386 168, 490 226, 488 336 C 486 444, 392 520, 330 590 C 300 566, 196 506, 160 418 C 126 334, 176 228, 292 200 Z"/></clipPath>
+    <linearGradient id="vein" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7F9CC8"/><stop offset="1" stop-color="#4E6E9E"/></linearGradient>
+  </defs>
+  <!-- great vessels behind -->
+  <path d="M236 230 C 228 150, 232 92, 250 40 L 300 40 C 288 96, 286 150, 294 222 Z" fill="url(#vein)" stroke="#2b2420" stroke-width="5"/>
+  <path d="M300 220 C 296 120, 360 60, 438 74 C 500 86, 520 140, 500 196 L 456 186 C 470 146, 456 118, 430 116 C 382 110, 356 150, 358 220 Z" fill="url(#kit-blood)" stroke="#2b2420" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M380 92 L 384 30 L 410 30 L 412 88 M 432 84 L 446 26 L 470 30 L 458 92" fill="#C2392F" stroke="#2b2420" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M190 280 C 150 250, 100 250, 70 268 L 80 300 C 110 288, 146 292, 176 318 Z" fill="url(#vein)" stroke="#2b2420" stroke-width="5" stroke-linejoin="round"/>
+  <!-- heart body -->
+  <g clip-path="url(#hb)">
+    <rect x="120" y="160" width="400" height="460" fill="url(#kit-organ)"/>
+    <ellipse cx="430" cy="470" rx="190" ry="230" fill="url(#kit-hatch)"/>
+    <ellipse cx="460" cy="430" rx="110" ry="150" fill="url(#kit-hatch-r)"/>
+    <ellipse cx="250" cy="290" rx="80" ry="54" fill="#fff" opacity=".32"/>
+    <!-- coronary arteries + veins -->
+    <g fill="none" stroke-linecap="round">
+      <path class="draw" d="M310 236 C 296 300, 330 380, 318 470 C 312 520, 326 548, 330 580" stroke="#8E1A14" stroke-width="9"/>
+      <path class="draw" d="M316 300 C 360 312, 392 352, 430 360 M 320 380 C 280 400, 240 396, 206 420 M 322 450 C 360 470, 392 470, 420 492" stroke="#8E1A14" stroke-width="5"/>
+      <path class="draw" d="M346 240 C 340 300, 372 360, 360 430" stroke="#5A72A0" stroke-width="5"/>
+    </g>
+  </g>
+  <path d="M292 200 C 386 168, 490 226, 488 336 C 486 444, 392 520, 330 590 C 300 566, 196 506, 160 418 C 126 334, 176 228, 292 200 Z" fill="none" stroke="#2b2420" stroke-width="6" stroke-linejoin="round" filter="url(#kit-rough)"/>
+</svg>

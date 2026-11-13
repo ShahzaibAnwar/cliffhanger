@@ -1,0 +1,3 @@
+#!/bin/sh
+# Blocks any commit that would publish a credential or private file.
+node scripts/check-secrets.mjs --staged || exit 1

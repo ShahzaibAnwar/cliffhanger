@@ -1,0 +1,47 @@
+{
+  "voice": {
+    "provider": "auto",
+    "ask_each_reel": true,
+    "only_my_voices": true,
+    "elevenlabs": {
+      "default_voice_id": "",
+      "model_id": "eleven_multilingual_v2",
+      "stability": 0.38,
+      "similarity_boost": 0.8,
+      "style": 0.4,
+      "speed": 1.05,
+      "voices": []
+    },
+    "edge": { "voice": "en-US-AndrewMultilingualNeural", "rate": "+8%" }
+  },
+  "brand": { "name": "YOUR BRAND", "handle": "@yourhandle", "accent": "#C8302A" },
+  "content": {
+    "vo_language": "English",
+    "headline_language": "English",
+    "target_seconds": 55,
+    "niche": "",
+    "series_name": "",
+    "series_promise": "1 question every day",
+    "end_cta": "Follow",
+    "max_scene_seconds": 5
+  },
+  "audio": { "bed": "drone", "bed_volume": 0.07, "music": "", "music_volume": 0.18, "ai_music": false, "music_prompt": "", "sfx": true, "sfx_volume": 1, "ai_sfx": false, "lufs": -14 },
+  "subtitles": { "burn": false, "style": "word", "y": 1500, "size": 60, "max_words": 4, "lang": "auto" },
+  "images": {
+    "provider": "auto",
+    "style": "auto",
+    "cloudflare_model": "@cf/black-forest-labs/flux-1-schnell",
+    "cloudflare_steps": 6,
+    "cloudflare_ref_model": "@cf/black-forest-labs/flux-2-klein-4b",
+    "gemini_model": "gemini-2.5-flash-image",
+    "feather": false,
+    "max_rerolls": 2
+  },
+  "animation": { "transition": "auto", "camera": "push", "film_fx": true, "sketch_art": false, "headline_fx": "" },
+  "captions": {
+    "platforms": ["instagram", "tiktok", "youtube", "facebook", "x", "linkedin", "threads"],
+    "always_hashtags": [],
+    "emoji": "light"
+  },
+  "output": { "projects_dir": "" }
+}
