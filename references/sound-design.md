@@ -69,6 +69,11 @@ tension: slow heartbeat + thin string (horror) · mystery: music-box arpeggio (c
 (investigation, countdowns) · calm: gentle arpeggio (wonder). All are levelled to the same loudness and
 ducked under the voice.
 
+## Sound names
+Built-in names: `node scripts/sfx.mjs list`. Common other names are understood (tick/ticking → clock, bell/chime → ding,
+hit/punch → impact, bang/explosion → boom, camera/snap → shutter, keyboard → typing, swoosh → whoosh, splash → water…);
+anything else warns at render time with the closest name, or use `{ "find": "<words>" }` for a real recording.
+
 ## Real recordings and your own sound library
 
 - `audio.real_sfx` (default on): every built-in effect (whoosh, impact, heartbeat, clock, typing, paper,

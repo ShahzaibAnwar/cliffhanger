@@ -6,7 +6,8 @@
                                                                  or only for one channel's folder (<dir>/style.json)
      node style.mjs unlock [--workspace <dir>]                   back to asking every time
    Several channels? Lock per workspace: a global lock also restyles other channels whose reels don't set a look.
-   settings.style = { "auto": true, "map": [ { look, keywords: [...], captions: { vertical, wide }, music_mood }, ... ] }
+   settings.style = { "auto": true, "map": [ { look, keywords: [...], captions: { vertical, wide, burn }, music_mood }, ... ] }
+   Captions are burned in when auto style picks them (captions.burn: false in the map, or subtitles.burn: false in a reel, turns that off).
    A reel with "look": "auto" (or no look while style.auto is on) gets its look, caption style and music mood here,
    unless the reel sets them itself. No match or a tie → the default look (and Claude asks the user). */
 import fs from 'node:fs';
@@ -37,7 +38,7 @@ export function pickStyle(text, { wide = false, map = styleMap() } = {}) {
   const tie = best.score > 0 && second && second.score === best.score;
   const m = best.score > 0 && !tie ? best.m : fallback;
   return {
-    look: m.look, captions: (m.captions || {})[wide ? 'wide' : 'vertical'] || 'word', music_mood: m.music_mood || '',
+    look: m.look, captions: (m.captions || {})[wide ? 'wide' : 'vertical'] || 'word', burn: (m.captions || {}).burn !== false, music_mood: m.music_mood || '',
     matched: best.score > 0 && !tie ? best.hits : [], tie: tie ? [best.m.look, second.m.look] : null, fallback: !(best.score > 0) || tie,
     why: best.score === 0 ? `no keyword matched → default "${m.look}"` : tie ? `tie between "${best.m.look}" and "${second.m.look}" (${best.hits.join(', ')} / ${second.hits.join(', ')}) → ask the user` : `matched ${best.hits.map(k => `"${k}"`).join(', ')} → "${m.look}"`,
   };

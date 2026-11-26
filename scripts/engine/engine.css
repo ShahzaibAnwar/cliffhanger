@@ -364,3 +364,14 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .end .next{color:#1B1A18}
 /* map: when zoomed inside a highlighted country, fill it lightly so it doesn't become a solid block */
 .map .land-hi path.soft{fill-opacity:.22 !important;stroke:var(--accent);stroke-width:3}
+
+/* ---- countdown (quiz pause) ---- */
+.countdown{display:grid;place-items:center}
+.countdown svg{position:absolute;inset:0;width:100%;height:100%}
+.countdown .cd-track{fill:rgba(255,255,255,.65);stroke:rgba(0,0,0,.12);stroke-width:7}
+.theme-dark .countdown .cd-track{fill:rgba(0,0,0,.35);stroke:rgba(255,255,255,.14)}
+.countdown .cd-ring{fill:none;stroke:var(--accent);stroke-width:7;stroke-linecap:round}
+.countdown .cd-num{position:relative;font:400 1em/1 var(--head);font-size:inherit;color:var(--ink)}
+.theme-dark .countdown .cd-num{color:var(--dark-ink)}
+.countdown{font-size:150px}
+.countdown .cd-lab{position:absolute;bottom:-56px;font:600 26px var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--muted);white-space:nowrap}

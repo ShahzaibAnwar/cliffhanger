@@ -36,6 +36,7 @@ if (reel.look === 'auto' || (!reel.look && !reel.animation?.look && SETTINGS.sty
   const r = pickStyle(text, { wide, map: styleMap(SETTINGS) });
   reel.look = r.look;
   if (!reel.subtitles?.style) reel.subtitles = { ...(reel.subtitles || {}), style: r.captions };
+  if (reel.subtitles?.burn == null && r.burn !== false) reel.subtitles = { ...reel.subtitles, burn: true };   // a caption style in the map means: show captions
   if (!reel.audio?.music_mood && !reel.audio?.music && r.music_mood) reel.audio = { ...(reel.audio || {}), music_mood: r.music_mood };
   console.log(`style: auto → ${r.look} · captions ${r.captions} · music ${r.music_mood || 'bed'}  (${r.why})`);
 }
@@ -192,6 +193,9 @@ let AI_MISSING = [];
 }
 // repeated as the last thing printed, so it can't scroll away unnoticed
 const aiMissingNote = () => { if (AI_MISSING.length) console.warn(`\n!!! ${AI_MISSING.length} picture(s)/clip(s) are missing: these scenes show the hand-drawn fallback.\n!!! Run  node scripts/imagegen.mjs "${proj}"  (AI images),  node scripts/photos.mjs project "${proj}"  (photos),\n!!! or  node scripts/inbox.mjs pack "${proj}"  for a list to make by hand, then render again.`); };
+// common names for built-in sounds
+const SFX_ALIAS = { tick: 'clock', ticking: 'clock', clock_tick: 'clock', bell: 'ding', chime: 'ding', hit: 'impact', punch: 'impact', bang: 'boom', explosion: 'boom',
+  camera: 'shutter', snap: 'shutter', keyboard: 'typing', type: 'typing', pencil: 'scribble', write: 'scratch', heart: 'heartbeat', swoosh: 'whoosh', rise: 'riser', static: 'glitch', splash: 'water' };
 // unknown option names used to pass silently ("motion": "sway"): warn with the closest valid name
 {
   const KNOWN = {
@@ -222,6 +226,18 @@ const aiMissingNote = () => { if (AI_MISSING.length) console.warn(`\n!!! ${AI_MI
     for (const [k, v] of Object.entries(o)) if (v && typeof v === 'object' && k !== 'svg') walk(v, where);
   };
   for (const sc of reel.scenes) { const w = `scene "${sc.id || '?'}"`; for (const k of ['transition', 'camera', 'look', 'theme']) check(w, k, sc[k]); walk([sc.visual, sc.overlays, sc.beats], w); }
+  // sound names (cues, ambience, overlay sfx): presets, aliases, or { find / prompt / file }
+  const { PRESETS } = await import('./sfx.mjs');
+  const sfxOk = n => PRESETS[n] || SFX_ALIAS[n] || ['ai', 'find', 'file'].includes(n);
+  const sfxCheck = (where, c) => {
+    const n = typeof c === 'string' ? c : c && !c.prompt && !c.find && !c.file ? c.type : null;
+    if (!n || sfxOk(n)) return;
+    const msg = `! ${where}: unknown sound "${n}" (did you mean "${near(n, Object.keys(PRESETS))}"? or use { "find": "${n}" } for a real recording)`;
+    if (!warned.has(msg)) { warned.add(msg); console.warn(msg); }
+  };
+  const sfxWalk = (o, where) => { if (Array.isArray(o)) return o.forEach(x => sfxWalk(x, where)); if (!o || typeof o !== 'object') return;
+    if (o.sfx) [].concat(o.sfx).forEach(c => sfxCheck(where, c)); for (const [k, v] of Object.entries(o)) if (v && typeof v === 'object' && k !== 'svg' && k !== 'sfx') sfxWalk(v, where); };
+  for (const sc of reel.scenes) { const w = `scene "${sc.id || '?'}"`; [].concat(sc.sfx || []).forEach(c => sfxCheck(w, c)); if (sc.ambience) sfxCheck(w, sc.ambience); sfxWalk([sc.visual, sc.overlays, sc.beats], w); }
 }
 // talking mascot: how loud the voice is on every frame (0..1), from the voiceover clips
 let MOUTH = null;
@@ -317,7 +333,9 @@ const fps = parseInt(opt('fps', preview ? '15' : String(reel.format?.fps || 30))
 const browser = await launch();
 const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: scale });
 // parallel capture: frames are independent (window.__seek is stateless), so N tabs render them at once
-const WORKERS = Math.max(1, Math.min(12, parseInt(opt('workers', SETTINGS.render?.workers || 0), 10) || Math.max(2, Math.min(8, Math.floor((await import('node:os')).cpus().length / 3)))));
+// --cool (or settings render.profile "cool"): 3 tabs; slower, but the laptop stays quieter and cooler
+const COOL = flag('cool') || SETTINGS.render?.profile === 'cool';
+const WORKERS = Math.max(1, Math.min(12, parseInt(opt('workers', COOL ? 3 : SETTINGS.render?.workers || 0), 10) || Math.max(2, Math.min(8, Math.floor((await import('node:os')).cpus().length / 3)))));
 const gpuName = await page.evaluate(() => { try { const g = document.createElement('canvas').getContext('webgl'), e = g && g.getExtension('WEBGL_debug_renderer_info');
   return g ? String(e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : 'webgl').replace(/^ANGLE \([^,]*,\s*/, '').replace(/\s*\(0x[0-9A-F]+\).*$/i, '') : 'software'; } catch { return 'unknown'; } });
 if (GPU !== 'off' && /intel|swiftshader|software|microsoft basic/i.test(gpuName) && GPU !== 'intel') console.warn(`! browser is drawing on ${gpuName}, not a discrete GPU`);
@@ -505,6 +523,16 @@ for (const w of encoder.why) console.warn(`! GPU encoder skipped → ${w}`);
 const enc = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'image2pipe', '-c:v', 'mjpeg', '-framerate', String(fps), '-i', '-',
   ...encoder.args, '-movflags', '+faststart', silent], { stdio: ['pipe', 'inherit', 'inherit'] });
 const t0 = Date.now();
+// load sampling: CPU from the OS, GPU/encoder/temperature from nvidia-smi when present (one line at the end)
+const LOAD = { cpu: [], gpu: [], enc: [], temp: [] };
+const osm = await import('node:os'), cpuT = () => osm.cpus().reduce((a, c) => { const t = c.times; a.idle += t.idle; a.all += t.user + t.nice + t.sys + t.idle + t.irq; return a; }, { idle: 0, all: 0 });
+let cpuPrev = cpuT();
+const hasSmi = spawnSync('nvidia-smi', ['-L'], { encoding: 'utf8' }).status === 0;
+const loadTimer = setInterval(() => {
+  const c = cpuT(), d = c.all - cpuPrev.all; if (d > 0) LOAD.cpu.push(100 * (1 - (c.idle - cpuPrev.idle) / d)); cpuPrev = c;
+  if (hasSmi) { const r = spawnSync('nvidia-smi', ['--query-gpu=utilization.gpu,utilization.encoder,temperature.gpu', '--format=csv,noheader,nounits'], { encoding: 'utf8' });
+    const [g, e, tp] = (r.stdout || '').trim().split('\n')[0].split(',').map(Number); if (isFinite(g)) { LOAD.gpu.push(g); LOAD.enc.push(e); LOAD.temp.push(tp); } }
+}, 3000);
 const workers = await openWorkers(Math.min(WORKERS, Math.max(1, Math.ceil(nFrames / 30))));
 console.log(`capture: ${workers.length} parallel tab(s)`);
 // workers grab frames in any order; the writer feeds ffmpeg strictly in order, with a bounded buffer
@@ -541,7 +569,10 @@ for (const b of extraBrowsers) await b.close();
 enc.stdin.end(); await once(enc, 'close');
 if (!preview) { try { await makeCover(); } catch (e) { console.warn('! cover failed: ' + e.message); } }
 await browser.close();
+clearInterval(loadTimer);
 const secs = (Date.now() - t0) / 1000;
+{ const avg = a => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : null;
+  if (LOAD.cpu.length) console.log(`load: CPU ${avg(LOAD.cpu)}% avg${LOAD.gpu.length ? ` · GPU ${avg(LOAD.gpu)}% · encoder ${avg(LOAD.enc)}% · GPU up to ${Math.round(Math.max(...LOAD.temp))} °C` : ''}  (the CPU share is the capture tabs; --cool uses fewer)`); }
 console.log(`\rvideo frames done: ${nFrames} in ${secs.toFixed(0)}s (${(nFrames / secs).toFixed(1)} fps, ${workers.length} tab(s), ${encoder.name})`);
 }
 
@@ -555,6 +586,7 @@ if (flag('no-audio') || !voScenes.length) {
 } else {
   const sfxDir = path.join(build, 'sfx'); fs.mkdirSync(sfxDir, { recursive: true });
   const { PRESETS, presetFile, aiSfx, findSound, REAL, REAL_DUR } = await import('./sfx.mjs');
+  for (const e of events) if (!PRESETS[e.type] && SFX_ALIAS[e.type]) e.type = SFX_ALIAS[e.type];   // "tick" → clock, …
   const { addCredit } = await import('./library.mjs');
   const realOn = audioCfg.real_sfx !== false, netOk = !flag('offline');
   let realUsed = 0;
@@ -583,7 +615,7 @@ if (flag('no-audio') || !voScenes.length) {
         if (r === 'DENIED') { aiOk = false; } else if (r) { file = r; aiUsed++; } else aiFell++;
       }
       if (!file && realOn && REAL[e.type]) { file = await lib(REAL[e.type]); if (file) natural = REAL_DUR[e.type] || 1.5; }
-      if (!file) file = presetFile(e.fallback && PRESETS[e.fallback] ? e.fallback : (PRESETS[e.type] ? e.type : 'swish'), sfxDir);
+      if (!file) { const ty = PRESETS[e.type] ? e.type : SFX_ALIAS[e.type]; file = presetFile(e.fallback && PRESETS[e.fallback] ? e.fallback : (ty || 'swish'), sfxDir); }
       if (!file) continue;
       const k = add(file, e.loop);
       const d = e.dur || (e.loop ? 4 : natural);

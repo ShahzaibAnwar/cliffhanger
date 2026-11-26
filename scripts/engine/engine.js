@@ -148,13 +148,14 @@
         el.textContent = P.prefix + P.fmt.format(Math.round(v)) + P.suffix;
         break;
       }
-      case 'draw': el.style.strokeDashoffset = P.len * (1 - (t < a.t0 ? 0 : E.io(p))); break;
+      case 'draw': el.style.strokeDashoffset = el._rev ? P.len * (t < a.t0 ? 0 : p) : P.len * (1 - (t < a.t0 ? 0 : E.io(p))); break;
       case 'fillo': el.style.fillOpacity = t < a.t0 ? 0 : P.base * E.io(p); break;
       case 'width': { const f = P.from || 0; el.style.width = (t < a.t0 ? f : f + (P.to - f) * E.out(p)) + (P.unit || '%'); break; }
       case 'blink': el.style.opacity = t < a.t0 ? 0 : (Math.floor((t - a.t0) * 2.6) % 2 ? 0 : 1); break;
       case 'shake': if (t >= a.t0 && t <= a.t0 + a.dur) { const k = P.amp * (1 - p); s._shk.x += Math.sin(t * 95) * k; s._shk.y += Math.cos(t * 77) * k; } break;
       case 'flash': el.style.opacity = (t >= a.t0 && p < 1) ? (1 - p) * (P.max || 0.8) : 0; break;
       case 'growy': el.style.transform = `scaleY(${t < a.t0 ? 0 : E.out(p)})`; break;
+      case 'countdown': el.textContent = t < a.t0 ? String(P.n) : t >= a.t0 + P.n ? P.end : String(P.n - Math.floor(t - a.t0)); break;
     }
   }
   function applyC(c, t, s) {
@@ -809,6 +810,21 @@
         });
         break;
       }
+      case 'countdown': {   // "think" pause for quizzes: a ring that empties + the seconds counting down, a tick each second
+        const n = Math.max(1, Math.round(o.from || o.seconds || 3)), size = o.size || 260, t0 = T(o.at, 0.1);
+        const box = h('div', 'ov countdown', sc); box.style.left = (o.x != null ? o.x : TXT_X) + 'px'; box.style.top = (o.y != null ? o.y : Math.round(H * (SPLIT ? 0.55 : 0.62))) + 'px';
+        box.style.width = box.style.height = size + 'px'; box.style.marginLeft = box.style.marginTop = -size / 2 + 'px';
+        const svg = sv('svg', { viewBox: '0 0 100 100' }, box); sv('circle', { cx: 50, cy: 50, r: 44, class: 'cd-track' }, svg);
+        const ring = sv('circle', { cx: 50, cy: 50, r: 44, class: 'cd-ring', transform: 'rotate(-90 50 50)' }, svg);
+        const num = h('div', 'cd-num', box, String(n)); if (o.label) h('div', 'cd-lab', box, esc(o.label));
+        const L = 2 * Math.PI * 44; ring.style.strokeDasharray = L;
+        A(box, 'in', t0, 0.35, { style: 'pop', pre: '', rot: 0 });
+        A(ring, 'draw', t0, n, { len: L }); ring._rev = true;
+        A(num, 'countdown', t0, n, { n, end: o.end_text || '0' });
+        for (let k = 0; k < n; k++) sfx(o.tick || 'clock', t0 + k, o.tick_vol != null ? o.tick_vol : 0.35, 0.3);
+        sfx(o.end_sfx || 'ding', t0 + n, 0.45);
+        break;
+      }
       case 'ransom': {   // letters cut from different papers, stuck down one per frame
         const r = h('div', 'ov ransom', sc);
         r.style.left = (o.x != null ? o.x : TXT_X) + 'px'; r.style.top = (o.y != null ? o.y : Math.round(H * 0.5)) + 'px';
@@ -971,7 +987,10 @@
         window.__seek(Math.max(s.start, s.end - 0.06));
         const rects = [...s._el.querySelectorAll('.ov,.term,.labfile,.np-row,.stat .num,.stat .lab,.bar-row,.end > *,.mascot')]
           .map(e => e.getBoundingClientRect()).filter(r => r.width && r.height);
-        s._subY = cands.find(y => !rects.some(r => r.bottom > y - 6 && r.top < y + hgt)) ?? base;
+        const art = [...s._el.querySelectorAll('.obj .clean > *, .mapbox, .chartbox, .notepad')].map(e => e.getBoundingClientRect()).filter(r => r.width && r.height);
+        const clear = list => y => !list.some(r => r.bottom > y - 6 && r.top < y + hgt);
+        // a free spot away from overlays AND art; if none, stay in the usual band (the stills check names the overlay to move)
+        s._subY = cands.find(y => clear(rects)(y) && clear(art)(y)) ?? base;
       }
       for (const s of scenes) s._el.style.display = 'none';
     }

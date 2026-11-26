@@ -181,6 +181,9 @@ turned red), `highlight_at`, `x`, `y`, `w`, `rot`.
 
 Overlay **lens**: zoom callout on the scene's main `art`: `fx`, `fy` (0–1 point in the art), `x`, `y`
 (lens centre), `r`, `zoom`, `text`, `at`. Read `fx`/`fy` off `node scripts/grid.mjs <image>` instead of guessing.
+Overlay **countdown** (quiz "think" pauses): `from` (3), `at`, `label` ("seconds"), `x`, `y`, `size` (260), `tick`
+(sound each second, default `clock`), `end_sfx` (`ding`), `end_text`. Pair it with a scene that has no `vo` and a
+`duration` of a few seconds; it shows a ring emptying while the digit counts down.
 Overlay **ransom**: a ransom-note word, letters cut from different papers and stuck down one per frame:
 `text` (≤ 10 characters reads best), `at`, `x`, `y`, `size` (130), `align` (`center`/`left`).
 Overlay **pins**: `items: [{x, y, label, at}]`, for maps

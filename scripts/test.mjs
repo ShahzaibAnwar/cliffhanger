@@ -124,10 +124,11 @@ t('looks, map and chart render', () => {
   fs.writeFileSync(path.join(proj, 'data', 'u.csv'), 'year,n\n2020,1\n2021,3\n2022,6\n');
   fs.writeFileSync(path.join(proj, 'reel.json'), JSON.stringify({ title: 'vis', look: 'comic', scenes: [
     { id: 'm', duration: 2, headline: ['MAP'], visual: { type: 'map', highlight: ['PAK'], route: [[67, 24.9], [116.4, 39.9]], points: [{ lon: 67, lat: 24.9, label: 'Karachi' }] } },
-    { id: 'c', theme: 'dark', look: 'blueprint', duration: 2, headline: ['CHART'], visual: { type: 'chart', csv: 'data/u.csv', x_col: 'year', y_col: 'n', unit: 'M' } }] }));
+    { id: 'c', theme: 'dark', look: 'blueprint', duration: 2, headline: ['CHART'], visual: { type: 'chart', csv: 'data/u.csv', x_col: 'year', y_col: 'n', unit: 'M' },
+      overlays: [{ type: 'countdown', from: 2, at: 0.1 }] }] }));
   const out = sh(process.execPath, [path.join(HERE, 'render.mjs'), proj, '--at', '1.8,3.8']);
   if (/\[page error\]/.test(out)) throw new Error('page errors');
-  return 'comic + blueprint, map + CSV chart';
+  return 'comic + blueprint, map + CSV chart + countdown';
 });
 const { pickStyle } = await import('./style.mjs');
 t('auto style picks a look from the topic', () => {

@@ -169,6 +169,8 @@ Create the project folder: `reel.json`, `art/`. Schema and every component are i
   `inbox.mjs <project>` imports them (pictures get the usual cut-out). Motion: an object with
   `"video_prompt": "..."` shows that clip (muted, looped, frame-exact) once it's imported; any clip can be
   used directly with `"video": "art/clips/x.mp4"`. Don't automate the Gemini website.
+- **Quiz / interactive formats:** a "think" scene with no `vo`, a few seconds long, `ambience: "clock"` and a
+  `countdown` overlay (ring + digits + a tick each second), then the answer scene.
 - **Point at the right spot:** before placing a `lens`, `pins` or anything that points at part of an
   image, run `node "$SKILL_DIR/scripts/grid.mjs" <image>` and Read the `_grid.jpg`; take `fx`/`fy` (0–1)
   or pixel positions from it instead of guessing.
@@ -255,7 +257,9 @@ Media Foundation) → CPU libx264 last. Frames are captured by several browser t
 every render say what was used (`gpu: draw = … · encode = …`, `capture: N parallel tab(s)`); a
 `! GPU encoder skipped →` line explains any fallback (an NVIDIA driver older than 610 can't run this
 ffmpeg's NVENC: update the driver). `node scripts/doctor.mjs` shows the same. Never add `--disable-gpu`.
-Settings: `render.gpu` (`auto` · `nvidia` · `amd` · `apple` · `intel` · `off`), `render.workers`. Read
+Settings: `render.gpu` (`auto` · `nvidia` · `amd` · `apple` · `intel` · `off`), `render.workers`. If the laptop gets
+hot or loud, use `--cool` (or `render.profile: "cool"`): 3 tabs, about half the speed; the load line at the end of
+each render shows where the work went. Read
 `out/contact.jpg` and spot-check 2–3 frames with `--at`, including one mid-transition, before delivering.
 
 - **Subtitles**: `subtitles.burn` (settings or reel) burns word-by-word captions in; Urdu/Hindi cuts show

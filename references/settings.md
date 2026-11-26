@@ -52,7 +52,7 @@ settings, `voiceover.py` retries automatically with a simpler request.
 | `animation.transition, camera, film_fx, sketch_art, headline_fx` | motion defaults |
 | `output.projects_dir` | where new reel project folders go; also where `series.json` lives |
 | `subtitles.burn, style, lang, y, size, max_words` | burned-in subtitles; style `word` · `karaoke` · `pop` · `box` · `tape` · `line` |
-| `style.auto, style.map` | automatic style per video: `auto: true` picks look + caption style + music mood from the topic using `map` (`[{look, keywords, captions: {vertical, wide}, music_mood}]`; built-in default shown by `node scripts/style.mjs show`). `style.mjs lock` / `unlock` switch it for every channel; `--workspace <dir>` writes `<dir>/style.json` so only that channel's reels are affected |
+| `style.auto, style.map` | automatic style per video: `auto: true` picks look + caption style + music mood from the topic using `map` (`[{look, keywords, captions: {vertical, wide}, music_mood}]`; built-in default shown by `node scripts/style.mjs show`). captions picked by auto style are burned in (set `captions.burn: false` in a map entry, or `subtitles.burn: false` in a reel, to keep them off). `style.mjs lock` / `unlock` switch it for every channel; `--workspace <dir>` writes `<dir>/style.json` so only that channel's reels are affected |
 | `animation.look` | default look (`auto` = pick per topic): `case-file` · `collage` · `chalkboard` · `blueprint` · `comic` · `vhs` · `newsprint` (see `gallery/index.html`) |
 | `audio.music_mood` | free real music by mood: `suspense` · `mystery` · `cinematic` · `epic` · `calm` · `uplifting` · `playful` · `scifi` · `ambient` (empty = synthesized bed) |
 | `content.max_scene_seconds` | stills check warns above this (add beats). 16:9 uses at least 8; `reel.max_scene_seconds` overrides per reel |
@@ -60,6 +60,7 @@ settings, `voiceover.py` retries automatically with a simpler request.
 | `audio.bed, ai_music, music_prompt` | background mood / AI music |
 | `audio.real_sfx` | `true` (default): built-in effects use real CC0 recordings from the shared `sfx-library/` (downloaded once); `false` = synthesized only |
 | `render.gpu` | **GPU first** (default `auto`): browser draws on the dedicated graphics card; the encoder goes dedicated GPU (NVIDIA NVENC → AMD AMF → Apple VideoToolbox) → integrated graphics (Intel Quick Sync → VAAPI → Windows Media Foundation) → CPU libx264 last. Force one with `nvidia` / `amd` / `apple` / `intel`, or `off` for CPU only. Env `CLIFFHANGER_GPU` overrides |
+| `render.profile` | `cool`: 3 capture tabs (quieter, cooler laptop; about half the speed). `--cool` does the same for one render. Every render ends with a load line (CPU %, GPU %, encoder %, max GPU °C) |
 | `render.workers` | parallel capture tabs (default: CPU threads ÷ 3, 2–8). `--workers N` per render |
 | `render.browsers` | spread the tabs over this many browser processes (default 1; more is slightly faster and uses much more memory). Env `CLIFFHANGER_BROWSERS` |
 | `animation.look` | `collage`: cut-out finish + stop-motion on twos + scribble wipes on theme changes |
