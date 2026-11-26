@@ -9,7 +9,9 @@ One skill, whole pipeline: **idea → research → story → script → voiceove
 The style is decoded from top-performing faceless science/explainer reels: a "case file" look
 (notebook paper or dark film, a two-line condensed headline whose second line is the red punch word,
 FIG. numbering, stamps, red pencil, terminal prompts), a voice that talks *to* the viewer, a new
-visual every 2–3 seconds, and an ending that opens a bigger question than the one it answered.
+visual every 2.5–4 seconds, and an ending that opens a bigger question than the one it answered.
+The rules behind this (with sources) are in `references/engagement.md`; the stills run scores every
+video against them.
 
 `SKILL_DIR` below means the folder that contains this file.
 
@@ -117,6 +119,23 @@ Create the project folder: `reel.json`, `art/`. Schema and every component are i
   animates on twos (stop-motion, pieces "boil" a little) and uses a marker-scribble wipe on theme changes.
   Pair it with `image_style: "archival"` (black-and-white documentary photos that cut out cleanly) and one
   `ransom` overlay on the payoff word. See `references/visual-style.md` → "Collage look".
+- **Real photos (free licences):** for real things, places, artefacts and historical people, give the
+  object `"photo_query": "apollo 11 lunar module"` (plus an `svg_file` fallback) and run
+  `node "$SKILL_DIR/scripts/photos.mjs" project <project>`. It searches Openverse (Wikimedia, Flickr CC,
+  museums), NASA and the Art Institute of Chicago, keeps only CC0 / public domain / CC BY, and writes the
+  credits (`out/credits.txt` after the render; put CC BY credits in the captions). Plain-background photos
+  become paper cut-outs (`finish: "collage"`), busy ones a taped photo print (`"print"`); `"torn"` gives
+  torn edges. Preview choices with `photos.mjs search "<words>"` and pick one with `"photo_pick": N`.
+  If downloading isn't possible, `photos.mjs guide <project>` prints search links and the exact file
+  name to save in `art/inbox/`; then `node "$SKILL_DIR/scripts/inbox.mjs" <project>` imports them.
+  Never use photos of identifiable living private people, logos, or copyrighted characters (cartoon,
+  film or game characters): those aren't "free" even when a site shows them.
+- **Gemini, Veo or other apps without an API:** `node "$SKILL_DIR/scripts/inbox.mjs" pack <project>` writes
+  `inbox-prompts.md`: each missing picture/clip with the exact prompt and the file name to save. The user
+  makes them in the Gemini app (or Whisk, Flow, any tool), drops the files in `art/inbox/`, and
+  `inbox.mjs <project>` imports them (pictures get the usual cut-out). Motion: an object with
+  `"video_prompt": "..."` shows that clip (muted, looped, frame-exact) once it's imported; any clip can be
+  used directly with `"video": "art/clips/x.mp4"`. Don't automate the Gemini website.
 - **Point at the right spot:** before placing a `lens`, `pins` or anything that points at part of an
   image, run `node "$SKILL_DIR/scripts/grid.mjs" <image>` and Read the `_grid.jpg`; take `fx`/`fy` (0–1)
   or pixel positions from it instead of guessing.
@@ -153,6 +172,11 @@ node "$SKILL_DIR/scripts/render.mjs" <project> --stills          # one frame per
 node "$SKILL_DIR/scripts/render.mjs" <project> --at 3.2,7.5      # exact moments
 ```
 
+**Engagement check:** the stills run ends with a score ("Engagement check: 8/9") and a fix for each
+failed rule (hook timing, short hook line, a new visual every 2.5–4 s, nothing held over 5 s, length,
+narration speed, keyword headlines, an ending that opens the next question). Fix every ✘ unless the
+user has a reason; the rules and their sources are in `references/engagement.md`. Never promise virality.
+
 Look at `build/contact.jpg` (Read the image). Check: headline fits and doesn't touch art, nothing
 overlaps the bottom 150 px (platform UI), red is used only for punch/danger, every scene has a clear
 focal object, stamps/chips aren't covering the key art. Fix JSON/SVG and re-run until clean.
@@ -170,6 +194,12 @@ writing. Add **at most one directed cue per scene** where the story has a sound-
 (heartbeat, clock, night room), and a `riser` before the biggest reveal. Always give AI cues a
 `fallback` preset. AI sounds generate only if `audio.ai_sfx` is on (they cost credits once and are
 then cached), so mention it to the user when a reel would clearly benefit.
+
+**Real sounds:** with `audio.real_sfx` on (default) the built-in effects use real CC0 recordings
+(Freesound via Openverse, downloaded once into `sfx-library/` and reused by every project), with a few takes
+per effect for variety. For a specific sound, add a cue `{ "find": "creaky wooden door", "at": "word:door" }`;
+for your own file `{ "file": "sfx/door.wav" }`. Users can drop whole sound packs into `sfx-library/`
+(file names are the search words). `node scripts/sfx.mjs find "<words>"` pre-fetches and lists a sound.
 
 ## 7. Final render
 

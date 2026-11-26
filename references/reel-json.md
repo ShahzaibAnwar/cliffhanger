@@ -89,12 +89,16 @@ Any object/overlay can carry `"sfx": "impact"` or `"sfx": {"prompt": "...", "fal
 `assets/art/`) | `svg` (inline string) | `image` (png/jpg path) | **`image_prompt`** (AI-generated
 by `imagegen.mjs`; keep an `svg_file` as fallback). AI keys: `image_style`, `image_seed`,
 `image_ref` (reference image for a consistent variant), `character` (a name from `reel.characters`),
-`finish` (`collage`: grayscale halftone cut-out with a paper edge), `backing` (`block` · `disc` · `torn` · `none`,
+`finish` (`collage`: grayscale halftone cut-out with a paper edge · `print`: photo print with a white border and
+tape · `torn`: torn-paper edges · `tone: "bw"` makes a print black and white), `photo_query` (real free-licence photo,
+fetched by `photos.mjs`; `photo_pick`, `photo_source`: `nasa` · `openverse` · `aic`), `video` (a clip: muted,
+looped, frame-exact; `rate`, `from`, `loop`), `video_prompt` (a clip to make in Veo/any app via `inbox.mjs pack`),
+`backing` (`block` · `disc` · `torn` · `none`,
 a paint shape behind the art; `backing_color`, `backing_rot`, `backing_scale`), `halftone` (false to skip the dots),
 `image_provider` (`cloudflare`/`gemini`),
 `feather` (soft oval edge). Photo scenes: `bg_prompt`, `bg_style`, `bg_seed`.
 Keys: `x`(540) `y`(1180) `w`(820) `motion`: `float`(default) · `hover` (insects) · `kenburns` ·
-`kenout` · `drift` (`dx`,`dy`) · `pulse` · `spin` · `shiver` · `none`. `shadow` (ground shadow, default
+`kenout` · `drift` (`dx`,`dy`) · `pulse` · `spin` · `shiver` · `flutter` (paper sway; default for prints) · `none`. `shadow` (ground shadow, default
 true). `blend`: `multiply` (white-background PNGs on paper) / `screen` (black-background PNGs on dark).
 `mystery: true` + `reveal_at` → pixelated until revealed. SVG paths with `class="draw"` draw on
 (`draw_dur`, `draw_stagger`).

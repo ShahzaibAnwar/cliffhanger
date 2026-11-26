@@ -62,6 +62,17 @@ subtitles included), and `variants.mjs` renders alternative hooks for A/B tests.
 grid-crop preview, platform safe-zone and long-scene checks, beats (several visuals per line),
 newspaper clippings, comparisons, timelines, zoom lenses, map pins, and five music moods.
 
+**Real photos, clips and sounds (free licences):** `photos.mjs` finds CC0 / public-domain / CC BY photos
+(Openverse, NASA, Art Institute of Chicago), turns plain-background ones into paper cut-outs and the rest into
+taped photo prints or torn paper, and writes the credits. Clips play as moving art. Every built-in sound effect
+can use real CC0 recordings (Freesound via Openverse), and you can drop your own sound packs in `sfx-library/`.
+No download possible? The skill prints search links and file names for an `art/inbox/` folder; it also writes
+ready-to-paste prompt packs for the Gemini app and Veo, then imports what you save.
+
+**Engagement check:** every stills pass scores the video against researched retention rules (hook timing,
+a new visual every 2.5–4 s, length, narration speed, keyword headlines, the ending) with a fix for each miss.
+See [`references/engagement.md`](references/engagement.md) for the rules and their sources.
+
 **Long videos (16:9):** set `format` to 1920×1080 for YouTube: headlines move to a left column and art to the
 right automatically, chapter cards, a YouTube-player safe-zone check and a 1280×720 `thumbnail.jpg`.
 
@@ -153,12 +164,16 @@ references/
   reel-json.md              scene schema and component catalog
   visual-style.md           art direction, SVG art rules, AI image prompts
   voiceover.md              ElevenLabs and Edge settings, voices per language
-  sound-design.md           automatic SFX, presets, AI sound cues, the sound pass
+  sound-design.md           automatic SFX, presets, real recordings, AI sound cues, the sound pass
+  engagement.md             researched retention rules (with sources) behind the engagement check
   settings.md               every setting and how to change it
   social-captions.md        platform specs and captions template
 scripts/
   voiceover.py              TTS and word timings
   tighten.py                pacing pass: shorter pauses, faster delivery, timings remapped
+  photos.mjs                free-licence photo finder: search, download, cut-out or print, credits
+  inbox.mjs                 hand-off folder: prompt packs for Gemini/Veo, imports your own files
+  library.mjs               shared search, licence filter, download and credits (images + sounds)
   render.mjs                HTML engine → frames → ffmpeg, with audio mix, SRT, cover and contact sheet
   sfx.mjs                   sound presets, ElevenLabs sound effects and cache, preview
   art-preview.mjs           review sheet for SVG drawings (paper, dark, mid-sketch)

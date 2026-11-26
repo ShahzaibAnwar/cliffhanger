@@ -16,7 +16,7 @@ const list = staged
   ? execFileSync('git', ['diff', '--cached', '--name-only', '--diff-filter=ACMR'], { encoding: 'utf8' }).split('\n').filter(Boolean)
   : execFileSync('git', ['add', '-A', '--dry-run'], { encoding: 'utf8' }).split('\n').map(l => l.match(/^add '(.+)'$/)?.[1]).filter(Boolean);
 
-const FORBIDDEN = [/(^|\/)\.env(\..*)?$/, /(^|\/)settings\.json$/, /(^|\/)sfx-cache\//, /(^|\/)build\//, /(^|\/)node_modules\//, /(^|\/)variants\//, /\.pem$|\.key$|id_rsa/];
+const FORBIDDEN = [/(^|\/)\.env(\..*)?$/, /(^|\/)settings\.json$/, /(^|\/)sfx-cache\//, /(^|\/)sfx-library\//, /(^|\/)build\//, /(^|\/)node_modules\//, /(^|\/)variants\//, /\.pem$|\.key$|id_rsa/];
 const ALLOWED_ENV_TEMPLATE = /(^|\/)\.env\.example$/;
 const secrets = {};
 for (const f of ['.env']) {

@@ -89,12 +89,12 @@
   // A cue is a preset name ("impact") or {prompt:"glass shattering", dur, fallback:"impact", vol} (AI sound, cached)
   function sfx(type, t, vol, dur, extra) {
     const x = extra || {};
-    events.push({ type, t, vol: vol == null ? 0.5 : vol, dur: dur != null ? dur : x.dur, prompt: x.prompt, fallback: x.fallback, loop: !!x.loop, influence: x.influence });
+    events.push({ type, t, vol: vol == null ? 0.5 : vol, dur: dur != null ? dur : x.dur, prompt: x.prompt, fallback: x.fallback, loop: !!x.loop, influence: x.influence, find: x.find, file: x.file });
   }
   function cue(c, t, defVol) {
     if (!c) return;
     if (typeof c === 'string') return sfx(c, t, defVol);
-    sfx(c.type || (c.prompt ? 'ai' : 'pop'), t, c.vol != null ? c.vol : defVol, c.dur, c);
+    sfx(c.type || (c.prompt ? 'ai' : c.find ? 'find' : c.file ? 'file' : 'pop'), t, c.vol != null ? c.vol : defVol, c.dur, c);
   }
   function enter(el, spec, defStyle, defAt, defDur, pre, rot) {
     const style = spec.enter || defStyle;
@@ -167,6 +167,7 @@
       case 'pulse': el.style.transform = `scale(${1 + (P.amp || 0.04) * Math.sin(t * (P.sp || 6))})`; break;
       case 'spin': el.style.transform = `rotate(${(t - s.start) * (P.deg || 20)}deg)`; break;
       case 'shiver': el.style.transform = `translate(${Math.sin(t * 61) * 2}px,${Math.cos(t * 53) * 2}px)`; break;
+      case 'flutter': el.style.transform = `perspective(1400px) translateY(${Math.sin(t * 1.2 + P.ph) * 7}px) rotateX(${Math.sin(t * 0.9 + P.ph) * 3}deg) rotateY(${Math.sin(t * 0.7 + P.ph * 2) * 5}deg) rotate(${Math.sin(t * 0.8 + P.ph) * 0.8}deg)`; break;
       default: break;
     }
   }
@@ -176,8 +177,8 @@
     const pts = [], r = k => rnd(seed * 13.7 + k);
     if (kind === 'disc') {
       for (let i = 0; i < 48; i++) { const a = i / 48 * Math.PI * 2, rr = 47 + (r(i) - 0.5) * 3.2; pts.push([50 + Math.cos(a) * rr, 50 + Math.sin(a) * rr]); }
-    } else {                                  // block / torn: a painted rectangle with brushy, torn edges
-      const n = 14, amp = kind === 'torn' ? 2.6 : 1.4;
+    } else {                                  // block / torn / rip: a rectangle with brushy or torn edges
+      const n = kind === 'rip' ? 26 : 14, amp = kind === 'rip' ? 3.4 : kind === 'torn' ? 2.6 : 1.4;
       for (let i = 0; i <= n; i++) pts.push([i / n * 100, 1.5 + (r(i) - 0.5) * amp]);
       for (let i = 0; i <= n; i++) pts.push([98.5 + (r(i + 40) - 0.5) * amp, i / n * 100]);
       for (let i = n; i >= 0; i--) pts.push([i / n * 100, 98.5 + (r(i + 80) - 0.5) * amp]);
@@ -209,8 +210,19 @@
     if (finish === 'collage') wrap.classList.add('finish-collage');
     if (o.blend && finish !== 'collage') wrap.style.mixBlendMode = o.blend;    // collage cut-outs are opaque paper
     const inner = h('div', 'inner', wrap);
-    const content = o.svg || (o.image ? `<img src="${o.image}" alt="">` : (o.html || ''));
+    const content = o.svg || (o.video ? `<video src="${o.video}" muted playsinline preload="auto"></video>` : o.image ? `<img src="${o.image}" alt="">` : (o.html || ''));
     const clean = h('div', 'clean', inner, content);
+    if (o.video) {             // moving art: seeked to the exact frame time by __seek (deterministic, parallel-safe)
+      const v = clean.querySelector('video');
+      S._videos.push({ el: v, at: T(o.at, 0.05), rate: o.rate || 1, from: o.from || 0, loop: o.loop !== false });
+      v.addEventListener('error', () => { clean.innerHTML = wrap._fallback || ''; window.__fallbacks = (window.__fallbacks || 0) + 1; });
+    }
+    if (finish === 'print') {  // photo print: paper border + two strips of tape
+      wrap.classList.add('finish-print');
+      h('i', 'tape t1', inner); h('i', 'tape t2', inner);
+      if (o.tone === 'bw') wrap.classList.add('tone-bw');
+    }
+    if (finish === 'torn') { wrap.classList.add('finish-torn'); clean.style.clipPath = roughShape('rip', (o.x * 5 + o.y * 11) % 991); }
     if (finish === 'collage' && o.halftone === false) wrap.classList.add('no-ht');
     if (o.shadow && S.theme !== 'photo' && finish !== 'collage') wrap.insertBefore(h('div', 'gshadow'), inner);
     const sketch = o.enter === 'sketch' && !!o.svg;
@@ -230,7 +242,8 @@
         sfx('pop', tr, 0.35);
       } else clean.style.opacity = 0;
     }
-    if (o.motion && o.motion !== 'none') C(inner, o.motion, { ph: (o.x + o.y) % 7, dx: o.dx, dy: o.dy, amt: o.amt, deg: o.deg });
+    const motion = spec.motion || (finish === 'print' || finish === 'torn' ? 'flutter' : o.motion);
+    if (motion && motion !== 'none') C(inner, motion, { ph: (o.x + o.y) % 7, dx: o.dx, dy: o.dy, amt: o.amt, deg: o.deg });
     // stroke draw-on for elements marked class="draw" inside the SVG
     const t0 = o.draw_at != null ? T(o.draw_at) - 0.15 : T(o.at, 0.05);
     if (!sketch) S._layout.push(() => {
@@ -743,7 +756,7 @@
   const rnd = n => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 
   scenes.forEach((s, i) => {
-    S = s; s._anims = []; s._conts = []; s._layout = []; s._pencils = []; s._shk = { x: 0, y: 0 }; s._boil = [];
+    S = s; s._anims = []; s._conts = []; s._layout = []; s._pencils = []; s._shk = { x: 0, y: 0 }; s._boil = []; s._videos = [];
     const sc = h('div', 'scene theme-' + s.theme, stage);
     s._el = sc;
     const shaker = h('div', 'shaker', sc); s._shaker = shaker;
@@ -811,6 +824,8 @@
       await document.fonts.ready;
     } catch (e) { /* fall back to system fonts */ }
     await Promise.all([...document.images].map(im => im.decode ? im.decode().catch(() => null) : null));
+    await Promise.all([...document.querySelectorAll('video')].map(v => v.readyState >= 2 ? null : new Promise(res => {
+      v.addEventListener('loadeddata', res, { once: true }); v.addEventListener('error', res, { once: true }); setTimeout(res, 8000); })));
     // any image that failed to load → swap in its hand-drawn fallback (or hide it cleanly)
     document.querySelectorAll('.obj').forEach(w => {
       const im = w.querySelector('.clean img'); if (!im || (im.complete && im.naturalWidth > 0)) return;
@@ -980,6 +995,17 @@
     frame(s, t);
     if (inTr) { frame(prev, t); transition(s._tr, prev._el, s._el, (t - s.start) / s._td, t); }
     drawSubs(t);
-    return s.id;
+    const vids = [];
+    for (const x of inTr ? [s, prev] : [s]) for (const v of x._videos || []) {
+      const d = v.el.duration;
+      if (!d || isNaN(d)) continue;
+      let ct = Math.max(0, (t - v.at) * v.rate) + v.from;
+      ct = v.loop ? ct % d : Math.min(ct, d - 0.04);
+      if (Math.abs(v.el.currentTime - ct) > 0.001) vids.push(new Promise(res => {
+        const done = () => { v.el.removeEventListener('seeked', done); res(); };
+        v.el.addEventListener('seeked', done); v.el.currentTime = ct; setTimeout(done, 3000);
+      }));
+    }
+    return vids.length ? Promise.all(vids).then(() => s.id) : s.id;
   };
 })();

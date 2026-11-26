@@ -9,6 +9,7 @@ settings.json
 # ---- caches, builds, generated ----
 node_modules/
 sfx-cache/
+sfx-library/
 **/build/
 **/variants/
 __pycache__/

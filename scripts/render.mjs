@@ -158,7 +158,7 @@ function resolveAssets(o) {
       const p = String(o[k]).startsWith('@lib/') ? path.join(LIB, o[k].slice(5)) : path.resolve(proj, o[k]);
       if (!fs.existsSync(p)) { console.error('Missing svg_file: ' + p); process.exit(1); }
       o.svg = scopeSvg(fs.readFileSync(p, 'utf8')); delete o.svg_file;
-    } else if ((k === 'image' || k === 'bg_image') && typeof o[k] === 'string' && !/^(https?|data|file):/.test(o[k])) {
+    } else if ((k === 'image' || k === 'bg_image' || k === 'video') && typeof o[k] === 'string' && !/^(https?|data|file):/.test(o[k])) {
       const p = String(o[k]).startsWith('@lib/') ? path.join(LIB, o[k].slice(5)) : path.resolve(proj, o[k]);
       if (!fs.existsSync(p)) { console.error('Missing image: ' + p); process.exit(1); }
       o[k] = pathToFileURL(p).href;
@@ -171,10 +171,13 @@ let AI_MISSING = [];
 { // AI illustrations (image_prompt / bg_prompt) → generated files; svg_file stays as fallback
   const { resolveGenerated } = await import('./imagegen.mjs');
   AI_MISSING = resolveGenerated(scenes, proj, SETTINGS.images || {}, reel.characters || null);
+  const { resolvePhotos } = await import('./photos.mjs');
+  const { resolveClips } = await import('./inbox.mjs');
+  AI_MISSING.push(...resolvePhotos(scenes, proj), ...resolveClips(scenes, proj));
   if (AI_MISSING.length) console.warn(`! ${AI_MISSING.length} AI image(s) not generated yet (using svg_file fallback where given). Run: node scripts/imagegen.mjs "${proj}"\n  ` + AI_MISSING.join('\n  '));
 }
 // repeated as the last thing printed, so it can't scroll away unnoticed
-const aiMissingNote = () => { if (AI_MISSING.length) console.warn(`\n!!! ${AI_MISSING.length} AI image(s) were NOT generated: these scenes show the hand-drawn fallback.\n!!! Run  node scripts/imagegen.mjs "${proj}"  and render again.`); };
+const aiMissingNote = () => { if (AI_MISSING.length) console.warn(`\n!!! ${AI_MISSING.length} picture(s)/clip(s) are missing: these scenes show the hand-drawn fallback.\n!!! Run  node scripts/imagegen.mjs "${proj}"  (AI images),  node scripts/photos.mjs project "${proj}"  (photos),\n!!! or  node scripts/inbox.mjs pack "${proj}"  for a list to make by hand, then render again.`); };
 resolveAssets(scenes);
 
 // canvas size: vertical by default; reel.format.width/height switches it (e.g. 1920x1080 for long-form)
@@ -261,6 +264,51 @@ async function openWorkers(n) {
   return out;
 }
 
+// ---------- engagement check (rules + sources: references/engagement.md) ----------
+// Measurable things that move retention. It can't promise virality; it catches what reliably loses viewers.
+function engagementCheck() {
+  const out = [], add = (ok, rule, detail, fix) => out.push({ ok, rule, detail, fix: ok ? undefined : fix });
+  const main = scenes.filter(x => !x._beatOf), first = main[0] || {};
+  const words = main.flatMap(x => (x.words || []).map(w => ({ ...w, abs: x.start + w.s })));
+  const firstWord = words.length ? words[0].abs : (first.vo ? first.vo_at : null);
+  // 1. hook: narration starts at once
+  if (firstWord != null) add(firstWord <= 0.6, 'Hook starts immediately', `first word at ${firstWord.toFixed(2)} s`, 'start the voice by 0.5 s: no intro, logo or silence at the start (lead: 0)');
+  // 2. hook line: short curiosity line (best ~9 words in informational niches)
+  const hookWords = String(first.vo || '').trim().split(/\s+/).filter(Boolean).length;
+  if (hookWords) add(hookWords <= 14, 'Short hook line', `${hookWords} words in the first line`, 'cut the first line to a 6–12 word question or surprising claim');
+  // 3. headline on screen within 1 s
+  const hl = first.headline && (Array.isArray(first.headline) ? first.headline.length : 1);
+  add(!!hl, 'Headline on screen at once', hl ? 'first scene has a headline' : 'first scene has no headline', 'give scene 1 a headline that states the question (works on mute)');
+  // 4. pacing: a new visual every 2.5–4 s, nothing held longer than 5 s (8 s on 16:9 long-form)
+  const ordered = [...scenes].sort((a, b) => a.start - b.start);
+  const shots = ordered.map((x, i, arr) => (i + 1 < arr.length ? arr[i + 1].start : TOTAL) - x.start)
+    .filter((d, i) => d > 0.05 && !(i === ordered.length - 1 && (WIDE || ordered[i].visual?.type === 'endcard')));   // end card holds on purpose
+  const avg = shots.reduce((a, b) => a + b, 0) / Math.max(1, shots.length), longest = Math.max(...shots), cap = WIDE ? 8 : 5;
+  add(avg >= 2 && avg <= (WIDE ? 6 : 4.5), 'Visual changes every 2.5–4 s', `average ${avg.toFixed(1)} s per visual`, avg < 2 ? 'slow down: under 2 s per shot lowers retention (too fast to follow)' : 'add "beats" (a new visual mid-line) so something changes every 2.5–4 s');
+  add(longest <= cap + 0.5, `No visual held over ${cap} s`, `longest ${longest.toFixed(1)} s`, 'split the longest scene with beats or a cut-in (lens, chip, stamp)');
+  // 5. length
+  if (!WIDE) add(TOTAL >= 30 && TOTAL <= 90, 'Length 30–90 s (best 45–60)', `${TOTAL.toFixed(0)} s`, TOTAL > 180 ? 'over 3:00 is not shown to non-followers on Reels and is the Shorts maximum: cut it down' : TOTAL < 30 ? 'very short: data favour 30–60 s for reach' : 'aim for 45–60 s; trim weaker beats');
+  // 6. narration pace
+  const speech = main.reduce((a, x) => a + (x.vo_dur || 0), 0), nWords = main.reduce((a, x) => a + String(x.vo || '').trim().split(/\s+/).filter(Boolean).length, 0);
+  if (speech > 5 && nWords) { const wpm = nWords / speech * 60; add(wpm >= 140 && wpm <= 215, 'Narration 160–190 words/min', `${wpm.toFixed(0)} wpm`, wpm < 140 ? 'too slow: run tighten.py (e.g. 1.14 0.24) or cut words' : 'too fast to follow: add pauses or split lines'); }
+  // 7. headlines are keywords, not the transcript (redundant on-screen text hurts learning)
+  const norm = x => String(x).toLowerCase().replace(/[^a-z0-9\u0600-\u06ff\u0900-\u097f ]/g, ' ').split(/\s+/).filter(Boolean);
+  const copied = main.filter(x => x.headline && x.vo && (() => { const h = norm([].concat(x.headline).join(' ')), v = norm(x.vo); return h.length >= 6 && h.filter(w => v.includes(w)).length / h.length > 0.9 && h.length >= v.length * 0.7; })());
+  add(!copied.length, 'Headlines are keywords, not the transcript', copied.length ? `${copied.length} scene(s) repeat the narration word for word` : 'short keyword headlines', `shorten: ${copied.slice(0, 3).map(x => x.id).join(', ')}`);
+  // 8. ending opens a new question (Part 2) or loops back
+  const last = [...main].reverse().find(x => x.vo) || {};
+  const opens = /\?\s*$/.test(String(last.vo || '').trim()) || !!reel.series?.next || /part\s*2|next|tomorrow|follow/i.test(String(last.vo || ''));
+  if (!WIDE) add(opens, 'Ending opens the next question', opens ? 'ends on a question / Part 2 tease' : 'ending closes everything', 'end on the new, related question Part 2 will answer (last 5 s)');
+  // 9. 16:9: end card long enough for YouTube end screens (5–20 s)
+  if (WIDE) { const endDur = (main[main.length - 1] || {}).dur || 0; add(endDur >= 8, 'End card covers the end screen', `last scene ${endDur.toFixed(1)} s`, 'give the end card "min": 18 so YouTube end-screen elements fit'); }
+  const score = out.filter(x => x.ok).length;
+  return { score: `${score}/${out.length}`, checks: out };
+}
+function printEngagement(e) {
+  console.log(`\nEngagement check: ${e.score}  (rules and sources: references/engagement.md)`);
+  for (const c of e.checks) console.log(`  ${c.ok ? '✔' : '✘'} ${c.rule}: ${c.detail}${c.ok ? '' : '\n      → ' + c.fix}`);
+}
+
 function chaptersText() {
   const ch = scenes.filter(s => s.chapter && !s._beatOf).map(s => ({ t: s.start, title: String(s.chapter) }));
   if (!ch.length) return null;
@@ -324,11 +372,12 @@ if (flag('stills') || opt('at')) {
   const cols = Math.min(6, shots.length), rows = Math.ceil(shots.length / cols);
   const contact = path.join(build, 'contact.jpg');
   ff(['-framerate', '1', '-start_number', '1', '-i', path.join(dir, '%02d.png'), '-vf', `scale=300:-1,tile=${cols}x${rows}:padding=6:color=white`, '-frames:v', '1', '-update', '1', contact]);
-  const chs = chaptersText();
+  const chs = chaptersText(), eng = opt('at') ? null : engagementCheck();
   console.log(JSON.stringify({ mode: 'stills', dir, contact, total: TOTAL, frames: shots.map(s => `${s.name}.png = ${s.id} @${s.tt.toFixed(2)}s`),
     scene_starts: scenes.map(s => `${s.id} ${s.start.toFixed(2)}${s.transition ? ' ' + s.transition : ''}`),
     ...(chs ? { chapters: chs.text.trim().split('\n'), chapter_warnings: chs.warn } : {}),
-    ...(AI_MISSING.length ? { ai_images_missing: AI_MISSING } : {}) }, null, 1));
+    ...(AI_MISSING.length ? { ai_images_missing: AI_MISSING } : {}), ...(eng ? { engagement: eng.score } : {}) }, null, 1));
+  if (eng) printEngagement(eng);
   aiMissingNote();
   process.exit(0);
 }
@@ -393,7 +442,10 @@ if (flag('no-audio') || !voScenes.length) {
   fs.copyFileSync(silent, finalPath);
 } else {
   const sfxDir = path.join(build, 'sfx'); fs.mkdirSync(sfxDir, { recursive: true });
-  const { PRESETS, presetFile, aiSfx } = await import('./sfx.mjs');
+  const { PRESETS, presetFile, aiSfx, findSound, REAL, REAL_DUR } = await import('./sfx.mjs');
+  const { addCredit } = await import('./library.mjs');
+  const realOn = audioCfg.real_sfx !== false, netOk = !flag('offline');
+  let realUsed = 0;
   const inputs = []; const chains = []; const voLabels = []; const fxLabels = []; let nIn = 0;
   const add = (f, loop) => { if (loop) inputs.push('-stream_loop', '-1'); inputs.push('-i', f); return nIn++; };
   const ms = x => Math.max(0, Math.round(x * 1000));
@@ -403,22 +455,31 @@ if (flag('no-audio') || !voScenes.length) {
   }
   if (audioCfg.sfx !== false) {
     let aiOk = audioCfg.ai_sfx === true, aiUsed = 0, aiFell = 0;
-    for (const e of events) {
+    for (const [ei, e] of events.entries()) {
       if (e.t >= TOTAL) continue;
-      let file = null;
-      if (e.prompt) {
+      let file = null, natural = null;
+      const lib = async q => {                                       // local packs + free CC0 recordings (cached for every project)
+        const r = await findSound(q, { proj, allowNetwork: netOk, variant: ei });
+        if (!r) return null;
+        if (r.credit) addCredit(proj, 'sound', path.relative(proj, r.file).replace(/\\/g, '/'), r.credit);
+        realUsed++; return r.file;
+      };
+      if (e.file) { const p = path.resolve(proj, e.file); if (fs.existsSync(p)) file = p; else console.warn('! sound file missing: ' + e.file); }
+      if (!file && e.find) { file = await lib(e.find); if (file) natural = 2.5; }
+      if (!file && e.prompt) {
         const r = await aiSfx(e, { allowNetwork: aiOk });            // cached sounds are reused even when ai_sfx is off
-        if (r === 'DENIED') { aiOk = false; } else if (r) { file = r; aiUsed++; }
-        if (!file) { aiFell++; file = presetFile(e.fallback && PRESETS[e.fallback] ? e.fallback : (PRESETS[e.type] ? e.type : 'swish'), sfxDir); }
-      } else file = presetFile(e.type, sfxDir);
+        if (r === 'DENIED') { aiOk = false; } else if (r) { file = r; aiUsed++; } else aiFell++;
+      }
+      if (!file && realOn && REAL[e.type]) { file = await lib(REAL[e.type]); if (file) natural = REAL_DUR[e.type] || 1.5; }
+      if (!file) file = presetFile(e.fallback && PRESETS[e.fallback] ? e.fallback : (PRESETS[e.type] ? e.type : 'swish'), sfxDir);
       if (!file) continue;
       const k = add(file, e.loop);
-      const d = e.dur || (e.loop ? 4 : null);
+      const d = e.dur || (e.loop ? 4 : natural);
       const trim = d ? `atrim=0:${Math.max(0.1, Math.min(d, TOTAL - e.t)).toFixed(3)},afade=t=out:st=${Math.max(0, Math.min(d, TOTAL - e.t) - 0.12).toFixed(3)}:d=0.12,` : '';
       const fadeIn = e.loop ? 'afade=t=in:d=0.3,' : '';
       chains.push(`[${k}:a]aformat=sample_rates=48000:channel_layouts=stereo,${trim}${fadeIn}volume=${(e.vol * (audioCfg.sfx_volume ?? 1)).toFixed(3)},adelay=${ms(e.t)}:all=1[x${k}]`); fxLabels.push(`[x${k}]`);
     }
-    if (aiUsed || aiFell) console.log(`sfx: ${aiUsed} AI sounds${aiFell ? `, ${aiFell} fell back to presets${audioCfg.ai_sfx ? '' : ' (AI sound effects are off in settings)'}` : ''}`);
+    if (aiUsed || aiFell || realUsed) console.log(`sfx: ${realUsed} real recordings, ${aiUsed} AI sounds${aiFell ? `, ${aiFell} AI cues fell back${audioCfg.ai_sfx ? '' : ' (AI sound effects are off in settings)'}` : ''}`);
   }
   let bedLabel = null;
   if (audioCfg.music) {
@@ -495,8 +556,15 @@ ff(['-i', finalPath, '-vf', `fps=${Math.max(0.2, 24 / TOTAL).toFixed(3)},scale=2
 if (reel.series?.name && !preview) {        // keep the workspace's series memory current
   try { const { syncSeries } = await import('./series.mjs'); syncSeries(path.dirname(proj)); } catch (e) { console.warn('! series sync skipped: ' + e.message); }
 }
+const { readCredits, creditLine } = await import('./library.mjs');
+const credits = readCredits(proj);
+let creditsPath = null;
+if (credits.length && !preview) {
+  creditsPath = path.join(outDir, 'credits.txt');
+  fs.writeFileSync(creditsPath, 'Credits (paste into the description; CC BY items require it):\n' + credits.map(c => '- ' + creditLine(c)).join('\n') + '\n');
+}
 const chs = preview ? null : chaptersText();
 let chaptersPath = null;
 if (chs) { chaptersPath = path.join(outDir, 'chapters.txt'); fs.writeFileSync(chaptersPath, chs.text); for (const w of chs.warn) console.warn('! chapters: ' + w); }
-console.log(JSON.stringify({ video: finalPath, srt: srtPath, contact: sheet, duration: TOTAL, fps, frames: nFrames, ...(chaptersPath ? { chapters: chaptersPath } : {}), ...(AI_MISSING.length ? { ai_images_missing: AI_MISSING } : {}) }, null, 1));
+console.log(JSON.stringify({ video: finalPath, srt: srtPath, contact: sheet, duration: TOTAL, fps, frames: nFrames, ...(chaptersPath ? { chapters: chaptersPath } : {}), ...(creditsPath ? { credits: creditsPath } : {}), ...(AI_MISSING.length ? { ai_images_missing: AI_MISSING } : {}) }, null, 1));
 aiMissingNote();

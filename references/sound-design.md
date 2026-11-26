@@ -68,3 +68,18 @@ Don't stack more than three sounds in one second, and keep any one cue's `vol` a
 tension: slow heartbeat + thin string (horror) · mystery: music-box arpeggio (curiosity) · pulse: ticking
 (investigation, countdowns) · calm: gentle arpeggio (wonder). All are levelled to the same loudness and
 ducked under the voice.
+
+## Real recordings and your own sound library
+
+- `audio.real_sfx` (default on): every built-in effect (whoosh, impact, heartbeat, clock, typing, paper,
+  pencil, glitch, braam…) is played from a real CC0 recording instead of the synthesized one. The first
+  render downloads up to 3 takes per effect from Freesound (through Openverse; CC0 only, no key needed),
+  trims the silence, evens the loudness and stores them in `sfx-library/` for every later project. Takes
+  rotate so repeated cues don't sound identical. Offline, or with `--offline`, the synthesized presets play.
+- Any cue can ask for a specific sound: `{ "find": "thunder rumble", "at": "word:storm", "vol": 0.5, "dur": 2 }`.
+- Your own file: `{ "file": "sfx/door.wav" }` (path inside the project). A project's `sfx/` folder and
+  `sfx-library/` are searched by file name first, so drop in sound packs (Sonniss GDC bundles,
+  purchased libraries) and name files by what they are.
+- Order for every cue: your file → your folders → real CC0 recording → ElevenLabs AI sound (if on) → preset.
+- Credits for downloaded sounds are added to the project's `credits.json` (CC0 needs none, but it's recorded).
+- `node scripts/sfx.mjs find "glass shatter"` pre-fetches a sound; `node scripts/sfx.mjs library` lists the library.

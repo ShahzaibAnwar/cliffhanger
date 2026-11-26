@@ -123,6 +123,77 @@ export async function aiSfx(c, { allowNetwork = true } = {}) {
   } catch (e) { console.warn(`! AI sound "${c.prompt}" failed: ${e.message}`); return null; }
 }
 
+// ---------- real recordings: local library + free CC0 sounds (Freesound via Openverse) ----------
+// Resolution for a cue: { file } (your own) → <project>/sfx/ and sfx-library/ (matched by filename words)
+// → a CC0 recording downloaded once into sfx-library/ (reused by every project) → AI sound → synthesized preset.
+// Drop your own packs (wav/mp3/ogg/flac) into sfx-library/ (any subfolder): file names are the search words.
+export const LIB_DIR = path.join(SKILL_DIR, 'sfx-library');
+const AUDIO = /\.(wav|mp3|ogg|flac|m4a|aiff?)$/i;
+// what each built-in effect sounds like in real life (used when audio.real_sfx is on)
+// natural length of each effect when a real recording stands in for it (seconds)
+export const REAL_DUR = { swish: 0.6, whoosh: 0.9, whoosh_low: 1.2, paper: 1, pop: 0.4, ding: 1.2, thud: 0.8, impact: 1.2, boom: 2.5, braam: 3,
+  riser: 3, heartbeat: 1.3, clock: 2, buzz: 1.5, glitch: 0.8, shutter: 0.6, typing: 1.6, scribble: 1.2, scratch: 1.2, water: 1.5 };
+export const REAL = {
+  swish: 'swish', whoosh: 'whoosh swoosh', whoosh_low: 'deep whoosh', paper: 'paper rustle', pop: 'pop', ding: 'ding bell',
+  thud: 'thud', impact: 'impact hit', boom: 'cinematic boom', braam: 'cinematic braam', riser: 'riser', heartbeat: 'heartbeat',
+  clock: 'clock ticking', buzz: 'electric buzz', glitch: 'glitch', shutter: 'camera shutter', typing: 'keyboard typing',
+  scribble: 'pencil scribble', scratch: 'pencil writing on paper', water: 'water splash',
+};
+const words = s => String(s).toLowerCase().replace(/\.[a-z0-9]+$/, '').split(/[^a-z0-9]+/).filter(w => w.length > 1);
+function listAudio(dir) {
+  const out = [];
+  if (!fs.existsSync(dir)) return out;
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) out.push(...listAudio(p)); else if (AUDIO.test(e.name)) out.push(p);
+  }
+  return out;
+}
+function readIndex() { try { return JSON.parse(fs.readFileSync(path.join(LIB_DIR, 'index.json'), 'utf8')); } catch { return {}; } }
+function matches(query, dirs) {
+  const q = words(query); if (!q.length) return [];
+  const idx = readIndex();
+  return dirs.flatMap(listAudio).map(f => {
+    const meta = idx[path.basename(f)], w = new Set([...words(path.relative(LIB_DIR, f)), ...(meta ? words(meta.query + ' ' + meta.title) : [])]);
+    return { f, hits: q.filter(x => w.has(x)).length };
+  }).filter(m => m.hits === q.length).map(m => m.f).sort();
+}
+// Trim leading silence, keep at most `max` s, fade out, even loudness.
+function processClip(src, out, max = 6) {
+  const r = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', src, '-af',
+    `silenceremove=start_periods=1:start_threshold=-45dB,atrim=0:${max},afade=t=out:st=${Math.max(0, max - 0.25)}:d=0.25,loudnorm=I=-20:TP=-2:LRA=11`,
+    '-ar', '48000', '-ac', '2', '-c:a', 'libmp3lame', '-q:a', '3', out], { encoding: 'utf8' });
+  return r.status === 0;
+}
+// Returns { file, credit } or null. variant picks among several takes (so repeated cues don't sound identical).
+export async function findSound(query, { proj = null, allowNetwork = true, variant = 0, licence = 'cc0', takes = 3 } = {}) {
+  const dirs = [proj && path.join(proj, 'sfx'), LIB_DIR].filter(Boolean);
+  let have = matches(query, dirs);
+  if (have.length < takes && allowNetwork) {
+    try {
+      const { searchSounds, download } = await import('./library.mjs');
+      const idx = readIndex();
+      const cands = (await searchSounds(query, { licence, n: 8, maxSeconds: 40 })).filter(c => !Object.values(idx).some(x => x.id === c.id));
+      for (const c of cands.slice(0, takes - have.length)) {
+        const slug = query.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30);
+        const raw = path.join(CACHE_DIR, 'dl-' + c.id.replace(/[^\w-]/g, '') + path.extname(new URL(c.url).pathname || '.mp3'));
+        const out = path.join(LIB_DIR, `${slug}-${c.id.replace(/[^\w-]/g, '').slice(-10)}.mp3`);
+        fs.mkdirSync(LIB_DIR, { recursive: true });
+        try { await download(c.url, raw); } catch (e) { console.warn(`! sound download failed (${c.title.slice(0, 40)}): ${e.message}`); continue; }
+        if (!processClip(raw, out)) { console.warn(`! could not process sound ${c.title.slice(0, 40)}`); continue; }
+        fs.rmSync(raw, { force: true });
+        idx[path.basename(out)] = { query, id: c.id, title: c.title, creator: c.creator, licence: c.licence, licence_version: c.licence_version, source: c.source, page: c.page };
+        fs.mkdirSync(LIB_DIR, { recursive: true }); fs.writeFileSync(path.join(LIB_DIR, 'index.json'), JSON.stringify(idx, null, 1));
+        console.log(`  + sound "${query}": ${c.title.slice(0, 50)} (${c.licence}, ${c.source})`);
+      }
+      have = matches(query, dirs);
+    } catch (e) { console.warn(`! sound search "${query}" failed: ${e.message.slice(0, 120)}`); }
+  }
+  if (!have.length) return null;
+  const file = have[Math.abs(variant) % have.length], meta = readIndex()[path.basename(file)];
+  return { file, credit: meta ? { title: meta.title, creator: meta.creator, licence: meta.licence, licence_version: meta.licence_version, source: meta.source, page: meta.page } : null };
+}
+
 // ---------- CLI ----------
 // true when this file was run directly (also through a symlink/junction, e.g. ~/.claude/skills/cliffhanger)
 function isMainModule(url) {
@@ -131,7 +202,14 @@ function isMainModule(url) {
 if (process.argv[1] && isMainModule(import.meta.url)) {
   const [cmd, ...rest] = process.argv.slice(2);
   const opt = (n, d) => { const i = rest.indexOf('--' + n); return i >= 0 ? rest[i + 1] : d; };
-  if (cmd === 'list' || !cmd) {
+  if (cmd === 'find') {          // node sfx.mjs find "door creak" [--takes 3] [--licence cc0|safe]
+    const q = rest.filter(x => !x.startsWith('--') && x !== opt('takes') && x !== opt('licence')).join(' ');
+    const r = await findSound(q, { takes: +opt('takes', 3), licence: opt('licence', 'cc0') });
+    console.log(r ? `ready: use { "find": "${q}" } in a sfx cue  (${path.relative(SKILL_DIR, r.file)})` : 'nothing found; try simpler words, or drop your own file into sfx-library/');
+  } else if (cmd === 'library') {
+    const files = listAudio(LIB_DIR); console.log(`${files.length} sounds in ${LIB_DIR}`);
+    for (const f of files) console.log('  ' + path.relative(LIB_DIR, f));
+  } else if (cmd === 'list' || !cmd) {
     for (const [k, [d]] of Object.entries(PRESETS)) console.log(`${k.padEnd(11)} ${d}`);
     console.log('\nmusic beds (audio.bed):'); for (const [k, [d]] of Object.entries(BEDS)) console.log(`${k.padEnd(11)} ${d}`);
   } else if (cmd === 'beds') {

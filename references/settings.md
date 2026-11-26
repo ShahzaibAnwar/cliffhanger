@@ -55,6 +55,7 @@ settings, `voiceover.py` retries automatically with a simpler request.
 | `content.max_scene_seconds` | stills check warns above this (add beats). 16:9 uses at least 8; `reel.max_scene_seconds` overrides per reel |
 | `images.max_rerolls` | automatic AI image re-rolls when the quality check fails |
 | `audio.bed, ai_music, music_prompt` | background mood / AI music |
+| `audio.real_sfx` | `true` (default): built-in effects use real CC0 recordings from the shared `sfx-library/` (downloaded once); `false` = synthesized only |
 | `render.gpu` | **GPU first** (default `auto`): browser draws on the dedicated graphics card; the encoder goes dedicated GPU (NVIDIA NVENC → AMD AMF → Apple VideoToolbox) → integrated graphics (Intel Quick Sync → VAAPI → Windows Media Foundation) → CPU libx264 last. Force one with `nvidia` / `amd` / `apple` / `intel`, or `off` for CPU only. Env `CLIFFHANGER_GPU` overrides |
 | `render.workers` | parallel capture tabs (default: CPU threads ÷ 3, 2–8). `--workers N` per render |
 | `render.browsers` | spread the tabs over this many browser processes (default 1; more is slightly faster and uses much more memory). Env `CLIFFHANGER_BROWSERS` |

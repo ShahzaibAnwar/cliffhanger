@@ -75,10 +75,40 @@ t('character references (offline)', () => {
   } finally { fs.rmSync(proj, { recursive: true, force: true }); }
 });
 
+const { prepare } = await import('./photos.mjs');
+const { findSound } = await import('./sfx.mjs');
+const tmpProj = fs.mkdtempSync(path.join(os.tmpdir(), 'cliff-media-'));
+t('photo prep: plain background → cut-out, busy → print', () => {
+  const plain = path.join(tmpProj, 'plain.png'), busy = path.join(tmpProj, 'busy.png');
+  sh('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'color=0xEDEDED:s=600x600', '-vf', 'drawbox=x=180:y=150:w=240:h=300:color=0x553311:t=fill', '-frames:v', '1', plain]);
+  sh('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=s=600x600', '-frames:v', '1', busy]);
+  const a = prepare(plain, path.join(tmpProj, 'a')), b = prepare(busy, path.join(tmpProj, 'b'));
+  if (a.kind !== 'cutout') throw new Error('plain background was not cut out: ' + JSON.stringify(a));
+  if (b.kind !== 'print') throw new Error('busy photo was cut out: ' + JSON.stringify(b));
+  return 'cut-out + print';
+});
+await (async () => {
+  const sdir = path.join(tmpProj, 'sfx'); fs.mkdirSync(sdir, { recursive: true });
+  sh('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'sine=f=300:d=0.5', path.join(sdir, 'creaky-door-01.wav')]);
+  const r = await findSound('creaky door', { proj: tmpProj, allowNetwork: false });
+  t('own sounds are found by their file names', () => { if (!r || !/creaky-door-01/.test(r.file)) throw new Error('project sfx/ file not matched'); return 'sfx/creaky-door-01.wav'; });
+})();
+t('video clips play frame-exact', () => {
+  const proj = path.join(tmpProj, 'clip'); fs.mkdirSync(path.join(proj, 'art'), { recursive: true });
+  sh('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=s=360x360:r=30:d=3', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', path.join(proj, 'art', 'c.mp4')]);
+  fs.writeFileSync(path.join(proj, 'reel.json'), JSON.stringify({ title: 'clip', scenes: [{ id: 'c', duration: 3, headline: ['CLIP'], visual: { type: 'art', video: 'art/c.mp4', finish: 'print', motion: 'none' } }] }));
+  const out = sh(process.execPath, [path.join(HERE, 'render.mjs'), proj, '--at', '0.5,2.0']);
+  if (/\[page error\]/.test(out)) throw new Error('page errors');
+  const [f1, f2] = ['01.png', '02.png'].map(f => fs.readFileSync(path.join(proj, 'build', 'stills', f)));
+  if (f1.equals(f2)) throw new Error('the clip did not move between 0.5 s and 2.0 s');
+  return 'moves between frames';
+});
+process.on('exit', () => { try { fs.rmSync(tmpProj, { recursive: true, force: true }); } catch { /* temp */ } });
+
 t('component gallery renders (stills)', () => {
   const out = sh(process.execPath, [path.join(HERE, 'render.mjs'), path.join(ROOT, 'examples', 'component-gallery'), '--stills']);
   if (/\[page error\]/.test(out)) throw new Error('page errors:\n' + out.split('\n').filter(l => l.includes('[page error]')).join('\n'));
-  const j = JSON.parse(out.slice(out.indexOf('{')));
+  const a0 = out.indexOf('{'), j = JSON.parse(out.slice(a0, out.indexOf('\n}', a0) + 2));   // JSON summary, before the engagement report
   for (const f of j.frames) { const p = path.join(j.dir, f.split(' ')[0]); if (!fs.existsSync(p) || fs.statSync(p).size < 20000) throw new Error('blank or missing still ' + f); }
   if (!fs.existsSync(j.contact)) throw new Error('no contact sheet');
   return `${j.frames.length} scenes → ${path.relative(ROOT, j.contact)}`;

@@ -245,3 +245,14 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 /* ---- 16:9 split layout: headline in the left column (art defaults to the right) ----
    Same strength as .hl, so .hl.center / .hl.label keep their own placement and reel.css still overrides it. */
 :where(.wide-split) .hl{right:52%;top:200px}
+/* ---- photo print: white paper border, tape, soft shadow ---- */
+.finish-print .clean img,.finish-print .clean video{border:14px solid #F5F2EA;border-bottom-width:38px;box-shadow:0 14px 26px rgba(30,25,15,.35);background:#F5F2EA}
+.finish-print.tone-bw .clean img,.finish-print.tone-bw .clean video{filter:grayscale(1) contrast(1.12)}
+.finish-print .inner{transform-style:preserve-3d}
+.tape{position:absolute;top:-16px;width:120px;height:34px;background:rgba(236,228,196,.82);box-shadow:0 2px 3px rgba(0,0,0,.12);z-index:3}
+.tape.t1{left:6%;transform:rotate(-8deg)}
+.tape.t2{right:6%;transform:rotate(7deg)}
+/* ---- torn paper photo ---- */
+.finish-torn .inner{filter:drop-shadow(0 10px 12px rgba(30,25,15,.35))}
+.finish-torn .clean{background:#F5F2EA;padding:10px}
+.obj video{display:block;width:100%;height:auto}

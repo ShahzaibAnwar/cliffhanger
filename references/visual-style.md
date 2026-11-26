@@ -148,3 +148,16 @@ torn yellow paint block, animated on twos so it feels hand-made. Turn it on with
   SVG, or ask for the object without its label and add the real label as an overlay.
 - `editorial-photo` is a realistic full-bleed style that leaves calm, darker space in the lower third for text
   (photo-scene backgrounds with `bg_prompt`, covers).
+
+## Real photos and found footage
+
+- Prefer real photos for real things (spacecraft, artefacts, places, historical people, archive scenes);
+  keep AI or drawn art for insides, diagrams and things no camera saw.
+- `photo_query` uses free licences only: CC0, public domain, CC BY (credit written automatically). NC/ND are
+  never used; CC BY-SA only with `--licence sa`, because share-alike can bind the whole video.
+- Plain backgrounds cut out cleanly (paper cut-outs); busy scenes become taped photo prints or torn paper.
+  Ask for "isolated on plain background" style words ("museum object", "studio") when you want a cut-out.
+- Not free even if a site shows them: logos, film/cartoon/game characters, and identifiable living private
+  people. For historical figures, use genuine public-domain photos (NASA, Library of Congress, Wikimedia).
+- Motion from clips: `video` (NASA has public-domain footage; Veo/Flow clips via `inbox.mjs pack`). Clips are
+  muted; keep them 3–8 s and calm; one clip per scene at most.

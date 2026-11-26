@@ -394,6 +394,16 @@ export function availableProviders() {
   return { cloudflare: !!(readEnv('CLOUDFLARE_ACCOUNT_ID') && readEnv('CLOUDFLARE_API_TOKEN')), gemini: !!readEnv('GEMINI_API_KEY') };
 }
 
+// The exact prompt sent to a provider (also used by inbox.mjs pack for manual Gemini/other apps).
+// Cut-outs ask for the complete subject with room around it (cropped subjects can't be cut out cleanly);
+// on black backgrounds a shadowed subject gets keyed out with the background, so ask for front light.
+export function fullPrompt(spec, style) {
+  const st = STYLES[style];
+  const subj = spec.image_prompt + (st.bg !== 'full' ? ', the whole subject, complete and uncropped, centred with empty space all around it' : '')
+    + (st.bg === 'dark' ? ', brightly lit from the front, no deep shadows on the subject' : '');
+  return st.p(subj);
+}
+
 export async function generate(spec, theme, cfg, proj, { provider } = {}) {
   const k = genKey(spec, theme, cfg, proj), st = STYLES[k.style];
   const av = availableProviders();
@@ -404,11 +414,7 @@ export async function generate(spec, theme, cfg, proj, { provider } = {}) {
   else order = ['cloudflare', 'gemini'];                        // FLUX.2 on Cloudflare handles references too
   order = order.filter(p => av[p]);
   if (!order.length) throw new Error('No image provider configured. Add a Cloudflare or Gemini key in the settings page (node scripts/settings.mjs → Images).');
-  // cut-outs: ask for the complete subject with room around it (cropped subjects can't be cut out cleanly);
-  // on black backgrounds a shadowed subject gets keyed out with the background, so ask for front light
-  const subj = spec.image_prompt + (st.bg !== 'full' ? ', the whole subject, complete and uncropped, centred with empty space all around it' : '')
-    + (st.bg === 'dark' ? ', brightly lit from the front, no deep shadows on the subject' : '');
-  const prompt = st.p(subj);
+  const prompt = fullPrompt(spec, k.style);
   const seed = spec.image_seed ?? (parseInt(k.hash.slice(0, 6), 16) % 100000);
   let lastErr;
   const tries = 1 + Math.max(0, cfg.max_rerolls ?? 2);
