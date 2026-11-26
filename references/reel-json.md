@@ -1,7 +1,14 @@
 # reel.json reference
 
-Canvas is always **1080 × 1920** (x, y below are in these pixels; `x,y` = the element's centre).
+Canvas is **1080 × 1920** by default (x, y below are in these pixels; `x,y` = the element's centre).
 Safe area: keep important things between y = 180 and y = 1770; headline zone is y ≈ 196–460.
+
+**16:9 (long YouTube videos):** `"format": { "width": 1920, "height": 1080 }` (any size works). Wide videos
+use the **split layout** by default: the headline sits in the left column, art defaults to the right
+(x ≈ 1380, y ≈ 560), and chips, captions, big numbers and ransom words default to the left column
+(x ≈ 480). `"layout": "center"` keeps everything centred instead. `headline_style: "center"` makes
+full-width chapter cards. The safe-zone check watches the YouTube player bar instead of Reels buttons, and
+the final render also writes `out/thumbnail.jpg` (1280 × 720).
 
 ```jsonc
 {
@@ -9,7 +16,8 @@ Safe area: keep important things between y = 180 and y = 1770; headline zone is 
   "slug": "hypnic-jerk",
   "series": { "name": "Body Glitches", "part": 1, "next": "The exploding head" },
   "brand": { "name": "YOUR BRAND", "handle": "@yourhandle", "accent": "#C8302A" },
-  "format": { "fps": 30 },
+  "format": { "fps": 30 },                   // 16:9: { "width": 1920, "height": 1080, "fps": 30 }
+  "layout": "split",                          // 16:9 only: split (default) | center
   "voice": {
     "provider": "auto",                       // auto | elevenlabs | edge
     "elevenlabs": { "voice_id": "nPczCjzI2devNBz1zQrb", "model_id": "eleven_multilingual_v2",
@@ -32,7 +40,7 @@ Safe area: keep important things between y = 180 and y = 1770; headline zone is 
 | `section` | small mono label top-left ("THE BITE"); FIG. numbers are automatic |
 | `chrome` | `false` hides meta row + brand tag (use on end card) |
 | `vo` | the spoken line. Scene length = VO length + `pad` (0.08 s) unless `duration` is set |
-| `vo_tts` | optional alternate text sent to TTS (pronunciation fixes) |
+| `vo_tts` | optional alternate text sent to TTS (pronunciation fixes: spell out years and codes, e.g. vo "July 1969 … 1202" → vo_tts "July nineteen sixty-nine … twelve oh two"; the subtitles keep `vo`) |
 | `duration`, `min`, `pad`, `lead` | timing overrides; `lead` delays the VO inside the scene |
 | `headline` | `["LINE ONE", "PUNCH LINE"]` — line 2 is red. One string = one line |
 | `accent_line` | which line is red (default 1) |

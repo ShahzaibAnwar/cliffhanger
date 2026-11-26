@@ -7,7 +7,13 @@
   const D = window.REEL;
   // canvas size: vertical 1080x1920 unless the reel sets format.width/height (e.g. 1920x1080 for long-form)
   const W = (D.size && D.size.w) || 1080, H = (D.size && D.size.h) || 1920, WIDE = W > H;
+  // 16:9 default "split" layout: headline in the left column, art on the right, text overlays on the left.
+  // reel.layout "center" keeps everything centred. Explicit x/y always win.
+  const SPLIT = WIDE && D.layout !== 'center';
+  const ART_X = SPLIT ? Math.round(W * 0.72) : W / 2, ART_Y = SPLIT ? Math.round(H * 0.52) : Math.round(H * 0.615);
+  const TXT_X = SPLIT ? Math.round(W * 0.25) : W / 2;
   const stage = document.getElementById('stage');
+  if (SPLIT) stage.classList.add('wide-split');
   const scenes = D.scenes;
   const events = [];             // sound-effect cues, read by render.mjs
   window.__events = events;
@@ -182,7 +188,7 @@
 
   // ---------- objects (art) ----------
   function obj(spec, parent, defs) {
-    const o = Object.assign({ x: W / 2, y: Math.round(H * 0.615), w: WIDE ? 760 : 820, rot: 0, motion: 'float', enter: D.art_enter || 'fadeUp', at: 0.05, dur: 0.6, shadow: true }, defs || {}, spec);
+    const o = Object.assign({ x: ART_X, y: ART_Y, w: WIDE ? 760 : 820, rot: 0, motion: 'float', enter: D.art_enter || 'fadeUp', at: 0.05, dur: 0.6, shadow: true }, defs || {}, spec);
     const wrap = h('div', 'obj', parent);
     wrap.style.left = o.x + 'px'; wrap.style.top = o.y + 'px'; wrap.style.width = o.w + 'px';
     if (o.z) wrap.style.zIndex = o.z;
@@ -581,7 +587,7 @@
 
   // ---------- overlays ----------
   function overlay(o, sc, svgLayer) {
-    const x = o.x != null ? o.x : W / 2, y = o.y != null ? o.y : Math.round(H * 0.78), rot = o.rot || 0;
+    const x = o.x != null ? o.x : TXT_X, y = o.y != null ? o.y : Math.round(H * (SPLIT ? 0.72 : 0.78)), rot = o.rot || 0;
     const place = (el, defEnter, defDur) => {
       el.style.left = x + 'px'; el.style.top = y + 'px';
       return enter(el, o, defEnter, 0.2, defDur || 0.4, o.anchor === 'left' ? 'translate(0,-50%)' : 'translate(-50%,-50%)', rot);
@@ -685,7 +691,7 @@
       }
       case 'ransom': {   // letters cut from different papers, stuck down one per frame
         const r = h('div', 'ov ransom', sc);
-        r.style.left = (o.x != null ? o.x : W / 2) + 'px'; r.style.top = (o.y != null ? o.y : Math.round(H * 0.5)) + 'px';
+        r.style.left = (o.x != null ? o.x : TXT_X) + 'px'; r.style.top = (o.y != null ? o.y : Math.round(H * 0.5)) + 'px';
         if (o.align !== 'left') r.style.transform = 'translateX(-50%)';
         const size = o.size || 130, t0 = T(o.at, 0.1), every = o.every || 1 / 30;
         const looks = ['rn-a', 'rn-b', 'rn-c', 'rn-d', 'rn-e'];

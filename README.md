@@ -62,6 +62,9 @@ subtitles included), and `variants.mjs` renders alternative hooks for A/B tests.
 grid-crop preview, platform safe-zone and long-scene checks, beats (several visuals per line),
 newspaper clippings, comparisons, timelines, zoom lenses, map pins, and five music moods.
 
+**Long videos (16:9):** set `format` to 1920×1080 for YouTube: headlines move to a left column and art to the
+right automatically, chapter cards, a YouTube-player safe-zone check and a 1280×720 `thumbnail.jpg`.
+
 **AI illustrations:** `scripts/imagegen.mjs` generates engraved, cutaway, x-ray or photo-style
 illustrations with **Cloudflare Workers AI** (FLUX schnell, about 170 free images a day) or **Google Gemini**
 (paid, billing required). **Characters** stay the same person from scene to scene: the first image of a

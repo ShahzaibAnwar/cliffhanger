@@ -19,11 +19,21 @@
    else Gemini. Keys: settings page (node settings.mjs) → Images, or env vars
    CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN, GEMINI_API_KEY. */
 import fs from 'node:fs';
+import dns from 'node:dns';
+dns.setDefaultResultOrder('ipv4first');   // some networks time out on the IPv6 route to Cloudflare/ElevenLabs
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { readEnv, loadSettings } from './settings-lib.mjs';
+
+// network blips ("fetch failed", resets, timeouts) are retried twice before a provider counts as failed
+async function netFetch(url, opts) {
+  for (let k = 0; ; k++) {
+    try { return await fetch(url, opts); }
+    catch (e) { if (k >= 2) throw e; await new Promise(r => setTimeout(r, 800 * (k + 1))); }
+  }
+}
 
 const NO_TEXT = 'Absolutely no text, letters, numbers, captions, labels, signatures or watermark. No border, no frame, no plate lines, no box around the subject.';
 // bg: what the image background will be → how it blends into the reel (multiply on paper, screen on dark)
@@ -172,7 +182,7 @@ async function cloudflareFlux2(prompt, cfg, refPath) {
   }
   let r;
   for (let k = 0; k < 3; k++) {
-    r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acct}/ai/run/${model}`, { method: 'POST', headers: { Authorization: `Bearer ${tok}` }, body: form });
+    r = await netFetch(`https://api.cloudflare.com/client/v4/accounts/${acct}/ai/run/${model}`, { method: 'POST', headers: { Authorization: `Bearer ${tok}` }, body: form });
     if (r.ok || !/NSFW|flagged/i.test(await r.clone().text())) break;
   }
   const ct = r.headers.get('content-type') || '';
@@ -188,7 +198,7 @@ async function cloudflare(prompt, cfg, seed, refPath) {
   if (refPath || /flux-2/.test(cfg.cloudflare_model || '')) return cloudflareFlux2(prompt, cfg, refPath);
   const model = cfg.cloudflare_model || '@cf/black-forest-labs/flux-1-schnell';
   // seed isn't accepted by every model; a new image_seed still re-rolls because it changes the cache key
-  const call = body => fetch(`https://api.cloudflare.com/client/v4/accounts/${acct}/ai/run/${model}`, {
+  const call = body => netFetch(`https://api.cloudflare.com/client/v4/accounts/${acct}/ai/run/${model}`, {
     method: 'POST', headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   let r = await call({ prompt, steps: Math.min(8, cfg.cloudflare_steps || 6) });
   for (let k = 0; k < 2 && r.status === 400; k++) {                      // false "NSFW" flags are random: retry; else drop options
@@ -213,7 +223,7 @@ async function gemini(prompt, cfg, aspect, refPath) {
     prompt = `Using the attached image as the reference for the subject's exact look and drawing style: ${prompt}`;
   }
   parts.push({ text: prompt });
-  const call = gen => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+  const call = gen => netFetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST', headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
     body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: gen }) });
   let r = await call({ responseModalities: ['IMAGE'], imageConfig: { aspectRatio: aspect || '1:1' } });

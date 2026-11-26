@@ -242,3 +242,6 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .rn-e{background:#1B1A18;color:var(--paint);font-family:Anton,Impact,sans-serif}
 /* ---- scribble transition ---- */
 .scrib{position:absolute;inset:0;width:100%;height:100%;z-index:60;pointer-events:none;clip-path:inset(0 0 0 101%)}
+/* ---- 16:9 split layout: headline in the left column (art defaults to the right) ----
+   Same strength as .hl, so .hl.center / .hl.label keep their own placement and reel.css still overrides it. */
+:where(.wide-split) .hl{right:52%;top:200px}

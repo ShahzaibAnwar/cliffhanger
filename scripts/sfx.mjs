@@ -8,6 +8,8 @@
      node sfx.mjs preview [out.wav]            all presets back-to-back (listen to pick)
      node sfx.mjs gen "glass shattering" [--dur 1.5] [--influence 0.5] [--loop]   test an AI cue (uses credits) */
 import fs from 'node:fs';
+import dns from 'node:dns';
+dns.setDefaultResultOrder('ipv4first');   // some networks time out on the IPv6 route to Cloudflare/ElevenLabs
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';

@@ -177,7 +177,7 @@ resolveAssets(scenes);
 // canvas size: vertical by default; reel.format.width/height switches it (e.g. 1920x1080 for long-form)
 const W = parseInt(reel.format?.width || 1080, 10), H = parseInt(reel.format?.height || 1920, 10), WIDE = W > H;
 const data = {
-  size: { w: W, h: H },
+  size: { w: W, h: H }, layout: reel.layout || null,
   brand: Object.assign({ name: 'YOUR BRAND', accent: '#C8302A' }, reel.brand || {}),
   scenes, total: TOTAL,
   transition: ANIM.transition || 'auto', camera: ANIM.camera || 'push', film_fx: ANIM.film_fx !== false,

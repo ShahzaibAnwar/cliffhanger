@@ -202,6 +202,15 @@ It copies visuals and AI images, picks the series' voice for that language, plac
 cue at the same spot in the translated line, and writes `<project>-ur/`. Then voiceover → render.
 Keep technical words in English where people say them that way.
 
+## 7.55 Long videos (16:9, optional)
+
+For a long YouTube video, set `"format": { "width": 1920, "height": 1080 }`. Same engine, same scene types;
+the split layout puts headlines left and art right automatically (see reel-json.md → 16:9). Long-video habits
+that work: a chapter card per section (`headline_style: "center"`, ~1.7 s, `transition: "glitch"`), `vo_tts`
+for every year, number and code the voice would misread, `min` to give a visual beat time to land, and a
+generator script (`build_reel.py`) when a video has 40+ scenes, so positions stay consistent. Renders use the
+GPU and parallel tabs, so 5,000+ frames take a few minutes. The cover becomes `out/thumbnail.jpg`.
+
 ## 7.6 Hook A/B variants (optional)
 
 Add `"hook_variants": [{ "id": "b", "vo": "...", "headline": [...] }]` to reel.json and run
