@@ -45,5 +45,6 @@
     "emoji": "light"
   },
   "output": { "projects_dir": "" },
+  "style": { "auto": false },
   "render": { "gpu": "auto", "workers": 0, "browsers": 1 }
 }

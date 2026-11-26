@@ -217,9 +217,11 @@ for a marker-scribble wipe anywhere (`transition_color` sets its colour; default
 
 - `"subtitles": { "burn": true, "style": "word"|"karaoke"|"pop"|"box"|"tape"|"line", "y": 1500, "size": 60, "max_words": 4, "lang": "auto"|"vo" }`
   (karaoke: a colour fill sweeps through each word · pop: words pop in, key words bigger and highlighted · box: the
-  spoken word in an accent box). See them all in `gallery/index.html`.
+  spoken word in an accent box). See them all in `gallery/index.html`. `y` defaults to 1500 on 9:16 and just above
+  the player bar on 16:9; a `y` that doesn't fit the canvas is ignored. Stills are taken while a caption is showing.
 - `"look": "case-file"|"collage"|"chalkboard"|"blueprint"|"comic"|"vhs"|"newsprint"`: the visual world (any scene can
-  override with its own `look`). Each works on paper and dark scenes.
+  override with its own `look`). Each works on paper and dark scenes. `"look": "auto"` (+ `"topic": "…"`) picks look,
+  caption style and music mood from the topic with the style map (`style.mjs`); values set in the reel are kept.
 - `"mascot": { "image": "art/me.png", "mouth": [0.5, 0.62], "chin": 0.7, "jaw_w": 0.22, "mouth_style": "stretch"|"gap", "scenes": "all", "x", "y", "w" }`:
   a talking paper puppet (jaw follows the voice).
 - `"cover": { "scene": "builds", "text": ["SOMEONE'S", "IN THE ROOM"], "size": 150, "theme": "dark", "keep_overlays": false }`
@@ -228,9 +230,11 @@ for a marker-scribble wipe anywhere (`transition_color` sets its colour; default
 
 ## Maps and charts
 
-**map** — `highlight` (ISO-3 codes or country names), `route: [[lon, lat], …]` (`route_at`, `route_dur`, `curve`:
+**map** — `highlight` (ISO-3 codes or country names; `highlight_style`: `solid` · `soft`, automatic soft fill when the
+view sits inside a highlighted country), `route: [[lon, lat], …]` (`route_at`, `route_dur`, `curve`:
 false for straight lines, `dashed`), `points: [{lon, lat, label, at}]`, `bounds: [west, south, east, north]`, `x`,
-`y`, `w`, `h`, `at`. Outlines: Natural Earth 1:110m (public domain), bundled in `assets/geo/`.
+`y`, `w`, `h`, `at`. Outlines: Natural Earth 1:110m (public domain), bundled in `assets/geo/`: right for countries and
+regions, too coarse for a city (the render warns; use a photo or illustrated map there).
 
 **chart** — `kind`: `line` (default) · `bar`; data from `csv` + `x_col` + `y_col` (+ `last`: N most recent rows), or
 inline `data: [{x, y}]`; `title`, `unit`, `prefix`, `format: "raw"` (no thousands separators), `zero: false`,

@@ -304,7 +304,7 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .scene.look-newsprint .bg{background:linear-gradient(90deg,transparent 0 33%,rgba(0,0,0,.18) 33.1%,transparent 33.3%,transparent 66.6%,rgba(0,0,0,.18) 66.7%,transparent 66.9%),
   radial-gradient(ellipse 80% 60% at 50% 40%,rgba(255,255,255,.35),transparent 70%),#EFE8D6}
 .scene.look-newsprint.theme-dark .bg{background:#2A2722}
-.scene.look-newsprint.theme-dark{--ink:#EFE8D6;--dark-ink:#EFE8D6}
+.scene.look-newsprint.theme-dark{--ink:#EFE8D6;--dark-ink:#EFE8D6;--accent:#F0705F}
 .scene.look-newsprint .hl{font-weight:900;text-transform:none;letter-spacing:-.01em;line-height:1.05;border-top:6px double currentColor;border-bottom:2px solid currentColor;padding:14px 0 18px}
 .scene.look-newsprint .hl .l2{font-style:italic}
 .scene.look-newsprint .meta{font-family:'Special Elite',var(--mono);color:#333;border-bottom:3px double rgba(0,0,0,.6)}
@@ -318,7 +318,7 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .subs.karaoke i:not(.on){--fill:0%}
 .subs.karaoke i.on:not(.now){--fill:100%}
 /* pop: words pop in one by one; key words are bigger and in the accent colour */
-.subs.pop i{display:inline-block;opacity:0;transform-origin:50% 70%}
+.subs.pop i{display:inline-block;opacity:0;transform-origin:50% 70%;margin:0 .14em}
 .subs.pop i.on{opacity:1}
 .subs.pop i.key.on{color:var(--hl)}
 /* box: the current word sits in a highlight box (the "short-form app" look) */
@@ -359,3 +359,8 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .pup-mouth{position:absolute;inset:0;background:#2A0E0E}
 .mascot .pup-in{filter:drop-shadow(0 10px 12px rgba(30,25,15,.3))}
 .mascot.finish-collage .pup-up img,.mascot.finish-collage .pup-jaw img{filter:url(#cf-halftone) drop-shadow(3px 0 0 #F3EFE6) drop-shadow(-3px 0 0 #F3EFE6) drop-shadow(0 3px 0 #F3EFE6) drop-shadow(0 -3px 0 #F3EFE6)}
+
+/* tape and white boxes always carry dark text, whatever the look's ink colour */
+.end .next{color:#1B1A18}
+/* map: when zoomed inside a highlighted country, fill it lightly so it doesn't become a solid block */
+.map .land-hi path.soft{fill-opacity:.22 !important;stroke:var(--accent);stroke-width:3}

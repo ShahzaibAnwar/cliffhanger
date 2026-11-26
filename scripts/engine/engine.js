@@ -460,7 +460,10 @@
         const d = c.r.map(r => 'M' + r.map(P).map(([x, y]) => x.toFixed(1) + ',' + y.toFixed(1)).join('L') + 'Z').join('');
         if (!isHi(c)) { sv('path', { d }, land); return; }
         const p = sv('path', { d }, hiG); p.style.fillOpacity = 0;
-        A(p, 'fillo', T(v.highlight_at != null ? v.highlight_at : v.at, 0.4), 0.6, { base: 1 });
+        const xy = c.r.flat().map(P), bw = Math.max(...xy.map(q => q[0])) - Math.min(...xy.map(q => q[0])), bh = Math.max(...xy.map(q => q[1])) - Math.min(...xy.map(q => q[1]));
+        const soft = v.highlight_style === 'soft' || (v.highlight_style !== 'solid' && bw * bh > mw * mh * 1.5);   // zoomed inside it
+        if (soft) p.classList.add('soft');
+        A(p, 'fillo', T(v.highlight_at != null ? v.highlight_at : v.at, 0.4), 0.6, { base: soft ? 0.22 : 1 });
       });
       if (v.route && v.route.length > 1) {
         const q = v.route.map(P);
@@ -529,6 +532,7 @@
     },
     endcard(v, sc) {
       const e = h('div', 'end', sc); if (v.y) e.style.top = v.y + 'px';
+      else if (H < 1500) { e.style.top = Math.round(H * 0.2) + 'px'; e.style.transform = `scale(${(H / 1750).toFixed(3)})`; e.style.transformOrigin = '50% 0'; }   // 16:9: fit the shorter frame
       const parts = [];
       if (v.kicker) parts.push(h('div', 'k', e, esc(v.kicker)));
       if (v.title) parts.push(h('div', 't', e, esc(v.title)));
@@ -960,8 +964,9 @@
     }
     S = null;
     if (subsEl) {
-      const base = SUB.y || 1500, hgt = (SUB.size || 60) * 2.5;
-      const cands = [base, base - 150, base - 300, base + 120, 1180];
+      const base = SUBY, hgt = (SUB.size || 60) * 2.5;
+      const cands = [base, base - 150, base - 300, base + 120, Math.round(H * 0.615)].filter(y => y >= 140 && y + hgt <= H - 8);   // never off the canvas
+      if (!cands.length) cands.push(Math.max(140, H - hgt - 20));
       for (const s of scenes) {
         window.__seek(Math.max(s.start, s.end - 0.06));
         const rects = [...s._el.querySelectorAll('.ov,.term,.labfile,.np-row,.stat .num,.stat .lab,.bar-row,.end > *,.mascot')]
@@ -1059,10 +1064,12 @@
   }
   // ---------- burned-in subtitles (one layer over all scenes) ----------
   const SUB = D.subtitles && D.subtitles.burn ? D.subtitles : null;
+  // default: 1500 on 9:16, just above the player bar on 16:9; a y that doesn't fit this canvas (e.g. 1500 on 1080 high) is ignored
+  const SUBY = SUB ? (SUB.y != null && SUB.y + (SUB.size || 60) * 2.5 <= H ? SUB.y : (WIDE ? H - 200 : 1500)) : 0;
   let subsEl = null, subCur = null;
   if (SUB && (D.subs || []).length) {
     subsEl = h('div', 'subs ' + (SUB.style || 'word'), stage);
-    subsEl.style.top = (SUB.y || 1500) + 'px';
+    subsEl.style.top = (SUBY) + 'px';
     if (SUB.size) subsEl.style.fontSize = SUB.size + 'px';
   }
   const SUBSTYLE = SUB ? (SUB.style || 'word') : null;
@@ -1074,7 +1081,7 @@
     const c = D.subs.find(x => t >= x.t0 && t < x.t1 + 0.12) || null;
     if (c !== subCur) {
       subCur = c;
-      if (c) { const sc = scenes.find(x => c.t0 + 0.06 >= x.start && c.t0 + 0.06 < x.end) || scenes[0]; subsEl.style.top = (sc._subY || SUB.y || 1500) + 'px'; }
+      if (c) { const sc = scenes.find(x => c.t0 + 0.06 >= x.start && c.t0 + 0.06 < x.end) || scenes[0]; subsEl.style.top = (sc._subY || SUBY) + 'px'; }
       subsEl.innerHTML = c ? '<span class="sl">' + c.words.map(w => `<i${isKey(w.w, sc0(c)) ? ' data-k="1"' : ''}>` + esc(w.w) + '</i>').join(' ') + '</span>' : '';
     }
     if (!c) return;
@@ -1105,14 +1112,26 @@
         if (!isArt && (r.left < -2 || r.right > W + 2 || r.top < -2 || r.bottom > H + 2)) out.push({ scene: s.id, zone: 'off canvas (cut off)', what: (el.innerText || el.className).replace(/\s+/g, ' ').trim().slice(0, 40) });
         for (const z of Z) { const a = hit(r, z); if (a > (isArt ? area * 0.2 : area * (z.x0 > 900 ? 0.08 : 0.03))) out.push({ scene: s.id, zone: z.n, what: (isArt ? 'illustration' : (el.innerText || el.className).replace(/\s+/g, ' ').trim().slice(0, 40)) }); }
       });
+      // illustration vs page: mostly dark ink on a dark scene (or pale on paper) disappears
+      const lum = c => { const m = String(c).match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/); if (!m || (m[4] != null && +m[4] < 0.3)) return null;
+        const f = x => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(+m[1]) + 0.7152 * f(+m[2]) + 0.0722 * f(+m[3]); };
+      const bgL = lum(getComputedStyle(s._bg).backgroundColor) ?? (s.theme === 'dark' ? 0.02 : 0.8);
+      s._el.querySelectorAll('.obj .clean svg').forEach(svgEl => {
+        const ls = []; [...svgEl.querySelectorAll('path,circle,ellipse,rect,polygon,polyline,line')].slice(0, 300).forEach(el => { const cs = getComputedStyle(el); for (const k of ['fill', 'stroke']) { const L = lum(cs[k]); if (L != null) ls.push(L); } });
+        if (ls.length < 4) return;
+        const close = ls.filter(L => (Math.max(L, bgL) + 0.05) / (Math.min(L, bgL) + 0.05) < 1.6).length / ls.length;
+        if (close > 0.6) out.push({ scene: s.id, zone: 'low contrast with the page (art may vanish): use the paper theme or lighter art', what: 'illustration' });
+      });
       if (subsEl) {                                           // overlays fighting with subtitles
-        const sy = s._subY || SUB.y || 1500, band = { x0: 60, x1: 1020, y0: sy - 4, y1: sy + (SUB.size || 60) * 2.4 };
+        const sy = s._subY || SUBY, band = { x0: 60, x1: W - 60, y0: sy - 4, y1: sy + (SUB.size || 60) * 2.4 };
         s._el.querySelectorAll('.ov,.term,.labfile').forEach(el => { const r = el.getBoundingClientRect(); if (r.width && hit(r, band) > 0) out.push({ scene: s.id, zone: 'subtitle band', what: (el.innerText || el.className).replace(/\s+/g, ' ').trim().slice(0, 40) }); });
       }
     }
     return out;
   };
 
+  // caption state at time t (used by render.mjs to check every parallel tab draws captions like the main tab)
+  window.__subsProbe = function (t) { window.__seek(t); return subsEl ? `${subsEl.style.top}|${subsEl.textContent.trim()}|${getComputedStyle(subsEl).display}` : 'none'; };
   window.__seek = function (t) {
     let idx = scenes.findIndex(x => t >= x.start && t < x.end);
     if (idx < 0) idx = t < 0 ? 0 : scenes.length - 1;

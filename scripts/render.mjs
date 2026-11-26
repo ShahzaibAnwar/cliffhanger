@@ -25,6 +25,20 @@ if (!fs.existsSync(reelPath)) { console.error('No reel.json in ' + proj); proces
 const reel = JSON.parse(fs.readFileSync(reelPath, 'utf8'));
 const { loadSettings, deepMerge } = await import('./settings-lib.mjs');
 const SETTINGS = loadSettings();                 // user defaults; reel.json values win
+// a channel's own style lock: <workspace>/style.json ({ auto, map }) overrides settings.style for reels in that folder
+try { const ws = JSON.parse(fs.readFileSync(path.join(path.dirname(proj), 'style.json'), 'utf8')); SETTINGS.style = { ...(SETTINGS.style || {}), ...ws }; } catch { /* none */ }
+// automatic style: "look": "auto" (or no look while settings.style.auto is on) → look + caption style + music mood
+// from the topic, via the style map; anything the reel sets itself is kept
+if (reel.look === 'auto' || (!reel.look && !reel.animation?.look && SETTINGS.style?.auto && (!SETTINGS.animation?.look || SETTINGS.animation.look === 'auto'))) {
+  const { pickStyle, styleMap } = await import('./style.mjs');
+  const wide = (+reel.format?.width || 1080) > (+reel.format?.height || 1920);
+  const text = [reel.topic, reel.niche, reel.title, reel.series?.name, ...(reel.scenes || []).slice(0, 3).map(x => [].concat(x.headline || []).join(' ') + ' ' + (x.vo || ''))].filter(Boolean).join(' ');
+  const r = pickStyle(text, { wide, map: styleMap(SETTINGS) });
+  reel.look = r.look;
+  if (!reel.subtitles?.style) reel.subtitles = { ...(reel.subtitles || {}), style: r.captions };
+  if (!reel.audio?.music_mood && !reel.audio?.music && r.music_mood) reel.audio = { ...(reel.audio || {}), music_mood: r.music_mood };
+  console.log(`style: auto → ${r.look} · captions ${r.captions} · music ${r.music_mood || 'bed'}  (${r.why})`);
+}
 reel.brand = deepMerge(SETTINGS.brand || {}, reel.brand || {});
 reel.audio = deepMerge(SETTINGS.audio || {}, reel.audio || {});
 if (!reel.audio.music) reel.audio.music = null;
@@ -104,7 +118,7 @@ const sceneCountBeforeBeats = scenes.length;
 }
 
 // burned-in subtitle chunks
-const SUBS = deepMerge({ burn: false, style: 'word', y: 1500, size: 60, max_words: 4, lang: 'auto' }, deepMerge(SETTINGS.subtitles || {}, reel.subtitles || {}));
+const SUBS = deepMerge({ burn: false, style: 'word', size: 60, max_words: 4, lang: 'auto' }, deepMerge(SETTINGS.subtitles || {}, reel.subtitles || {}));
 function subtitleChunks() {
   const END = /(\.\.\.|[.?!,;:۔؟،।])$/, chunks = [], maxW = SUBS.max_words || 4;
   const sent = tt => { const o = []; let c = []; for (const w of String(tt).split(/\s+/).filter(Boolean)) { c.push(w); if (/(\.\.\.|[.?!۔؟।])$/.test(w)) { o.push(c); c = []; } } if (c.length) o.push(c); return o; };
@@ -178,6 +192,37 @@ let AI_MISSING = [];
 }
 // repeated as the last thing printed, so it can't scroll away unnoticed
 const aiMissingNote = () => { if (AI_MISSING.length) console.warn(`\n!!! ${AI_MISSING.length} picture(s)/clip(s) are missing: these scenes show the hand-drawn fallback.\n!!! Run  node scripts/imagegen.mjs "${proj}"  (AI images),  node scripts/photos.mjs project "${proj}"  (photos),\n!!! or  node scripts/inbox.mjs pack "${proj}"  for a list to make by hand, then render again.`); };
+// unknown option names used to pass silently ("motion": "sway"): warn with the closest valid name
+{
+  const KNOWN = {
+    enter: ['fade', 'fadeUp', 'fadeDown', 'pop', 'slam', 'slideL', 'slideR', 'slideUp', 'spring', 'swing', 'drop', 'zoom', 'blur', 'wipe', 'wipeDown', 'stick', 'sketch', 'none'],
+    motion: ['float', 'hover', 'kenburns', 'kenout', 'drift', 'pulse', 'spin', 'shiver', 'flutter', 'none'],
+    transition: ['auto', 'cut', 'whip', 'slide', 'zoom', 'glitch', 'flash', 'page', 'scribble'],
+    camera: ['push', 'pull', 'pan', 'tilt', 'drift', 'crash', 'none'],
+    look: ['auto', 'case-file', 'collage', 'chalkboard', 'blueprint', 'comic', 'vhs', 'newsprint'],
+    finish: ['collage', 'print', 'torn', 'none'],
+    theme: ['paper', 'dark', 'photo'],
+  };
+  const dist = (a, b) => { const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]); for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1].toLowerCase() === b[j - 1].toLowerCase() ? 0 : 1)); return d[a.length][b.length]; };
+  const ALIAS = { sway: 'flutter', wobble: 'flutter', wave: 'flutter', bob: 'float', wipe: 'scribble', fadein: 'fade', fade_in: 'fade', slidein: 'slideUp', bounce: 'drop', shake: 'shiver', dissolve: 'cut', kenburn: 'kenburns' };
+  const near = (v, list) => (ALIAS[String(v).toLowerCase()] && list.includes(ALIAS[String(v).toLowerCase()])) ? ALIAS[String(v).toLowerCase()] : list.slice().sort((x, y) => dist(v, x) - dist(v, y))[0];
+  const warned = new Set(), check = (where, key, val) => {
+    if (val == null || val === '' || typeof val !== 'string' || !KNOWN[key] || KNOWN[key].includes(val)) return;
+    const msg = `! ${where}: unknown ${key} "${val}" (did you mean "${near(val, KNOWN[key])}"? valid: ${KNOWN[key].join(', ')})`;
+    if (!warned.has(msg)) { warned.add(msg); console.warn(msg); }
+  };
+  check('reel', 'look', reel.look); check('animation', 'look', ANIM.look); check('animation', 'transition', ANIM.transition); check('animation', 'camera', ANIM.camera);
+  if (SUBS.burn && !['word', 'karaoke', 'pop', 'box', 'tape', 'line'].includes(SUBS.style)) console.warn(`! subtitles: unknown style "${SUBS.style}" (valid: word, karaoke, pop, box, tape, line)`);
+  if (reel.audio?.music_mood) import('./library.mjs').then(({ MOODS }) => { if (!MOODS[reel.audio.music_mood] && reel.audio.music_mood !== 'none') console.warn(`! audio: unknown music_mood "${reel.audio.music_mood}" (valid: ${Object.keys(MOODS).join(', ')})`); });
+  const walk = (o, where) => {
+    if (Array.isArray(o)) return o.forEach(x => walk(x, where));
+    if (!o || typeof o !== 'object') return;
+    for (const k of ['enter', 'motion', 'finish']) check(where, k, o[k]);
+    for (const [k, v] of Object.entries(o)) if (v && typeof v === 'object' && k !== 'svg') walk(v, where);
+  };
+  for (const sc of reel.scenes) { const w = `scene "${sc.id || '?'}"`; for (const k of ['transition', 'camera', 'look', 'theme']) check(w, k, sc[k]); walk([sc.visual, sc.overlays, sc.beats], w); }
+}
 // talking mascot: how loud the voice is on every frame (0..1), from the voiceover clips
 let MOUTH = null;
 if (reel.mascot && (reel.mascot.image || reel.mascot.svg_file)) {
@@ -195,6 +240,8 @@ if (reel.mascot && (reel.mascot.image || reel.mascot.svg_file)) {
 let GEO = null;
 for (const s of scenes) for (const v of [s.visual, ...(s.beats || []).map(b => b.visual)].filter(Boolean)) {
   if (v.type === 'map' && !GEO) GEO = JSON.parse(fs.readFileSync(path.join(HERE, '..', 'assets', 'geo', 'world-110m.json'), 'utf8'));
+  if (v.type === 'map' && v.bounds && Math.min(v.bounds[2] - v.bounds[0], v.bounds[3] - v.bounds[1]) < 6)
+    console.warn(`! scene "${s.id}": map zoomed to city level; the bundled outlines are coarse (1:110m) there. Zoom out, or use a photo/illustrated map for this scene.`);
   if (v.type === 'chart' && v.csv && !v.data) {
     const rows = fs.readFileSync(path.resolve(proj, v.csv), 'utf8').trim().split(/\r?\n/).map(l => l.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(c => c.replace(/^"|"$/g, '').trim()));
     const head = rows.shift(), xi = v.x_col ? head.indexOf(v.x_col) : 0, yi = v.y_col ? head.indexOf(v.y_col) : 1;
@@ -231,7 +278,7 @@ const data = {
   transition: ANIM.transition || 'auto', camera: ANIM.camera || 'push', film_fx: ANIM.film_fx !== false,
   art_enter: ANIM.sketch_art ? 'sketch' : (ANIM.art_enter || 'fadeUp'), headline_fx: ANIM.headline_fx || null,
   // collage look (from paper cut-out explainers): cut-out finish, stop-motion on twos, scribble wipes
-  look: reel.look || ANIM.look || null,              // case-file (default) · collage · chalkboard · blueprint · comic · vhs · newsprint
+  look: reel.look || (ANIM.look !== 'auto' ? ANIM.look : null) || null,              // case-file (default) · collage · chalkboard · blueprint · comic · vhs · newsprint
   finish: ANIM.finish || ((reel.look || ANIM.look) === 'collage' ? 'collage' : null),
   stop_motion: ANIM.stop_motion != null ? ANIM.stop_motion : ((reel.look || ANIM.look) === 'collage' ? 2 : null),
   backing: ANIM.backing || null, backing_color: ANIM.backing_color || null, transition_color: ANIM.transition_color || null,
@@ -304,6 +351,21 @@ async function openWorkers(n) {
     await pg.evaluate(() => window.__ready);
     out.push({ pg, cdp: await pg.context().newCDPSession(pg) });
   }));
+  // every extra tab must draw burned captions exactly like the main tab (a tab that doesn't is reloaded, then dropped)
+  const subs = data.subs || [];
+  if (subs.length && out.length > 1) {
+    const c = subs[Math.floor(subs.length / 2)], probeT = c.words[0].s + 0.05;
+    const want = await page.evaluate(tt => window.__subsProbe(tt), probeT);
+    for (let i = out.length - 1; i >= 1; i--) {
+      let got = await out[i].pg.evaluate(tt => window.__subsProbe(tt), probeT);
+      if (got !== want) {
+        console.warn(`! capture tab ${i + 1}: captions differ from the main tab (${got} vs ${want}); reloading it`);
+        await out[i].pg.reload({ waitUntil: 'load' }); await out[i].pg.evaluate(() => window.__ready);
+        got = await out[i].pg.evaluate(tt => window.__subsProbe(tt), probeT);
+        if (got !== want) { console.warn(`! capture tab ${i + 1}: still different, not using it`); await out[i].pg.close(); out.splice(i, 1); }
+      }
+    }
+  }
   return out;
 }
 
@@ -404,7 +466,14 @@ if (flag('stills') || opt('at')) {
   for (const f of fs.readdirSync(dir)) if (f.endsWith('.png')) fs.rmSync(path.join(dir, f), { force: true });
   const shots = opt('at')
     ? opt('at').split(',').map(Number).map((tt, i) => ({ tt, name: `${String(i + 1).padStart(2, '0')}`, id: tt + 's' }))
-    : scenes.map((s, i) => ({ tt: Math.min(s.end - 0.05, s.start + Math.max(s.dur * 0.82, s.dur - 0.35)), name: `${String(i + 1).padStart(2, '0')}`, id: s.id }));
+    : scenes.map((s, i) => {
+        let tt = Math.min(s.end - 0.05, s.start + Math.max(s.dur * 0.82, s.dur - 0.35));
+        if (data.subs?.length) {      // burned captions: pick a moment inside the scene's last caption, so stills show them
+          const c = [...data.subs].reverse().find(c => c.t0 >= s.start - 0.05 && c.t0 < s.end - 0.2);
+          if (c) tt = Math.min(s.end - 0.05, c.words[c.words.length - 1].e + 0.02);
+        }
+        return { tt, name: `${String(i + 1).padStart(2, '0')}`, id: s.id };
+      });
   for (const sh of shots) fs.writeFileSync(path.join(dir, sh.name + '.png'), await grab(sh.tt, 'png'));
   const safe = opt('at') ? [] : await page.evaluate(() => window.__safeCheck());
   await browser.close();

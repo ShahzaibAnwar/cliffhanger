@@ -48,7 +48,15 @@ export async function download(url, out, tries = 3, headers = {}) {
 // Same query → same list in the same order, every time (fixed request sizes, fixed source order, stable sort),
 // so a "photo_pick" chosen from `photos.mjs search` downloads exactly that picture.
 const AIC_FIELDS = 'id,title,image_id,artist_title,thumbnail,term_titles,subject_titles,classification_titles';
-const ovItem = r => ({ id: 'ov-' + r.id, source: r.source || 'openverse', title: r.title || '', creator: r.creator || '', licence: r.license, licence_version: r.license_version || '',
+const strip = s => String(s || '').replace(/<[^>]*>/g, ' ').replace(/&amp;/g, '&').replace(/&#0?39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
+// attribution looks like: "Title" by Creator is licensed under CC BY 4.0 … → skip the quoted title, then read "by …"
+const byFromAttribution = a => {
+  const m = strip(a).replace(/^"[^"]*"\s*/, '').match(/^by (.+?)(?: is licensed| is marked| under|, licensed|\.\s|$)/i);
+  const c = m ? m[1].trim().replace(/["“”]+$/, '') : '';
+  return c.length >= 2 && !/^\d+$/.test(c) ? c : '';
+};
+const prettySource = x => String(x || 'openverse').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/^Wikimedia$/, 'Wikimedia Commons');
+const ovItem = r => ({ id: 'ov-' + r.id, source: prettySource(r.source), title: strip(r.title), creator: strip(r.creator) || byFromAttribution(r.attribution), licence: r.license, licence_version: r.license_version || '',
   url: r.url, page: r.foreign_landing_url || r.url, w: r.width || 0, h: r.height || 0, tags: (r.tags || []).map(t => t.name).join(' ') });
 const nasaItem = it => {
   const d = it.data?.[0] || {}, href = it.links?.[0]?.href;
@@ -69,7 +77,8 @@ export function relevance(q, c) {
 }
 const STOP = new Set(['the', 'and', 'with', 'from', 'for', 'photo', 'image', 'picture', 'view', 'of']);
 
-export async function searchImages(q, { licence = 'safe', source = 'all', n = 12 } = {}) {
+export async function searchImages(q, opts = {}) {
+  const { licence = 'safe', source = 'all', n = 12 } = opts;
   const lic = LICENCES[licence] || LICENCES.safe;
   const want = k => source === 'all' || source === k;
   const [ov, nasa, aic] = await Promise.allSettled([
@@ -84,10 +93,18 @@ export async function searchImages(q, { licence = 'safe', source = 'all', n = 12
   for (const c of all) c.relevance = relevance(q, c);
   // off-topic results (museum full-text search returns paintings for animal names) are dropped;
   // if nothing matches at all, keep the list but mark it so the caller can warn
-  const need = q.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2 && !STOP.has(w)).length <= 2 ? 1 : 0.6;   // short queries: every word
+  const nq = q.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2 && !STOP.has(w)).length;
+  const need = nq <= 2 ? 1 : nq === 3 ? 0.66 : 0.5;   // short queries: every word; longer ones: most of them
   const onTopic = all.filter(c => c.relevance >= need);
+  if (!onTopic.length && !opts.broadened) {          // nothing matches: retry with fewer words before giving off-topic results
+    const ws = q.split(/\s+/).filter(Boolean);
+    for (let k = ws.length - 1; k >= 2; k--) {
+      const r = await searchImages(ws.slice(0, k).join(' '), { licence, source, n, broadened: true });
+      if (r.length && !r[0].off_topic) return r.map(c => ({ ...c, broadened_from: q }));
+    }
+  }
   const list = onTopic.length ? onTopic : all.map(c => ({ ...c, off_topic: true }));
-  const score = c => c.relevance * 3 + (Math.min(c.w || 1600, 3000) / 3000) + (needsCredit(c.licence) ? 0 : 0.25) - (c.w && c.w < 700 ? 1 : 0);
+  const score = c => c.relevance * 10 + (Math.min(c.w || 1600, 3000) / 3000) + (needsCredit(c.licence) ? 0 : 0.25) - (c.w && c.w < 700 ? 1 : 0);   // relevance first
   return list.sort((a, b) => score(b) - score(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).slice(0, n);
 }
 
@@ -104,7 +121,7 @@ export async function searchSounds(q, { licence = 'cc0', n = 8, maxSeconds = 60 
   const lic = LICENCES[licence] || LICENCES.cc0;
   const j = await getJson(`https://api.openverse.org/v1/audio/?q=${encodeURIComponent(q)}&license=${lic.join(',')}&source=freesound&page_size=${Math.min(20, n * 3)}&mature=false`);
   return (j.results || []).filter(r => r.url && (!r.duration || r.duration <= maxSeconds * 1000))
-    .map(r => ({ id: 'ov-' + r.id, source: r.source || 'freesound', title: r.title || q, creator: r.creator || '', licence: r.license, licence_version: r.license_version || '',
+    .map(r => ({ id: 'ov-' + r.id, source: r.source || 'freesound', title: strip(r.title) || q, creator: strip(r.creator), licence: r.license, licence_version: r.license_version || '',
       url: r.url, page: r.foreign_landing_url || r.url, dur: (r.duration || 0) / 1000 }))
     .sort((a, b) => (a.dur || 9) - (b.dur || 9))          // short, clean one-shots first
     .slice(0, n);
@@ -125,7 +142,7 @@ export async function searchMusic(mood, { licence = 'safe', minS = 60, maxS = 48
       const d = (r.duration || 0) / 1000;
       if (!r.url || seen.has(r.id) || d < minS || d > maxS || VOCAL.test(r.title || '')) continue;
       seen.add(r.id);
-      out.push({ id: 'ov-' + r.id, source: r.source, title: r.title || mood, creator: r.creator || '', licence: r.license, licence_version: r.license_version || '', url: r.url, page: r.foreign_landing_url || r.url, dur: d,
+      out.push({ id: 'ov-' + r.id, source: r.source, title: strip(r.title) || mood, creator: strip(r.creator), licence: r.license, licence_version: r.license_version || '', url: r.url, page: r.foreign_landing_url || r.url, dur: d,
         genres: (r.genres || []).join(',') });
     }
   }
@@ -142,7 +159,7 @@ export function addCredit(proj, kind, file, c) {
   const p = path.join(proj, 'credits.json');
   let all = []; try { all = JSON.parse(fs.readFileSync(p, 'utf8')); } catch { /* new */ }
   all = all.filter(x => x.file !== file);
-  all.push({ kind, file, title: c.title, creator: c.creator, licence: c.licence, licence_version: c.licence_version, source: c.source, page: c.page });
+  all.push({ kind, file, title: strip(c.title), creator: strip(c.creator), licence: c.licence, licence_version: c.licence_version, source: c.source, page: c.page });
   fs.writeFileSync(p, JSON.stringify(all, null, 1));
 }
 export function readCredits(proj) { try { return JSON.parse(fs.readFileSync(path.join(proj, 'credits.json'), 'utf8')); } catch { return []; } }

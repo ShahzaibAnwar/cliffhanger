@@ -129,6 +129,13 @@ t('looks, map and chart render', () => {
   if (/\[page error\]/.test(out)) throw new Error('page errors');
   return 'comic + blueprint, map + CSV chart';
 });
+const { pickStyle } = await import('./style.mjs');
+t('auto style picks a look from the topic', () => {
+  const cases = [['the dancing plague, a real epidemic', 'newsprint'], ['unsolved signal from space? no: the unsolved wow signal', null], ['fun facts about axolotl animals', 'comic'], ['quantum gravity', 'case-file']];
+  for (const [q, want] of cases) { const r = pickStyle(q); if (want && r.look !== want) throw new Error(`"${q}" → ${r.look}, expected ${want}`); }
+  if (!pickStyle('the unsolved wow signal').look) throw new Error('no look');
+  return 'topic → look, default when nothing matches';
+});
 t('component gallery renders (stills)', () => {
   const out = sh(process.execPath, [path.join(HERE, 'render.mjs'), path.join(ROOT, 'examples', 'component-gallery'), '--stills']);
   if (/\[page error\]/.test(out)) throw new Error('page errors:\n' + out.split('\n').filter(l => l.includes('[page error]')).join('\n'));

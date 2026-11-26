@@ -4,6 +4,7 @@
      node gallery.mjs                 build everything (about 1–2 minutes; offline, no API calls)
      node gallery.mjs --only looks    looks | captions | finishes | layouts
      node gallery.mjs --page          rebuild index.html / overview.jpg from the existing samples
+     node gallery.mjs --lock          from now on pick the style automatically from each topic (style.mjs lock)
    Claude shows this before a new video or series, so the user picks a style by seeing it, not by name. */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -149,6 +150,9 @@ function overview(g) {         // one image Claude can show in chat: looks row (
 function isMainModule(url) { try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(url)); } catch { return false; } }
 if (process.argv[1] && isMainModule(import.meta.url)) {
   const a = process.argv.slice(2), only = a.includes('--only') ? a[a.indexOf('--only') + 1] : a.includes('--page') ? 'page' : null;
+  if (a.includes('--lock')) {          // after seeing the gallery: pick styles automatically from now on (same as style.mjs lock)
+    const r = spawnSync(process.execPath, [path.join(HERE, 'style.mjs'), 'lock'], { encoding: 'utf8' }); process.stdout.write(r.stdout || r.stderr || ''); process.exit(r.status || 0);
+  }
   fs.mkdirSync(OUT, { recursive: true });
   const prevPath = path.join(OUT, 'gallery.json');
   const prev = fs.existsSync(prevPath) ? JSON.parse(fs.readFileSync(prevPath, 'utf8')) : {};

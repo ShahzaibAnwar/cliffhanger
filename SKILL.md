@@ -56,7 +56,16 @@ cliffhanger, keep the brand and per-language voices, reuse recurring art, and se
 
 ## 0.7 Pick the style: show, don't tell (new video or series, or "change the style")
 
-The user chooses the look by seeing it. If `"$SKILL_DIR/gallery/overview.jpg"` doesn't exist (or the skill was
+**Auto mode** (`style.auto` is on in settings; `node "$SKILL_DIR/scripts/style.mjs" show`): don't ask. Run
+`node "$SKILL_DIR/scripts/style.mjs" pick "<topic>" [--wide]`, put the result in reel.json (`look`, `subtitles.style`,
+`audio.music_mood`; or just `"look": "auto"` plus a `"topic"` and the renderer does it) and state it in one line
+("Style: newsprint · pop captions · mystery music: history/real event"). Ask only when it reports a tie or no match.
+The user can override any single choice; `style.mjs unlock` returns to asking. Offer to lock it once the user has
+seen the gallery and says "just pick it yourself". **If they run more than one channel, lock per channel:**
+`style.mjs lock --workspace <channel folder>` (writes `<folder>/style.json`); a global `style.mjs lock` also
+restyles other channels whose reels don't set a look. A single reel can always use `"look": "auto"` + `"topic"`.
+
+Otherwise the user chooses the look by seeing it. If `"$SKILL_DIR/gallery/overview.jpg"` doesn't exist (or the skill was
 updated), build it once: `node "$SKILL_DIR/scripts/gallery.mjs"` (~4 min, offline; `--page` rebuilds the page only).
 1. Read `gallery/overview.jpg` (it appears in the chat: looks on paper and dark scenes, caption styles, picture
    finishes), and give the link to `gallery/index.html` (one self-contained page with every option, a short
@@ -205,7 +214,8 @@ Look at `build/contact.jpg` (Read the image). Check: headline fits and doesn't t
 overlaps the bottom 150 px (platform UI), red is used only for punch/danger, every scene has a clear
 focal object, stamps/chips aren't covering the key art. Fix JSON/SVG and re-run until clean.
 
-Also act on the two reports the stills run prints:
+Also act on the reports the stills run prints (unknown option names come with a "did you mean", art with too little
+contrast against its page is flagged, and anything cut off at the frame edge is listed):
 - **safe zones**: anything under the platform buttons (right edge) or caption area (bottom ~260 px):
   move it up/left.
 - **long scenes**: over `content.max_scene_seconds` on one visual: add `beats`.

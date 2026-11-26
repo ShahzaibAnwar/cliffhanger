@@ -71,7 +71,9 @@ ready-to-paste prompt packs for the Gemini app and Veo, then imports what you sa
 
 **Styles you can see before you choose:** `gallery.mjs` renders every look (case file, paper collage, chalkboard,
 blueprint, comic, VHS, newsprint), caption style (word, karaoke, pop-in keywords, highlight box, tape, plain) and
-picture finish into one self-contained page; Claude shows it and asks which you want.
+picture finish into one self-contained page; Claude shows it and asks which you want. Or let it choose:
+`style.mjs lock` picks the look, caption style and music for each video from its topic (history → newsprint,
+tech → blueprint, unsolved → VHS…), using a map you can edit.
 
 ![every look, caption style and finish](examples/styles-overview.jpg)
 
@@ -190,6 +192,7 @@ scripts/
   tighten.py                pacing pass: shorter pauses, faster delivery, timings remapped
   photos.mjs                free-licence photo finder: search, download, cut-out or print, credits
   gallery.mjs               style gallery: every look, caption style and finish as images/clips + one page
+  style.mjs                 automatic style per topic (look + captions + music) from an editable map
   analytics.mjs             retention import, scene-by-scene drops, learnings across videos
   batch.mjs                 overnight production of many episodes + review page
   inbox.mjs                 hand-off folder: prompt packs for Gemini/Veo, imports your own files
