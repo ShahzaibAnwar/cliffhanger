@@ -193,6 +193,9 @@
   // relative luminance of a computed colour ("rgb(…)" / "rgba(…)"); null when (nearly) transparent
   const lumOf = c => { const m = String(c).match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/); if (!m || (m[4] != null && +m[4] < 0.3)) return null;
     const f = x => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(+m[1]) + 0.7152 * f(+m[2]) + 0.0722 * f(+m[3]); };
+  let _probe = null;
+  const lumCss = c => { if (!c) return null; if (!_probe) { _probe = h('i', '', stage); _probe.style.display = 'none'; } _probe.style.color = ''; _probe.style.color = c; return lumOf(getComputedStyle(_probe).color); };
+  const contrast = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
   // chips on a coloured background: dark text on light accents (violet, cyan…), light text on dark ones
   const inkChip = el => S._layout.push(() => { const L = lumOf(getComputedStyle(el).backgroundColor); if (L != null && L > 0.3) { el.style.color = '#16141A'; el.style.borderColor = 'rgba(0,0,0,.35)'; } });
 
@@ -244,6 +247,14 @@
     if (finish === 'torn') { wrap.classList.add('finish-torn'); clean.style.clipPath = roughShape('rip', (o.x * 5 + o.y * 11) % 991); }
     if (finish === 'collage' && o.halftone === false) wrap.classList.add('no-ht');
     if (o.shadow && S.theme !== 'photo' && finish !== 'collage') wrap.insertBefore(h('div', 'gshadow'), inner);
+    if (o.ink === 'auto' && o.svg) S._layout.push(() => {       // black-ink drawings on a dark page: near-black lines and fills take the page's ink colour
+      const cs = getComputedStyle(S._el), ink = cs.getPropertyValue(S.theme === 'dark' ? '--dark-ink' : '--ink').trim(), iL = lumCss(ink);
+      if (iL == null || iL < 0.5) return;                        // the page's ink is dark, so the page is light: nothing to swap
+      wrap.querySelectorAll('.clean svg path,.clean svg circle,.clean svg ellipse,.clean svg rect,.clean svg polygon,.clean svg polyline,.clean svg line,.clean svg text').forEach(el => {
+        const st = getComputedStyle(el);
+        for (const k of ['fill', 'stroke']) { const L = lumOf(st[k]); if (L != null && L < 0.03) el.style[k] = ink; }
+      });
+    });
     const sketch = o.enter === 'sketch' && !!o.svg;
     enter(wrap, o, sketch ? 'fade' : o.enter, o.at, sketch ? 0.12 : o.dur, 'translate(-50%,-50%)', o.rot);
     if (sketch) {        // whiteboard effect: every outline draws itself, then colour and hatching fade in
@@ -589,9 +600,11 @@
   function labfile(v, sc) {
     const c = h('div', 'labfile', sc);
     c.style.left = (v.x || 760) + 'px'; c.style.top = (v.y || 1150) + 'px'; if (v.w) c.style.width = v.w + 'px';
+    if (v.style) c.classList.add(String(v.style).replace(/[^a-z-]/g, ''));       // "document": letterhead, serif text, signature line
     if (v.kicker) h('div', 'k', c, esc(v.kicker));
     h('div', 't', c, esc(v.title || ''));
     (v.rows || []).forEach(r => h('div', 'r', c, esc(r[0]) + ': ' + (r[2] ? '<b>' + esc(r[1]) + '</b>' : esc(r[1]))));
+    if (v.signature) h('div', 'sig', c, `<span>${esc(v.signature)}</span>` + (v.signed_by ? `<small>${esc(v.signed_by)}</small>` : ''));
     enter(c, v, 'slideR', 0.1, 0.55, 'translate(-50%,-50%)', v.rot != null ? v.rot : 1.5);
     sfx('swish', T(v.at, 0.1), 0.3);
   }
@@ -743,7 +756,7 @@
         break;
       }
       case 'tag': { const e = h('div', 'ov tag ' + (o.style || ''), sc); if (o.kicker) h('small', '', e, esc(o.kicker)); h('span', '', e, esc(o.text)); place(e, 'slideL', 0.45); sfx('swish', T(o.at, 0.2), 0.25); break; }
-      case 'caption': { const e = h('div', 'ov cap', sc, esc(o.text)); place(e, 'fade', 0.5); break; }
+      case 'caption': { const e = h('div', 'ov cap', sc, esc(o.text)); e.style.maxWidth = (W - 120) + 'px'; place(e, 'fade', 0.5); break; }
       case 'big': { const e = h('div', 'ov big ' + (o.style || ''), sc, esc(o.text)); if (o.size) e.style.fontSize = o.size + 'px'; else fitWidth(e, o.text); place(e, 'pop', 0.35); break; }
       case 'counter': {
         const e = h('div', 'ov big ' + (o.style || 'red'), sc); if (o.size) e.style.fontSize = o.size + 'px';
@@ -1140,7 +1153,17 @@
     const c = D.subs.find(x => t >= x.t0 && t < x.t1 + 0.12) || null;
     if (c !== subCur) {
       subCur = c;
-      if (c) { const sc = scenes.find(x => c.t0 + 0.06 >= x.start && c.t0 + 0.06 < x.end) || scenes[0]; subsEl.style.top = (sc._subY || SUBY) + 'px'; }
+      if (c) {
+        const sc = scenes.find(x => c.t0 + 0.06 >= x.start && c.t0 + 0.06 < x.end) || scenes[0]; subsEl.style.top = (sc._subY || SUBY) + 'px';
+        if (!sc._subVars) {              // the caption box sits outside the scene, so the look's colours are copied onto it
+          const cs = getComputedStyle(sc._el); let acc = cs.getPropertyValue('--accent').trim();
+          const aL = lumCss(acc), tL = lumCss(cs.getPropertyValue('--tape').trim()) ?? 0.88;
+          if (SUBSTYLE === 'tape' && aL != null && contrast(aL, tL) < 3) acc = tL > 0.4 ? '#B3261E' : '#FFD84A';
+          sc._subVars = { acc, on: aL != null && aL > 0.3 ? '#16141A' : '#fff' };
+        }
+        if (sc._subVars.acc) subsEl.style.setProperty('--accent', sc._subVars.acc);
+        subsEl.style.setProperty('--sub-on', sc._subVars.on);
+      }
       subsEl.innerHTML = c ? '<span class="sl">' + c.words.map((w, i) => `<i${keysOf(c).has(i) ? ' data-k="1"' : ''}>` + esc(w.w) + '</i>').join(' ') + '</span>' : '';
     }
     if (!c) return;
@@ -1187,7 +1210,7 @@
           n++; tot += a; if (near(L)) closeA += a;
         });
         if (n + sn < 4 || !tot) return;
-        if (closeA / tot > 0.6 && (!sn || sc / sn > 0.6)) out.push({ scene: s.id, zone: 'low contrast with the page (art may vanish): use the paper theme or lighter art', what: 'illustration' });
+        if (closeA / tot > 0.6 && (!sn || sc / sn > 0.6)) out.push({ scene: s.id, zone: 'low contrast with the page (art may vanish): add "ink": "auto" to the art, use the paper theme, or lighter art', what: 'illustration' });
       });
       // text overlays on top of each other (two chips on one line, a label over a stamp…)
       const txt = [...s._el.querySelectorAll('.ov')].filter(el => !el.closest('.obj') && el.innerText && el.innerText.trim() && getComputedStyle(el).opacity !== '0').map(el => ({ el, r: el.getBoundingClientRect() })).filter(o => o.r.width);

@@ -131,7 +131,7 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .term .prog i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);width:0}
 
 /* labfile */
-.labfile{position:absolute;width:640px;background:#F1EBDD;padding:34px 40px 40px;box-shadow:0 18px 34px rgba(0,0,0,.25);color:var(--ink)}
+.labfile{position:absolute;width:640px;background:#F1EBDD;padding:34px 40px 40px;box-shadow:0 18px 34px rgba(0,0,0,.25);color:#1B1A18}   /* the card is always pale, so its ink is always dark */
 .labfile .k{font:500 22px var(--mono);letter-spacing:.24em;color:#777;text-transform:uppercase}
 .labfile .t{font:400 84px/1.05 var(--head);text-transform:uppercase;margin:10px 0 16px;padding-bottom:16px;border-bottom:2px solid rgba(0,0,0,.25)}
 .labfile .r{font:500 27px/1.55 var(--mono);text-transform:uppercase;letter-spacing:.04em}
@@ -168,6 +168,7 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .tag span{font:400 76px/1 var(--head)}
 .tag.red span{color:var(--accent)}
 .cap{font:500 26px var(--mono);letter-spacing:.24em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.ov.cap{white-space:normal;width:max-content;text-align:center;line-height:1.5}   /* long captions wrap at the canvas width */
 .theme-dark .cap{color:var(--dark-muted)}
 .big{font:400 150px/1 var(--head);text-transform:uppercase;white-space:nowrap}
 .big.red{color:var(--accent)}
@@ -186,7 +187,7 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .subs.line i{opacity:1}
 .subs.tape .sl{background:var(--tape);padding:10px 22px 6px;box-shadow:0 10px 24px rgba(0,0,0,.3);transform-origin:50% 50%}
 .subs.tape i{color:var(--ink);-webkit-text-stroke:0;text-shadow:none;opacity:.35;margin:0 .04em}
-.subs.tape i.on{opacity:1}.subs.tape i.now{color:var(--accent)}
+.subs.tape i{color:#1B1A18}.subs.tape i.on{opacity:1}.subs.tape i.now{color:var(--accent)}
 
 /* ---------- newspaper clipping ---------- */
 .news{position:absolute;width:780px;background:#F1ECE0;padding:30px 36px 34px;box-shadow:0 20px 40px rgba(0,0,0,.28);color:#1d1b18;
@@ -325,7 +326,7 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .subs.pop i.key.on{color:var(--hl)}
 /* box: the current word sits in a highlight box (the "short-form app" look) */
 .subs.box i{opacity:1;padding:2px 10px 0;border-radius:12px;margin:0 .02em}
-.subs.box i.now{background:var(--accent);-webkit-text-stroke:0;text-shadow:none}
+.subs.box i.now{background:var(--accent);color:var(--sub-on,#fff);-webkit-text-stroke:0;text-shadow:none}
 
 /* ---- map ---- */
 .mapbox{position:absolute;left:0;top:0}
@@ -388,3 +389,14 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .ai-label{position:absolute;left:72px;top:140px;z-index:26;font:600 18px var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--ink);opacity:.72;border:1.5px solid currentColor;padding:4px 9px 3px;white-space:nowrap;pointer-events:none}
 .theme-dark .ai-label{color:var(--dark-ink)}
 .theme-photo .ai-label{color:#fff;opacity:.9;background:rgba(0,0,0,.45);border-color:rgba(255,255,255,.7)}
+
+/* labfile "style": "document": a letter or prescription (letterhead, serif text, signature line) */
+.labfile.document{background:#F6F0DF;border:1px solid rgba(0,0,0,.28);outline:6px solid #F6F0DF;padding:40px 46px 36px}
+.labfile.document .k{text-align:center;letter-spacing:.3em;color:#555;padding-bottom:14px;border-bottom:3px double rgba(0,0,0,.45)}
+.labfile.document .t{font:italic 700 66px/1.1 'Playfair Display',Georgia,serif;text-transform:none;text-align:center;border-bottom:0;margin:22px 0 14px;padding-bottom:0}
+.labfile.document .r{font:500 31px/1.6 Georgia,'Times New Roman',serif;text-transform:none;letter-spacing:0}
+.labfile .sig{margin:34px 0 0 auto;width:58%;text-align:center}
+.labfile .sig span{display:block;font:700 50px/1 var(--hand);color:#1B2A6B;transform:rotate(-3deg);padding-bottom:4px;border-bottom:1.5px solid rgba(0,0,0,.6)}
+.labfile .sig small{display:block;font:500 18px var(--mono);letter-spacing:.2em;text-transform:uppercase;color:#666;margin-top:8px}
+/* paper strips are always pale: dark ink whatever the look */
+.hl.label{color:#1B1A18}

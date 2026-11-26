@@ -99,7 +99,7 @@ looped, frame-exact; `rate`, `from`, `loop`), `video_prompt` (a clip to make in 
 `backing` (`block` · `disc` · `torn` · `none`,
 a paint shape behind the art; `backing_color`, `backing_rot`, `backing_scale`), `halftone` (false to skip the dots),
 `image_provider` (`cloudflare`/`gemini`),
-`feather` (soft oval edge). Photo scenes: `bg_prompt`, `bg_style`, `bg_seed`.
+`feather` (soft oval edge). `"ink": "auto"` on an `svg_file` drawing: on dark scenes its near-black lines and fills take the page's light ink (no pale copy needed). Photo scenes: `bg_prompt`, `bg_style`, `bg_seed`.
 Keys: `x`(540) `y`(1180) `w`(820) `motion`: `float`(default) · `hover` (insects) · `kenburns` ·
 `kenout` · `drift` (`dx`,`dy`) · `pulse` · `spin` · `shiver` · `flutter` (paper sway; default for prints) · `none`. `shadow` (ground shadow, default
 true). `blend`: `multiply` (white-background PNGs on paper) / `screen` (black-background PNGs on dark).
@@ -120,6 +120,7 @@ the line pre-written (`"write_dur":0.01`), then `strike` + `replace`.
 **terminal** — `> PROMPT: TEXT_` typing box. `prompt`, `text`, `y`, `w`, `progress` (0–1), `progress_dur`, `type_dur`.
 
 **labfile** — index card. `kicker`, `title`, `rows: [[label, value, redBool]]`, `x`, `y`, `w`, `rot`.
+`"style": "document"` turns it into a letter or prescription (letterhead, serif text); `signature` (+ `signed_by`) adds a signed line.
 
 **question** — giant red "?" (`mark` to change) with optional `art` on top.
 
@@ -136,7 +137,7 @@ false hides), `next` (next-episode teaser), `next_label`, `cta` ("Follow"; false
 | `chip` | `text`, `style`: "" (black) · `red` (accent) · `light`, `color` | mono caption pill: "FEMALE · DRINKS BLOOD". Text turns dark on light accents/colours automatically |
 | `stamp` | `text`, `size`: "" · `big`, `rot` | slams in with a thud + screen shake |
 | `tag` | `text`, `kicker`, `style`: `red` | torn tape label: "DAY 06" |
-| `caption` | `text` | small grey mono line |
+| `caption` | `text` | small grey mono line; long text wraps inside the frame |
 | `big` | `text`, `size`, `style`: `red` | huge condensed word / symbol |
 | `counter` | `value` ("x 4", "100x", "DAY 10", "-272°C"), `size`, `count_dur` | big counting number: the number inside the text counts up (decimals kept: "3.5 KM"), the words around it stay; without `size`, long values shrink to fit the frame |
 | `terminal` | as terminal component + `x`,`y` | |
@@ -221,7 +222,7 @@ for a marker-scribble wipe anywhere (`transition_color` sets its colour; default
 
 - `"subtitles": { "burn": true, "style": "word"|"karaoke"|"pop"|"box"|"tape"|"line", "y": 1500, "size": 60, "max_words": 4, "lang": "auto"|"vo" }`
   (karaoke: a colour fill sweeps through each word · pop: words pop in, one key word per caption (two in long ones; headline words first) bigger and highlighted · box: the
-  spoken word in an accent box). See them all in `gallery/index.html`. `y` defaults to 1500 on 9:16 and just above
+  spoken word in an accent box; captions take the accent of the scene's look, kept readable on the tape and in the box). See them all in `gallery/index.html`. `y` defaults to 1500 on 9:16 and just above
   the player bar on 16:9; a `y` that doesn't fit the canvas is ignored. Stills are taken while a caption is showing, and the stills report lists each frame's caption text.
 - `"look": "case-file"|"collage"|"chalkboard"|"blueprint"|"comic"|"vhs"|"newsprint"`: the visual world (any scene can
   override with its own `look`). Each works on paper and dark scenes. `"look": "auto"` (+ `"topic": "…"`) picks look,
