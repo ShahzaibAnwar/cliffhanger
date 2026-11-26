@@ -125,7 +125,11 @@ Create the project folder: `reel.json`, `art/`. Schema and every component are i
   museums), NASA and the Art Institute of Chicago, keeps only CC0 / public domain / CC BY, and writes the
   credits (`out/credits.txt` after the render; put CC BY credits in the captions). Plain-background photos
   become paper cut-outs (`finish: "collage"`), busy ones a taped photo print (`"print"`); `"torn"` gives
-  torn edges. Preview choices with `photos.mjs search "<words>"` and pick one with `"photo_pick": N`.
+  torn edges. Preview choices with `photos.mjs search "<words>"` and pin the one you want with its
+  `"photo_id"` (exact; `"photo_pick": N` also works but depends on the sources' current ranking).
+  **Look at every fetched photo** (`node "$SKILL_DIR/scripts/art-preview.mjs" <project>/art/photos`) before
+  using it: reject off-topic, low-quality or distressing ones (a dead animal for a "meet this animal" beat)
+  and keep the drawing instead.
   If downloading isn't possible, `photos.mjs guide <project>` prints search links and the exact file
   name to save in `art/inbox/`; then `node "$SKILL_DIR/scripts/inbox.mjs" <project>` imports them.
   Never use photos of identifiable living private people, logos, or copyrighted characters (cartoon,

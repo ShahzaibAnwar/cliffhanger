@@ -91,7 +91,9 @@ by `imagegen.mjs`; keep an `svg_file` as fallback). AI keys: `image_style`, `ima
 `image_ref` (reference image for a consistent variant), `character` (a name from `reel.characters`),
 `finish` (`collage`: grayscale halftone cut-out with a paper edge · `print`: photo print with a white border and
 tape · `torn`: torn-paper edges · `tone: "bw"` makes a print black and white), `photo_query` (real free-licence photo,
-fetched by `photos.mjs`; `photo_pick`, `photo_source`: `nasa` · `openverse` · `aic`), `video` (a clip: muted,
+fetched by `photos.mjs`; `photo_id` pins the exact photo `photos.mjs search` showed, `photo_pick` takes the Nth
+result, `photo_source`: `nasa` · `openverse` · `aic`). An explicit `image`/`video` wins over `svg_file`, which becomes
+its fallback, `video` (a clip: muted,
 looped, frame-exact; `rate`, `from`, `loop`), `video_prompt` (a clip to make in Veo/any app via `inbox.mjs pack`),
 `backing` (`block` · `disc` · `torn` · `none`,
 a paint shape behind the art; `backing_color`, `backing_rot`, `backing_scale`), `halftone` (false to skip the dots),

@@ -178,6 +178,16 @@ let AI_MISSING = [];
 }
 // repeated as the last thing printed, so it can't scroll away unnoticed
 const aiMissingNote = () => { if (AI_MISSING.length) console.warn(`\n!!! ${AI_MISSING.length} picture(s)/clip(s) are missing: these scenes show the hand-drawn fallback.\n!!! Run  node scripts/imagegen.mjs "${proj}"  (AI images),  node scripts/photos.mjs project "${proj}"  (photos),\n!!! or  node scripts/inbox.mjs pack "${proj}"  for a list to make by hand, then render again.`); };
+// an explicit image/clip wins over svg_file; the drawing becomes its fallback (shown if the file is missing or fails)
+(function mediaFirst(o) {
+  if (Array.isArray(o)) return o.forEach(mediaFirst);
+  if (!o || typeof o !== 'object') return;
+  if ((o.image || o.video) && o.svg_file && o.fallback_svg_file === undefined) { o.fallback_svg_file = o.svg_file; delete o.svg_file; delete o.svg; }
+  if (o.video && typeof o.video === 'string' && !/^(https?|data|file):/.test(o.video) && !fs.existsSync(path.resolve(proj, o.video)) && o.fallback_svg_file !== undefined) {
+    console.warn('! clip missing, using hand-drawn fallback: ' + o.video); delete o.video; o.svg_file = o.fallback_svg_file; delete o.fallback_svg_file;
+  }
+  for (const k of Object.keys(o)) if (k !== 'svg') mediaFirst(o[k]);
+})(scenes);
 resolveAssets(scenes);
 
 // canvas size: vertical by default; reel.format.width/height switches it (e.g. 1920x1080 for long-form)

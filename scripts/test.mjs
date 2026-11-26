@@ -78,6 +78,13 @@ t('character references (offline)', () => {
 const { prepare } = await import('./photos.mjs');
 const { findSound } = await import('./sfx.mjs');
 const tmpProj = fs.mkdtempSync(path.join(os.tmpdir(), 'cliff-media-'));
+const { relevance } = await import('./library.mjs');
+t('photo search keeps on-topic results only', () => {
+  const cases = [['naked mole rat', { title: 'Naked Mole Rats' }, 1], ['greenland shark', { title: 'Bowl Depicting Shark', tags: 'ceramics' }, 0.5],
+    ['axolotl', { title: 'Self-Portrait', tags: 'painting portrait' }, 0], ['axolotl', { title: 'IMG_2231', tags: 'axolotl amphibian' }, 1]];
+  for (const [q, c, want] of cases) { const r = relevance(q, c); if (Math.abs(r - want) > 0.01) throw new Error(`relevance("${q}", "${c.title}") = ${r}, expected ${want}`); }
+  return 'title and tags matched; off-topic museum hits rejected';
+});
 t('photo prep: plain background → cut-out, busy → print', () => {
   const plain = path.join(tmpProj, 'plain.png'), busy = path.join(tmpProj, 'busy.png');
   sh('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'color=0xEDEDED:s=600x600', '-vf', 'drawbox=x=180:y=150:w=240:h=300:color=0x553311:t=fill', '-frames:v', '1', plain]);

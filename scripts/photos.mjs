@@ -13,12 +13,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { searchImages, download, addCredit, creditLine, slugify, hash, needsCredit } from './library.mjs';
+import { searchImages, imageById, download, addCredit, creditLine, slugify, hash, needsCredit } from './library.mjs';
 import { floodKnockout, cleanSpecks, autoTrim, libraryFallback } from './imagegen.mjs';
 
 export function photoKey(spec, proj) {
   const q = String(spec.photo_query).trim();
-  const base = path.join(proj, 'art', 'photos', `${slugify(q)}-${hash([q.toLowerCase(), spec.photo_pick || 0, spec.photo_source || 'all'].join('|'))}`);
+  const base = path.join(proj, 'art', 'photos', `${slugify(q)}-${hash(spec.photo_id ? 'id|' + spec.photo_id : [q.toLowerCase(), spec.photo_pick || 0, spec.photo_source || 'all'].join('|'))}`);
   return { q, base, inboxName: path.basename(base) };
 }
 const findFile = base => ['.png', '.jpg', '.jpeg', '.webp'].map(e => base + e).find(f => fs.existsSync(f)) || null;
@@ -63,7 +63,8 @@ export function prepare(src, base, { force } = {}) {
   if (ok) {
     const st = spawnSync('ffmpeg', ['-hide_banner', '-i', cut, '-vf', 'alphaextract,format=gray,scale=200:-1,signalstats,metadata=print:key=lavfi.signalstats.YAVG', '-f', 'null', '-'], { encoding: 'utf8' });
     const m = (st.stderr || '').match(/YAVG=([\d.]+)/); fg = m ? +m[1] / 255 : 1;
-    if (fg > 0.08 && fg < 0.8) { cleanSpecks(cut); autoTrim(cut); kind = 'cutout'; }
+    // photos carry dust, stars and sensor noise: drop detached bits under 2% of the main subject (AI art uses 0.4%)
+    if (fg > 0.08 && fg < 0.8) { cleanSpecks(cut, 0.02); autoTrim(cut); kind = 'cutout'; }
     else fs.rmSync(cut, { force: true });
   }
   if (kind === 'print') {
@@ -94,10 +95,11 @@ export function resolvePhotos(scenes, proj) {
 
 async function fetchOne(spec, proj, { licence = 'safe' } = {}) {
   const k = photoKey(spec, proj);
-  const cands = await searchImages(k.q, { licence: spec.photo_licence || licence, source: spec.photo_source || 'all', n: 12 });
+  // "photo_id" (printed by `photos.mjs search`) downloads exactly that picture; otherwise "photo_pick" from the ranked list
+  const cands = spec.photo_id ? [await imageById(spec.photo_id)] : await searchImages(k.q, { licence: spec.photo_licence || licence, source: spec.photo_source || 'all', n: 12 });
   if (!cands.length) throw new Error('no free-licence photo found; try other words, or use guide');
-  const pick = Math.min(spec.photo_pick || 0, cands.length - 1);
-  for (const c of [cands[pick], ...cands.filter((_, i) => i !== pick)]) {
+  const pick = spec.photo_id ? 0 : Math.min(spec.photo_pick || 0, cands.length - 1);
+  for (const c of [cands[pick], ...(spec.photo_id ? [] : cands.filter((_, i) => i !== pick))]) {
     const raw = k.base + '.orig' + (path.extname(new URL(c.url).pathname) || '.jpg').replace(/\.jpeg$/, '.jpg').slice(0, 5);
     try { await download(c.url, raw, 3, c.headers); } catch { if (c.fallback_url) { try { await download(c.fallback_url, raw, 3, c.headers); } catch { continue; } } else continue; }
     const r = prepare(raw, k.base);
@@ -130,8 +132,8 @@ if (process.argv[1] && isMainModule(import.meta.url)) {
   const a = process.argv.slice(2), cmd = a[0], opt = (n, d) => { const i = a.indexOf('--' + n); return i >= 0 ? a[i + 1] : d; };
   if (cmd === 'search') {
     const list = await searchImages(a[1], { licence: opt('licence', 'safe'), source: opt('source', 'all'), n: +opt('n', 10) });
-    list.forEach((c, i) => console.log(`${String(i).padStart(2)}  ${c.licence.padEnd(13)} ${(c.w ? c.w + 'x' + c.h : '?').padEnd(10)} ${c.source.padEnd(14)} ${c.title.slice(0, 60)}\n      ${c.page}`));
-    console.log(list.length ? '\nUse one with "photo_query" + "photo_pick": <number> in reel.json.' : 'Nothing found with a free licence; try simpler words.');
+    list.forEach((c, i) => console.log(`${String(i).padStart(2)}  ${c.licence.padEnd(13)} ${(c.w ? c.w + 'x' + c.h : '?').padEnd(10)} ${c.source.padEnd(14)} ${c.title.slice(0, 60)}${c.off_topic ? '  [off-topic]' : ''}\n      "photo_id": "${c.id}"   ${c.page}`));
+    console.log(list.length ? '\nUse one with "photo_query" + "photo_id": "<id>" in reel.json (exact), or "photo_pick": <number>.' : 'Nothing found with a free licence; try simpler words.');
     process.exit(0);
   }
   if (cmd === 'project' || cmd === 'guide') {
@@ -142,7 +144,12 @@ if (process.argv[1] && isMainModule(import.meta.url)) {
     if (cmd === 'guide') { guide(items, proj); process.exit(0); }
     let ok = 0; const failed = [];
     for (const it of items) {
-      try { const r = await fetchOne(it.spec, proj, { licence: opt('licence', 'safe') }); ok++; console.log(`  + ${it.scene}: ${r.kind === 'cutout' ? 'cut-out' : 'photo print'} · ${creditLine(r.c)}${needsCredit(r.c.licence) ? '  (credit required)' : ''}`); }
+      try {
+        const r = await fetchOne(it.spec, proj, { licence: opt('licence', 'safe') }); ok++;
+        console.log(`  + ${it.scene}: ${r.kind === 'cutout' ? 'cut-out' : 'photo print'} · ${creditLine(r.c)}${needsCredit(r.c.licence) ? '  (credit required)' : ''}`);
+        if (!it.spec.photo_id) console.log(`      pin this exact photo: "photo_id": "${r.c.id}"`);
+        if (r.c.off_topic || (r.c.relevance != null && r.c.relevance < 1)) console.warn(`      ! check it: the title doesn't match every word of "${it.spec.photo_query}"`);
+      }
       catch (e) { failed.push(it); console.warn(`  ! ${it.scene}: "${it.spec.photo_query}": ${e.message}`); }
     }
     console.log(`photos: ${ok} downloaded, ${failed.length} failed`);

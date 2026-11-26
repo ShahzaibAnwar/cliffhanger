@@ -45,35 +45,58 @@ export async function download(url, out, tries = 3, headers = {}) {
 }
 
 // ---------- images ----------
+// Same query → same list in the same order, every time (fixed request sizes, fixed source order, stable sort),
+// so a "photo_pick" chosen from `photos.mjs search` downloads exactly that picture.
+const AIC_FIELDS = 'id,title,image_id,artist_title,thumbnail,term_titles,subject_titles,classification_titles';
+const ovItem = r => ({ id: 'ov-' + r.id, source: r.source || 'openverse', title: r.title || '', creator: r.creator || '', licence: r.license, licence_version: r.license_version || '',
+  url: r.url, page: r.foreign_landing_url || r.url, w: r.width || 0, h: r.height || 0, tags: (r.tags || []).map(t => t.name).join(' ') });
+const nasaItem = it => {
+  const d = it.data?.[0] || {}, href = it.links?.[0]?.href;
+  return href ? { id: 'nasa-' + d.nasa_id, source: 'NASA', title: d.title || '', creator: d.photographer || d.secondary_creator || 'NASA', licence: 'public-domain', licence_version: '',
+    url: href.replace(/~(thumb|medium|small)\.jpg$/, '~large.jpg'), fallback_url: href, page: `https://images.nasa.gov/details/${encodeURIComponent(d.nasa_id)}`, w: 0, h: 0,
+    tags: [...(d.keywords || []), d.description || ''].join(' ').slice(0, 600) } : null;
+};
+const aicItem = (d, iiif) => d.image_id ? { id: 'aic-' + d.id, source: 'Art Institute of Chicago', title: d.title || '', creator: d.artist_title || '', licence: 'cc0', licence_version: '1.0',
+  url: `${iiif}/${d.image_id}/full/843,/0/default.jpg`, headers: { 'AIC-User-Agent': 'cliffhanger-skill/1.0' }, page: `https://www.artic.edu/artworks/${d.id}`,
+  w: d.thumbnail?.width || 0, h: d.thumbnail?.height || 0, tags: [...(d.term_titles || []), ...(d.subject_titles || []), ...(d.classification_titles || [])].join(' ') } : null;
+
+// share of query words found in the title and the source's own subject tags (singular/plural tolerant)
+export function relevance(q, c) {
+  const qs = q.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2 && !STOP.has(w));
+  if (!qs.length) return 1;
+  const hay = ` ${(c.title + ' ' + (c.tags || '')).toLowerCase().replace(/[^a-z0-9]+/g, ' ')} `;
+  return qs.filter(w => hay.includes(' ' + w) || hay.includes(' ' + w.replace(/(es|s)$/, ''))).length / qs.length;
+}
+const STOP = new Set(['the', 'and', 'with', 'from', 'for', 'photo', 'image', 'picture', 'view', 'of']);
+
 export async function searchImages(q, { licence = 'safe', source = 'all', n = 12 } = {}) {
-  const lic = LICENCES[licence] || LICENCES.safe, out = [];
-  const tasks = [];
-  if (source === 'all' || source === 'openverse') tasks.push((async () => {
-    const j = await getJson(`https://api.openverse.org/v1/images/?q=${encodeURIComponent(q)}&license=${lic.join(',')}&page_size=${Math.min(20, n * 2)}&mature=false`);
-    for (const r of j.results || []) out.push({ id: 'ov-' + r.id, source: r.source || 'openverse', title: r.title || q, creator: r.creator || '', licence: r.license, licence_version: r.license_version || '',
-      url: r.url, page: r.foreign_landing_url || r.url, w: r.width || 0, h: r.height || 0 });
-  })());
-  if (source === 'all' || source === 'nasa') tasks.push((async () => {
-    const j = await getJson(`https://images-api.nasa.gov/search?q=${encodeURIComponent(q)}&media_type=image`);
-    for (const it of (j.collection?.items || []).slice(0, n)) {
-      const d = it.data?.[0] || {}, href = it.links?.[0]?.href; if (!href) continue;
-      out.push({ id: 'nasa-' + d.nasa_id, source: 'NASA', title: d.title || q, creator: d.photographer || d.secondary_creator || 'NASA', licence: 'public-domain', licence_version: '',
-        url: href.replace(/~(thumb|medium|small)\.jpg$/, '~large.jpg'), fallback_url: href, page: `https://images.nasa.gov/details/${encodeURIComponent(d.nasa_id)}`, w: 0, h: 0 });
-    }
-  })());
-  if (source === 'all' || source === 'aic') tasks.push((async () => {
-    const j = await getJson(`https://api.artic.edu/api/v1/artworks/search?q=${encodeURIComponent(q)}&query[term][is_public_domain]=true&fields=id,title,image_id,artist_title,thumbnail&limit=${n}`);
-    const iiif = j.config?.iiif_url || 'https://www.artic.edu/iiif/2';
-    for (const d of j.data || []) if (d.image_id) out.push({ id: 'aic-' + d.id, source: 'Art Institute of Chicago', title: d.title || q, creator: d.artist_title || '', licence: 'cc0', licence_version: '1.0',
-      url: `${iiif}/${d.image_id}/full/843,/0/default.jpg`, headers: { 'AIC-User-Agent': 'cliffhanger-skill/1.0' }, page: `https://www.artic.edu/artworks/${d.id}`, w: d.thumbnail?.width || 0, h: d.thumbnail?.height || 0 });
-  })());
-  const res = await Promise.allSettled(tasks);
-  const errs = res.filter(r => r.status === 'rejected').map(r => r.reason?.message);
-  if (!out.length && errs.length) throw new Error('image search failed: ' + errs.join('; '));
-  // rank: bigger and closer to the query first; public domain before attribution
-  const words = q.toLowerCase().split(/\W+/).filter(w => w.length > 2);
-  const score = c => (Math.min(c.w || 1600, 3000) / 3000) + words.filter(w => (c.title || '').toLowerCase().includes(w)).length * 0.4 + (needsCredit(c.licence) ? 0 : 0.25) - (c.w && c.w < 700 ? 1 : 0);
-  return out.sort((a, b) => score(b) - score(a)).slice(0, n);
+  const lic = LICENCES[licence] || LICENCES.safe;
+  const want = k => source === 'all' || source === k;
+  const [ov, nasa, aic] = await Promise.allSettled([
+    want('openverse') ? getJson(`https://api.openverse.org/v1/images/?q=${encodeURIComponent(q)}&license=${lic.join(',')}&page_size=20&mature=false`).then(j => (j.results || []).map(ovItem)) : [],
+    want('nasa') ? getJson(`https://images-api.nasa.gov/search?q=${encodeURIComponent(q)}&media_type=image`).then(j => (j.collection?.items || []).slice(0, 20).map(nasaItem).filter(Boolean)) : [],
+    want('aic') ? getJson(`https://api.artic.edu/api/v1/artworks/search?q=${encodeURIComponent(q)}&query[term][is_public_domain]=true&fields=${AIC_FIELDS}&limit=12`)
+      .then(j => (j.data || []).map(d => aicItem(d, j.config?.iiif_url || 'https://www.artic.edu/iiif/2')).filter(Boolean)) : [],
+  ]);
+  const errs = [ov, nasa, aic].filter(r => r.status === 'rejected').map(r => r.reason?.message);
+  const all = [ov, nasa, aic].flatMap(r => r.status === 'fulfilled' ? r.value : []);          // fixed source order
+  if (!all.length && errs.length) throw new Error('image search failed: ' + errs.join('; '));
+  for (const c of all) c.relevance = relevance(q, c);
+  // off-topic results (museum full-text search returns paintings for animal names) are dropped;
+  // if nothing matches at all, keep the list but mark it so the caller can warn
+  const need = q.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2 && !STOP.has(w)).length <= 2 ? 1 : 0.6;   // short queries: every word
+  const onTopic = all.filter(c => c.relevance >= need);
+  const list = onTopic.length ? onTopic : all.map(c => ({ ...c, off_topic: true }));
+  const score = c => c.relevance * 3 + (Math.min(c.w || 1600, 3000) / 3000) + (needsCredit(c.licence) ? 0 : 0.25) - (c.w && c.w < 700 ? 1 : 0);
+  return list.sort((a, b) => score(b) - score(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).slice(0, n);
+}
+
+// One exact picture by the id `photos.mjs search` printed (ov-…, nasa-…, aic-…): no ranking involved.
+export async function imageById(id) {
+  if (id.startsWith('ov-')) return ovItem(await getJson(`https://api.openverse.org/v1/images/${encodeURIComponent(id.slice(3))}/`));
+  if (id.startsWith('nasa-')) { const j = await getJson(`https://images-api.nasa.gov/search?nasa_id=${encodeURIComponent(id.slice(5))}`); const c = nasaItem(j.collection?.items?.[0] || {}); if (c) return c; }
+  if (id.startsWith('aic-')) { const j = await getJson(`https://api.artic.edu/api/v1/artworks/${encodeURIComponent(id.slice(4))}?fields=${AIC_FIELDS}`); const c = aicItem(j.data || {}, j.config?.iiif_url || 'https://www.artic.edu/iiif/2'); if (c) return c; }
+  throw new Error('unknown photo_id ' + id);
 }
 
 // ---------- audio ----------
