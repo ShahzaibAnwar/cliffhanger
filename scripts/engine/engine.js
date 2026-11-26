@@ -5,6 +5,8 @@
 (function () {
   'use strict';
   const D = window.REEL;
+  // canvas size: vertical 1080x1920 unless the reel sets format.width/height (e.g. 1920x1080 for long-form)
+  const W = (D.size && D.size.w) || 1080, H = (D.size && D.size.h) || 1920, WIDE = W > H;
   const stage = document.getElementById('stage');
   const scenes = D.scenes;
   const events = [];             // sound-effect cues, read by render.mjs
@@ -164,7 +166,7 @@
 
   // ---------- objects (art) ----------
   function obj(spec, parent, defs) {
-    const o = Object.assign({ x: 540, y: 1180, w: 820, rot: 0, motion: 'float', enter: D.art_enter || 'fadeUp', at: 0.05, dur: 0.6, shadow: true }, defs || {}, spec);
+    const o = Object.assign({ x: W / 2, y: Math.round(H * 0.615), w: WIDE ? 760 : 820, rot: 0, motion: 'float', enter: D.art_enter || 'fadeUp', at: 0.05, dur: 0.6, shadow: true }, defs || {}, spec);
     const wrap = h('div', 'obj', parent);
     wrap.style.left = o.x + 'px'; wrap.style.top = o.y + 'px'; wrap.style.width = o.w + 'px';
     if (o.z) wrap.style.zIndex = o.z;
@@ -300,7 +302,7 @@
     art(v, sc) { S._mainArt = { el: obj(v, sc), spec: v }; },
     // newspaper clipping: masthead, date line, headline, columns of text with highlighted lines
     newspaper(v, sc) {
-      const c = h('div', 'news', sc); c.style.left = (v.x || 540) + 'px'; c.style.top = (v.y || 1150) + 'px'; if (v.w) c.style.width = v.w + 'px';
+      const c = h('div', 'news', sc); c.style.left = (v.x || W / 2) + 'px'; c.style.top = (v.y || Math.round(H * 0.6)) + 'px'; if (v.w) c.style.width = v.w + 'px';
       h('div', 'news-mast', c, esc(v.masthead || 'The Daily Record'));
       h('div', 'news-meta', c, `<span>${esc(v.date || '')}</span><span>${esc(v.issue || '')}</span>`);
       h('div', 'news-head', c, esc(v.headline || ''));
@@ -335,8 +337,8 @@
     },
     // vertical timeline: dated points appear one by one along a line that draws itself
     timeline(v, sc) {
-      const x = v.x || 190, y0 = v.y || 620, items = v.items || [], gap = v.gap || Math.min(240, (1600 - y0) / Math.max(1, items.length));
-      const svg = sv('svg', { class: 'ovsvg', viewBox: '0 0 1080 1920' }, sc);
+      const x = v.x || 190, y0 = v.y || 620, items = v.items || [], gap = v.gap || Math.min(240, (H * 0.833 - y0) / Math.max(1, items.length));
+      const svg = sv('svg', { class: 'ovsvg', viewBox: `0 0 ${W} ${H}` }, sc);
       const len = gap * Math.max(0, items.length - 1) + 40;
       const ln = sv('line', { x1: x, y1: y0, x2: x, y2: y0 + len, stroke: 'currentColor', 'stroke-width': 6, class: 'tl-line' }, svg);
       const t0 = T(v.at, 0.1);
@@ -411,7 +413,7 @@
 
   function terminal(v, sc, pos) {
     const box = h('div', 'term', sc);
-    box.style.left = (pos.x || 540) + 'px'; box.style.top = (pos.y || 1500) + 'px';
+    box.style.left = (pos.x || W / 2) + 'px'; box.style.top = (pos.y || Math.round(H * 0.78)) + 'px';
     if (pos.w) box.style.width = pos.w + 'px';
     const line = h('div', '', box);
     h('span', '', line, '&gt; ' + esc(v.prompt ? v.prompt + ': ' : ''));
@@ -550,7 +552,7 @@
 
   // ---------- overlays ----------
   function overlay(o, sc, svgLayer) {
-    const x = o.x != null ? o.x : 540, y = o.y != null ? o.y : 1500, rot = o.rot || 0;
+    const x = o.x != null ? o.x : W / 2, y = o.y != null ? o.y : Math.round(H * 0.78), rot = o.rot || 0;
     const place = (el, defEnter, defDur) => {
       el.style.left = x + 'px'; el.style.top = y + 'px';
       return enter(el, o, defEnter, 0.2, defDur || 0.4, o.anchor === 'left' ? 'translate(0,-50%)' : 'translate(-50%,-50%)', rot);
@@ -700,7 +702,7 @@
     }
     if (s.theme !== 'photo') {
       const holes = h('div', 'holes', bg);
-      [0.17, 0.33, 0.49, 0.65, 0.81].forEach(f => { const d = h('i', '', holes); d.style.top = (f * 1920) + 'px'; });
+      [0.17, 0.33, 0.49, 0.65, 0.81].forEach(f => { const d = h('i', '', holes); d.style.top = (f * H) + 'px'; });
       if (s.theme === 'dark') h('div', 'sprocket', bg);
     }
     if (s.chrome !== false && s.theme !== 'photo') {
@@ -712,7 +714,7 @@
     headline(s, shaker);
     const v = s.visual || { type: 'none' };
     (V[v.type] || V.none)(v, shaker);
-    const svgLayer = sv('svg', { class: 'ovsvg', viewBox: '0 0 1080 1920' }, shaker);
+    const svgLayer = sv('svg', { class: 'ovsvg', viewBox: `0 0 ${W} ${H}` }, shaker);
     (s.overlays || []).forEach(o => overlay(o, shaker, svgLayer));
     s._grain = h('div', 'grain', sc);
   });
@@ -778,13 +780,13 @@
     s._grain.style.backgroundPosition = `${Math.floor(rnd(f) * 260)}px ${Math.floor(rnd(f + 7) * 260)}px`;
     if (s._specks.length) {
       for (const k of s._specks) {
-        const y = ((k.b * 1920 - (t - s.start) * (25 + k.c * 60)) % 1920 + 1920) % 1920;
-        const x = k.a * 1080 + Math.sin(t * 0.7 + k.b * 9) * 25;
+        const y = ((k.b * H - (t - s.start) * (25 + k.c * 60)) % H + H) % H;
+        const x = k.a * W + Math.sin(t * 0.7 + k.b * 9) * 25;
         k.el.style.transform = `translate(${x}px,${y}px)`;
         k.el.style.opacity = rnd(f * 3 + k.a * 999) < 0.55 ? 0 : 0.15 + 0.4 * k.c;
       }
       const sx = rnd(Math.floor(t * 6) + s.start * 10);
-      s._scratch.style.left = (sx * 1080) + 'px'; s._scratch.style.opacity = sx < 0.35 ? 1 : 0;
+      s._scratch.style.left = (sx * W) + 'px'; s._scratch.style.opacity = sx < 0.35 ? 1 : 0;
       s._bg.style.filter = `brightness(${1 + 0.05 * (rnd(f + 3) - 0.5)})`;
     }
   }
@@ -792,10 +794,10 @@
     const e = E.io(p);
     switch (type) {
       case 'whip': { const b = Math.sin(p * Math.PI) * 22;
-        A_.style.transform = `translateX(${-e * 1080}px)`; B.style.transform = `translateX(${(1 - e) * 1080}px)`;
+        A_.style.transform = `translateX(${-e * W}px)`; B.style.transform = `translateX(${(1 - e) * W}px)`;
         A_.style.filter = B.style.filter = `blur(${b}px)`; break; }
       case 'slide': case 'page':
-        B.style.transform = `translateY(${(1 - E.out(p)) * 1920}px) rotate(${(1 - E.out(p)) * (type === 'page' ? 6 : 0)}deg)`;
+        B.style.transform = `translateY(${(1 - E.out(p)) * H}px) rotate(${(1 - E.out(p)) * (type === 'page' ? 6 : 0)}deg)`;
         B.style.boxShadow = '0 -30px 60px rgba(0,0,0,.35)'; A_.style.filter = `brightness(${1 - 0.4 * p})`; break;
       case 'zoom':
         A_.style.transform = `scale(${1 + e * 0.6})`; A_.style.opacity = 1 - e; A_.style.filter = `blur(${e * 12}px)`;
@@ -836,8 +838,10 @@
 
   // ---------- safe-zone check (platform UI covers these areas) ----------
   window.__safeCheck = function () {
-    const Z = [{ n: 'top bar', x0: 0, y0: 0, x1: 1080, y1: 120 }, { n: 'caption / username area', x0: 0, y0: 1660, x1: 1080, y1: 1920 },
-      { n: 'like / comment / share buttons', x0: 970, y0: 1040, x1: 1080, y1: 1660 }];
+    const Z = WIDE
+      ? [{ n: 'player controls / progress bar', x0: 0, y0: H - 110, x1: W, y1: H }, { n: 'channel watermark corner', x0: W - 200, y0: H - 230, x1: W, y1: H - 110 }]
+      : [{ n: 'top bar', x0: 0, y0: 0, x1: 1080, y1: 120 }, { n: 'caption / username area', x0: 0, y0: 1660, x1: 1080, y1: 1920 },
+         { n: 'like / comment / share buttons', x0: 970, y0: 1040, x1: 1080, y1: 1660 }];
     const out = [];
     const hit = (r, z) => Math.max(0, Math.min(r.right, z.x1) - Math.max(r.left, z.x0)) * Math.max(0, Math.min(r.bottom, z.y1) - Math.max(r.top, z.y0));
     for (const s of scenes) {

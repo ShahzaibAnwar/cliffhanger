@@ -5,7 +5,7 @@
    --stills    QA mode: one PNG per scene + contact sheet (seconds, not minutes)
    --at a,b    capture PNG frames at these absolute times
    --preview   half resolution, 15 fps — fast full-motion check
-   default     full 1080x1920 render with mixed audio -> out/<slug>.mp4 + .srt + contact.jpg */
+   default     full render (1080x1920, or reel.format.width x height, e.g. 1920x1080) with mixed audio -> out/<slug>.mp4 + .srt + contact.jpg */
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -172,7 +172,10 @@ function resolveAssets(o) {
 }
 resolveAssets(scenes);
 
+// canvas size: vertical by default; reel.format.width/height switches it (e.g. 1920x1080 for long-form)
+const W = parseInt(reel.format?.width || 1080, 10), H = parseInt(reel.format?.height || 1920, 10), WIDE = W > H;
 const data = {
+  size: { w: W, h: H },
   brand: Object.assign({ name: 'YOUR BRAND', accent: '#C8302A' }, reel.brand || {}),
   scenes, total: TOTAL,
   transition: ANIM.transition || 'auto', camera: ANIM.camera || 'push', film_fx: ANIM.film_fx !== false,
@@ -184,7 +187,7 @@ const js = fs.readFileSync(path.join(HERE, 'engine', 'engine.js'), 'utf8');
 const fontsUrl = reel.fonts_url || 'https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@600;700&family=JetBrains+Mono:wght@500;600;700&family=Playfair+Display:wght@900&display=block';
 const pageHtml = d => `<!doctype html><html><head><meta charset="utf-8">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="${fontsUrl}">
-<style>${css}${reel.css || ''}</style></head><body><div id="stage"></div>
+<style>${css}html,body,#stage{width:${W}px;height:${H}px}.ovsvg{width:${W}px;height:${H}px}.cmp-vs{left:${W / 2}px}${reel.css || ''}</style></head><body><div id="stage"></div>
 <script>window.REEL=${JSON.stringify(d).replace(/</g, '\\u003c')};</script><script>${js}</script></body></html>`;
 const html = pageHtml(data);
 const htmlPath = path.join(build, 'index.html');
@@ -205,7 +208,7 @@ const preview = flag('preview');
 const scale = preview ? 0.5 : parseFloat(opt('scale', '1'));
 const fps = parseInt(opt('fps', preview ? '15' : String(reel.format?.fps || 30)), 10);
 const browser = await launch();
-const page = await browser.newPage({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: scale });
+const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: scale });
 page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') console.log('[page]', m.text()); });
 page.on('pageerror', e => console.log('[page error]', e.message));
 await page.goto(pathToFileURL(htmlPath).href, { waitUntil: 'load' });
@@ -243,18 +246,19 @@ async function makeCover() {
   if (sc.visual) Object.assign(sc.visual, { at: 0, enter: 'none', motion: 'none', reveal_at: 0, mystery: cv.keep_mystery ? sc.visual.mystery : false }, cv.visual || {});
   const keep = (sc.overlays || []).filter(o => cv.keep_overlays || o.type === 'art')       // illustrations are part of the picture
     .map(o => ({ ...o, at: 0, enter: 'none', reveal_at: 0, mystery: false, sfx: undefined }));
-  if (reel.series?.part) keep.push({ type: 'tag', kicker: String(reel.series.name || '').toUpperCase(), text: `PART ${reel.series.part}`, x: cv.tag_x || 270, y: cv.tag_y || 1560, rot: -4, at: 0, enter: 'none' });
+  if (reel.series?.part) keep.push({ type: 'tag', kicker: String(reel.series.name || '').toUpperCase(), text: `PART ${reel.series.part}`, x: cv.tag_x || 270, y: cv.tag_y || (WIDE ? H - 170 : 1560), rot: -4, at: 0, enter: 'none' });
   sc.overlays = keep;
   const d = { ...data, scenes: [sc], total: 3, subs: [], subtitles: null, transition: 'cut', camera: 'none' };
   const cp = path.join(build, 'cover.html'); fs.writeFileSync(cp, pageHtml(d));
-  const pg = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
+  const pg = await browser.newPage({ viewport: { width: W, height: H } });
   await pg.goto(pathToFileURL(cp).href, { waitUntil: 'load' }); await pg.evaluate(() => window.__ready);
   await pg.evaluate(() => window.__seek(2.95));
   const png = path.join(outDir, 'cover.png'); await pg.screenshot({ path: png }); await pg.close();
-  ff(['-i', png, '-vf', 'crop=1080:1440:0:240', '-frames:v', '1', '-update', '1', '-q:v', '3', path.join(outDir, 'cover-grid.jpg')]);   // what the profile grid shows
+  if (WIDE) ff(['-i', png, '-vf', 'scale=1280:720', '-frames:v', '1', '-update', '1', '-q:v', '2', path.join(outDir, 'thumbnail.jpg')]);   // YouTube thumbnail (1280x720)
+  else ff(['-i', png, '-vf', 'crop=1080:1440:0:240', '-frames:v', '1', '-update', '1', '-q:v', '3', path.join(outDir, 'cover-grid.jpg')]);   // what the profile grid shows
   return png;
 }
-if (flag('cover')) { const c = await makeCover(); await browser.close(); console.log(JSON.stringify({ cover: c, grid: path.join(outDir, 'cover-grid.jpg') }, null, 1)); process.exit(0); }
+if (flag('cover')) { const c = await makeCover(); await browser.close(); console.log(JSON.stringify({ cover: c, grid: path.join(outDir, WIDE ? 'thumbnail.jpg' : 'cover-grid.jpg') }, null, 1)); process.exit(0); }
 
 // ---------- QA modes ----------
 if (flag('stills') || opt('at')) {
