@@ -54,6 +54,7 @@ settings, `voiceover.py` retries automatically with a simpler request.
 | `content.max_scene_seconds` | stills check warns above this (add beats) |
 | `images.max_rerolls` | automatic AI image re-rolls when the quality check fails |
 | `audio.bed, ai_music, music_prompt` | background mood / AI music |
+| `render.gpu` | **GPU first** (default `auto`): browser draws on the discrete graphics card; video encodes on NVIDIA NVENC → Intel QSV → AMD AMF, CPU (libx264) only if none works. Force one with `nvidia` / `intel` / `amd`, or `off` for CPU only. Env `CLIFFHANGER_GPU` overrides |
 
 Image keys (`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `GEMINI_API_KEY`) are also stored in `.env`
 through the settings page → **Images**, which also has a "Try it" button that generates a test image.

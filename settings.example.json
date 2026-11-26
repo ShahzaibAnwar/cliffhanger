@@ -43,5 +43,6 @@
     "always_hashtags": [],
     "emoji": "light"
   },
-  "output": { "projects_dir": "" }
+  "output": { "projects_dir": "" },
+  "render": { "gpu": "auto" }
 }

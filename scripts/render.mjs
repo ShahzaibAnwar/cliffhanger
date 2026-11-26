@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /* Cliffhanger renderer.
-   node render.mjs <project-dir> [--stills] [--at 3.2,7] [--preview] [--no-audio] [--fps 30] [--quality 90]
+   node render.mjs <project-dir> [--stills] [--at 3.2,7] [--preview] [--no-audio] [--fps 30] [--quality 90] [--workers N]
 
    --stills    QA mode: one PNG per scene + contact sheet (seconds, not minutes)
    --at a,b    capture PNG frames at these absolute times
    --preview   half resolution, 15 fps — fast full-motion check
+   --workers N parallel capture tabs (default: auto from CPU threads; settings render.workers)
    default     full render (1080x1920, or reel.format.width x height, e.g. 1920x1080) with mixed audio -> out/<slug>.mp4 + .srt + contact.jpg */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -193,6 +194,42 @@ const html = pageHtml(data);
 const htmlPath = path.join(build, 'index.html');
 fs.writeFileSync(htmlPath, html);
 
+// ---------- GPU first ----------
+// Rule: dedicated GPU first, then integrated graphics, then the CPU. The browser draws on the
+// high-performance (discrete) GPU, and the encoder is chosen by a real test encode in this order:
+//   1. dedicated GPU      NVIDIA NVENC → AMD AMF → Apple VideoToolbox (macOS)
+//   2. integrated graphics Intel Quick Sync → VAAPI (Linux) → Windows Media Foundation
+//   3. CPU                libx264
+// Override with settings.render.gpu or env CLIFFHANGER_GPU: auto (default) | nvidia | amd | apple | intel | off.
+const GPU = String(process.env.CLIFFHANGER_GPU || SETTINGS.render?.gpu || 'auto').toLowerCase();
+const GPU_ARGS = GPU === 'off' ? [] : ['--ignore-gpu-blocklist', '--enable-gpu-rasterization', '--enable-zero-copy',
+  ...(GPU === 'intel' ? [] : ['--force_high_performance_gpu']), ...(process.platform === 'win32' ? ['--use-angle=d3d11'] : [])];
+function pickEncoder(prev) {
+  const q = prev ? { x: '24', hw: '26', rate: '4M' } : { x: '19', hw: '20', rate: '8M' };
+  const cands = {
+    nvidia: { name: 'h264_nvenc', args: ['-c:v', 'h264_nvenc', '-preset', prev ? 'p2' : 'p5', '-tune', 'hq', '-rc', 'vbr', '-cq', q.hw, '-b:v', '0', '-maxrate', q.rate, '-bufsize', '16M', '-profile:v', 'high', '-vf', 'scale=out_range=tv,format=yuv420p', '-color_range', 'tv'] },
+    intel: { name: 'h264_qsv', args: ['-c:v', 'h264_qsv', '-preset', prev ? 'veryfast' : 'medium', '-global_quality', q.hw, '-vf', 'scale=out_range=tv,format=nv12', '-color_range', 'tv'] },
+    amd: { name: 'h264_amf', args: ['-c:v', 'h264_amf', '-quality', prev ? 'speed' : 'quality', '-rc', 'qvbr', '-qvbr_quality_level', q.hw, '-maxrate', q.rate, '-bufsize', '16M', '-vf', 'scale=out_range=tv,format=yuv420p', '-color_range', 'tv'] },
+    apple: { name: 'h264_videotoolbox', args: ['-c:v', 'h264_videotoolbox', '-q:v', prev ? '55' : '68', '-maxrate', q.rate, '-bufsize', '16M', '-profile:v', 'high', '-vf', 'scale=out_range=tv,format=yuv420p', '-color_range', 'tv'] },
+    vaapi: { name: 'h264_vaapi', args: ['-vaapi_device', '/dev/dri/renderD128', '-vf', 'format=nv12,hwupload', '-c:v', 'h264_vaapi', '-qp', q.hw] },
+    mf: { name: 'h264_mf (Windows)', args: ['-c:v', 'h264_mf', '-hw_encoding', '1', '-rate_control', 'u_vbr', '-b:v', prev ? '4M' : '8M', '-vf', 'scale=out_range=tv,format=nv12', '-color_range', 'tv'] },
+  };
+  // tier order: dedicated GPU, then integrated graphics, then CPU
+  const tiers = { darwin: ['apple', 'nvidia', 'amd', 'intel'], linux: ['nvidia', 'amd', 'intel', 'vaapi'], win32: ['nvidia', 'amd', 'intel', 'mf'] }[process.platform] || ['nvidia', 'amd', 'intel'];
+  const cpu = { name: 'libx264 (CPU)', args: ['-c:v', 'libx264', '-preset', prev ? 'veryfast' : 'medium', '-crf', q.x, '-maxrate', q.rate, '-bufsize', '16M', '-vf', 'scale=out_range=tv,format=yuv420p', '-color_range', 'tv'] };
+  if (GPU === 'off') return { ...cpu, why: [] };
+  const order = GPU in cands ? [GPU, ...tiers.filter(k => k !== GPU)] : tiers;
+  const why = [];
+  for (const k of order) {      // a real 0.2 s test encode: listed encoders can still fail (old driver, no device)
+    const t = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', ...(k === 'vaapi' ? cands[k].args.slice(0, 2) : []), '-f', 'lavfi', '-i', 'color=black:s=256x256:d=0.2', ...(k === 'vaapi' ? cands[k].args.slice(2) : cands[k].args), '-f', 'null', '-'], { encoding: 'utf8' });
+    if (t.status === 0) return { ...cands[k], why };
+    const lines = (t.stderr || '').split('\n');
+    const msg = lines.find(l => /minimum required/i.test(l)) || lines.find(l => /driver|not supported|No device|Cannot load|failed/i.test(l)) || 'unavailable';
+    if (k === 'nvidia' || k === 'amd' || k === 'apple' || /minimum required/i.test(msg)) why.push(`${cands[k].name}: ${msg.replace(/^\[[^\]]*\]\s*/, '').trim()}`);
+  }
+  return { ...cpu, why };
+}
+
 // ---------- browser ----------
 const { chromium } = await import('playwright-core');
 async function launch() {
@@ -200,7 +237,7 @@ async function launch() {
   if (process.env.CHROME_PATH) tries.push({ executablePath: process.env.CHROME_PATH });
   tries.push({}, { channel: 'chrome' }, { channel: 'msedge' }, { channel: 'chromium' });
   for (const o of tries) {
-    try { return await chromium.launch({ ...o, args: ['--disable-gpu-vsync', '--force-color-profile=srgb', '--hide-scrollbars'] }); } catch (e) { /* try next */ }
+    try { return await chromium.launch({ ...o, args: ['--disable-gpu-vsync', '--force-color-profile=srgb', '--hide-scrollbars', ...GPU_ARGS] }); } catch (e) { /* try next */ }
   }
   throw new Error('No Chromium found. Install Google Chrome or set CHROME_PATH.');
 }
@@ -209,6 +246,11 @@ const scale = preview ? 0.5 : parseFloat(opt('scale', '1'));
 const fps = parseInt(opt('fps', preview ? '15' : String(reel.format?.fps || 30)), 10);
 const browser = await launch();
 const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: scale });
+// parallel capture: frames are independent (window.__seek is stateless), so N tabs render them at once
+const WORKERS = Math.max(1, Math.min(12, parseInt(opt('workers', SETTINGS.render?.workers || 0), 10) || Math.max(2, Math.min(8, Math.floor((await import('node:os')).cpus().length / 3)))));
+const gpuName = await page.evaluate(() => { try { const g = document.createElement('canvas').getContext('webgl'), e = g && g.getExtension('WEBGL_debug_renderer_info');
+  return g ? String(e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : 'webgl').replace(/^ANGLE \([^,]*,\s*/, '').replace(/\s*\(0x[0-9A-F]+\).*$/i, '') : 'software'; } catch { return 'unknown'; } });
+if (GPU !== 'off' && /intel|swiftshader|software|microsoft basic/i.test(gpuName) && GPU !== 'intel') console.warn(`! browser is drawing on ${gpuName}, not a discrete GPU`);
 page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') console.log('[page]', m.text()); });
 page.on('pageerror', e => console.log('[page error]', e.message));
 await page.goto(pathToFileURL(htmlPath).href, { waitUntil: 'load' });
@@ -219,10 +261,27 @@ const events = await page.evaluate(() => window.__events);
 const fellBack = await page.evaluate(() => window.__fallbacks || 0);
 if (fellBack) console.warn(`! ${fellBack} image(s) failed to load in the browser; their hand-drawn fallback was used.`);
 const cdp = await page.context().newCDPSession(page);
-async function grab(time, type = 'jpeg', quality = parseInt(opt('quality', '90'), 10)) {
-  await page.evaluate(tt => window.__seek(tt), time);
-  const r = await cdp.send('Page.captureScreenshot', { format: type, quality: type === 'jpeg' ? quality : undefined, optimizeForSpeed: true });
+async function grabOn(pg, session, time, type = 'jpeg', quality = parseInt(opt('quality', '90'), 10)) {
+  await pg.evaluate(tt => window.__seek(tt), time);
+  const r = await session.send('Page.captureScreenshot', { format: type, quality: type === 'jpeg' ? quality : undefined, optimizeForSpeed: true });
   return Buffer.from(r.data, 'base64');
+}
+const grab = (time, type, quality) => grabOn(page, cdp, time, type, quality);
+const extraBrowsers = [];
+async function openWorkers(n) {
+  const out = [{ pg: page, cdp }];
+  const PROCS = Math.max(1, parseInt(process.env.CLIFFHANGER_BROWSERS || SETTINGS.render?.browsers || '1', 10));
+  const extra = await Promise.all(Array.from({ length: Math.min(PROCS, n) - 1 }, () => launch()));
+  extraBrowsers.push(...extra);
+  await Promise.all(Array.from({ length: n - 1 }, async (_, i) => {
+    const host = [browser, ...extra][(i + 1) % Math.min(PROCS, n)];
+    const pg = await host.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: scale });
+    pg.on('pageerror', e => console.log('[page error]', e.message));
+    await pg.goto(pathToFileURL(htmlPath).href, { waitUntil: 'load' });
+    await pg.evaluate(() => window.__ready);
+    out.push({ pg, cdp: await pg.context().newCDPSession(pg) });
+  }));
+  return out;
 }
 
 const slug = (reel.slug || reel.title || path.basename(proj)).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'reel';
@@ -287,18 +346,44 @@ const nFrames = Math.ceil(TOTAL * fps);
 const silent = path.join(build, preview ? 'video_preview.mp4' : 'video.mp4');
 if (flag('remux') && fs.existsSync(silent)) { console.log('--remux: reusing ' + silent); await browser.close(); }
 else {
+const encoder = pickEncoder(preview);
+console.log(`gpu: draw = ${gpuName} · encode = ${encoder.name}`);
+for (const w of encoder.why) console.warn(`! GPU encoder skipped → ${w}`);
 const enc = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'image2pipe', '-c:v', 'mjpeg', '-framerate', String(fps), '-i', '-',
-  '-c:v', 'libx264', '-preset', preview ? 'veryfast' : 'medium', '-crf', preview ? '24' : '19', '-maxrate', preview ? '4M' : '8M', '-bufsize', '16M', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', silent], { stdio: ['pipe', 'inherit', 'inherit'] });
+  ...encoder.args, '-movflags', '+faststart', silent], { stdio: ['pipe', 'inherit', 'inherit'] });
 const t0 = Date.now();
-for (let f = 0; f < nFrames; f++) {
-  const buf = await grab(f / fps);
-  if (!enc.stdin.write(buf)) await once(enc.stdin, 'drain');
-  if (f % (fps * 5) === 0) process.stdout.write(`\rframe ${f}/${nFrames}  ${((Date.now() - t0) / 1000).toFixed(0)}s`);
-}
+const workers = await openWorkers(Math.min(WORKERS, Math.max(1, Math.ceil(nFrames / 30))));
+console.log(`capture: ${workers.length} parallel tab(s)`);
+// workers grab frames in any order; the writer feeds ffmpeg strictly in order, with a bounded buffer
+const ready = new Map(); let next = 0, written = 0, wake = null;
+const LIMIT = workers.length * 8;
+const waitFor = () => new Promise(r => { wake = r; });
+const poke = () => { if (wake) { const w = wake; wake = null; w(); } };
+const writer = (async () => {
+  while (written < nFrames) {
+    if (!ready.has(written)) { await waitFor(); continue; }
+    const buf = ready.get(written); ready.delete(written); written++; poke();
+    if (!enc.stdin.write(buf)) await once(enc.stdin, 'drain');
+    if (written % (fps * 5) === 0) process.stdout.write(`\rframe ${written}/${nFrames}  ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+  }
+})();
+await Promise.all(workers.map(async w => {
+  while (true) {
+    while (next - written > LIMIT) await new Promise(r => setTimeout(r, 4));
+    const f = next++;
+    if (f >= nFrames) return;
+    ready.set(f, await grabOn(w.pg, w.cdp, f / fps));
+    poke();
+  }
+}));
+await writer;
+for (const w of workers.slice(1)) await w.pg.close();
+for (const b of extraBrowsers) await b.close();
 enc.stdin.end(); await once(enc, 'close');
 if (!preview) { try { await makeCover(); } catch (e) { console.warn('! cover failed: ' + e.message); } }
 await browser.close();
-console.log(`\rvideo frames done: ${nFrames} in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+const secs = (Date.now() - t0) / 1000;
+console.log(`\rvideo frames done: ${nFrames} in ${secs.toFixed(0)}s (${(nFrames / secs).toFixed(1)} fps, ${workers.length} tab(s), ${encoder.name})`);
 }
 
 // ---------- audio ----------

@@ -164,7 +164,14 @@ node "$SKILL_DIR/scripts/render.mjs" <project> --preview     # fast half-res che
 Outputs in `<project>/out/`: `<slug>.mp4`, `<slug>.srt` (upload as subtitles), `cover.png`
 (thumbnail, set with `reel.cover`), `contact.jpg`. Audio = voiceover + automatic and directed SFX + a
 low suspense drone, ducked under the voice. `reel.audio.music` swaps the drone for a licensed track.
-`--remux` re-mixes the audio without re-rendering frames (use it after sound-only changes). Read
+`--remux` re-mixes the audio without re-rendering frames (use it after sound-only changes).
+
+**GPU first, always.** Rendering uses the graphics card before the CPU: Chrome is launched on the
+high-performance (discrete) GPU, and the encoder is chosen by a real test encode in the order
+NVIDIA NVENC → Intel QSV → AMD AMF → CPU libx264. The first line of every render says what was used
+(`gpu: draw = … · encode = …`); a `! GPU encoder skipped →` line explains any fallback (e.g. an NVIDIA
+driver too old for this ffmpeg's NVENC; fix by updating the driver). Never add `--disable-gpu`.
+Setting: `render.gpu` (`auto` · `nvidia` · `intel` · `amd` · `off`). Read
 `out/contact.jpg` and spot-check 2–3 frames with `--at`, including one mid-transition, before delivering.
 
 - **Subtitles**: `subtitles.burn` (settings or reel) burns word-by-word captions in; Urdu/Hindi cuts show
@@ -210,6 +217,7 @@ Offer the Part-2 script as the next episode — the series engine is the growth 
   scripts. The *style* is a genre; the brand comes from `reel.brand`.
 - Facts over drama: dramatize the delivery, never the data. Mark estimates.
 - Keep reels 35–75 s (sweet spot 45–60 s), 120–170 spoken words in English.
+- GPU first: render on the graphics card; the CPU is only the fallback.
 - Don't publish or post anywhere; the user uploads.
 
 ---

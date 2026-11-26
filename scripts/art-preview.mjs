@@ -61,7 +61,7 @@ const html = path.join(tmp, 'index.html');
 fs.writeFileSync(html, `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@600;700&family=JetBrains+Mono:wght@500;600;700&display=block"><style>${css}</style></head><body><div id="stage"></div><script>window.REEL=${JSON.stringify(data).replace(/</g, '\\u003c')};</script><script>${js}</script></body></html>`);
 
 const { chromium } = await import('playwright-core');
-let browser; for (const o of [{}, { channel: 'chrome' }, { channel: 'msedge' }]) { try { browser = await chromium.launch(o); break; } catch { /* next */ } }
+let browser; for (const o of [{}, { channel: 'chrome' }, { channel: 'msedge' }]) { try { browser = await chromium.launch({ ...o, args: ['--ignore-gpu-blocklist', '--force_high_performance_gpu', ...(process.platform === 'win32' ? ['--use-angle=d3d11'] : [])] }); break; } catch { /* next */ } }
 const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
 page.on('pageerror', e => console.log('[page error]', e.message));
 await page.goto(pathToFileURL(html).href); await page.evaluate(() => window.__ready);
