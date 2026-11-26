@@ -84,10 +84,12 @@
   }
 
   // ---------- animation registry ----------
-  function A(el, type, t0, dur, p) { const a = { el, type, t0, dur: dur == null ? 0.45 : dur, p: p || {} }; S._anims.push(a); return a; }
+  let CARRY = false;                    // building a carried overlay: it is already in place when the scene starts, and makes no sound
+  function A(el, type, t0, dur, p) { const a = { el, type, t0: CARRY ? S.start - 5 : t0, dur: dur == null ? 0.45 : dur, p: p || {} }; S._anims.push(a); return a; }
   function C(el, type, p) { S._conts.push({ el, type, p: p || {} }); }
   // A cue is a preset name ("impact") or {prompt:"glass shattering", dur, fallback:"impact", vol} (AI sound, cached)
   function sfx(type, t, vol, dur, extra) {
+    if (CARRY) return;
     const x = extra || {};
     events.push({ type, t, vol: vol == null ? 0.5 : vol, dur: dur != null ? dur : x.dur, prompt: x.prompt, fallback: x.fallback, loop: !!x.loop, influence: x.influence, find: x.find, file: x.file });
   }
@@ -867,8 +869,8 @@
         A(box, 'in', t0, 0.35, { style: 'pop', pre: '', rot: 0 });
         A(ring, 'draw', t0, n, { len: L }); ring._rev = true;
         A(num, 'countdown', t0, n, { n, end: o.end_text || '0' });
-        for (let k = 0; k < n; k++) sfx(o.tick || 'clock', t0 + k, o.tick_vol != null ? o.tick_vol : 0.35, 0.3);
-        sfx(o.end_sfx || 'ding', t0 + n, 0.45);
+        if (o.tick !== false) for (let k = 0; k < n; k++) sfx(o.tick || 'clock', t0 + k, o.tick_vol != null ? o.tick_vol : 0.35, 0.3);   // "tick": false = silent count
+        if (o.end_sfx !== false) sfx(o.end_sfx || 'ding', t0 + n, 0.45);
         break;
       }
       case 'ransom': {   // letters cut from different papers, stuck down one per frame
@@ -995,7 +997,11 @@
     const v = s.visual || { type: 'none' };
     (V[v.type] || V.none)(v, shaker);
     const svgLayer = sv('svg', { class: 'ovsvg', viewBox: `0 0 ${W} ${H}` }, shaker);
-    (s.overlays || []).forEach(o => overlay(o, shaker, svgLayer));
+    (s.overlays || []).forEach(o => {
+      if (!o._carried) return overlay(o, shaker, svgLayer);
+      const before = new Set(s._layout); CARRY = true; try { overlay(o, shaker, svgLayer); } finally { CARRY = false; }
+      s._layout = s._layout.map(f => (before.has(f) ? f : () => { CARRY = true; try { f(); } finally { CARRY = false; } }));   // its layout steps too
+    });
     s._grain = h('div', 'grain', sc);
   });
   S = null;
@@ -1218,7 +1224,7 @@
         const a = txt[i].r, b = txt[j].r, ov = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left) + 10) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) + 10);   // touching (< 10 px apart) counts
         if (ov > 0) out.push({ scene: s.id, zone: `overlaps or touches "${txt[j].el.innerText.replace(/\s+/g, ' ').trim().slice(0, 30)}" (move one: x/y)`, what: txt[i].el.innerText.replace(/\s+/g, ' ').trim().slice(0, 30) });
       }
-      if (subsEl) {                                           // overlays fighting with subtitles
+      if (subsEl && D.subs.some(c => c.t0 + 0.06 >= s.start && c.t0 + 0.06 < s.end)) {      // overlays fighting with subtitles (scenes without narration show none)
         const sy = s._subY || SUBY, band = { x0: 60, x1: W - 60, y0: sy - 4, y1: sy + (SUB.size || 60) * 2.4 };
         const boxes = [...s._el.querySelectorAll('.hl,.ov,.term,.labfile,.stat .num')].filter(e => getComputedStyle(e).opacity !== '0').map(e => ({ e, r: e.getBoundingClientRect() })).filter(o => o.r.width);
         s._el.querySelectorAll('.ov,.term,.labfile').forEach(el => {

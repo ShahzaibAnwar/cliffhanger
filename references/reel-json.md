@@ -51,6 +51,7 @@ reports anything that still runs off the edge.
 | `duration`, `min`, `pad`, `lead` | timing overrides; `lead` delays the VO inside the scene |
 | `headline` | `["LINE ONE", "PUNCH LINE"]` — line 2 is red. One string = one line |
 | `accent_line` | which line is red (default 1) |
+| `hold` | `true`: an intentional still (play-along test, "stare at the dot"). No camera move or art drift; between consecutive hold scenes a hard cut with no cut sound, and an unchanged visual stays put instead of entering again. Not counted by "no visual held over 5 s" (scenes with a `countdown` aren't either) |
 | `punch_at` | when the red line appears. Default: when its first word is spoken (`--stills` warns when that's over 3 s in, 5.5 s on 16:9) |
 | `headline_at` | force line-1 time (default: each word appears as it is spoken) |
 | `headline_style` | `""` · `label` (white tape label, default on photo) · `center` |
@@ -131,6 +132,10 @@ false hides), `next` (next-episode teaser), `next_label`, `cta` ("Follow"; false
 
 ## Overlays (`overlays: [...]`)
 
+Any overlay can take `"carry": true`: it stays, already in place and silent, through the following scenes for as long
+as the visual is the same (`"carry": 2` = through the next 2 scenes whatever they show). Saves repeating it with
+`enter: none, at: 0` in every scene of a sequence.
+
 | type | keys | notes |
 |---|---|---|
 | `art` | as art component (`w` default 400) | extra objects, hands, icons |
@@ -184,7 +189,8 @@ turned red), `highlight_at`, `x`, `y`, `w`, `rot`.
 Overlay **lens**: zoom callout on the scene's main `art`: `fx`, `fy` (0–1 point in the art), `x`, `y`
 (lens centre), `r`, `zoom`, `text`, `at`. Read `fx`/`fy` off `node scripts/grid.mjs <image>` instead of guessing.
 Overlay **countdown** (quiz "think" pauses): `from` (3), `at`, `label` ("seconds"), `x`, `y`, `size` (260), `tick`
-(sound each second, default `clock`), `end_sfx` (`ding`), `end_text`. Pair it with a scene that has no `vo` and a
+(sound each second, default `clock`; `false` = silent count), `end_sfx` (`ding`; `false` = none), `end_text`.
+Without narration the scene shows no captions, so the countdown may sit where captions normally go. Pair it with a scene that has no `vo` and a
 `duration` of a few seconds; it shows a ring emptying while the digit counts down.
 Overlay **ransom**: a ransom-note word, letters cut from different papers and stuck down one per frame:
 `text` (≤ 10 characters reads best), `at`, `x`, `y`, `size` (130), `align` (`center`/`left`).

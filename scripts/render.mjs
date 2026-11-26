@@ -53,6 +53,35 @@ const timings = fs.existsSync(timingsPath) ? JSON.parse(fs.readFileSync(timingsP
 if (!fs.existsSync(timingsPath)) console.warn('! No build/timings.json — run voiceover.py first. Estimating durations from word count.');
 
 // ---------- timeline ----------
+// "hold": true on a scene: an intentional still (play-along tests, "stare at the dot"). No camera move or art drift; between
+// consecutive holds a hard cut with no cut sound, and an unchanged visual stays in place instead of entering again.
+// "carry": true on an overlay: it stays, already in place, through the following scenes while the visual is the same
+// ("carry": 3 = through the next 3 scenes whatever they show).
+{
+  const R = reel.scenes, visKey = v => (v ? JSON.stringify(Object.fromEntries(Object.entries(v).filter(([k]) => !['enter', 'at', 'dur', 'motion', 'until'].includes(k)))) : '');
+  const keys = R.map(s => visKey(s.visual));
+  R.forEach((s, i) => {
+    if (s.hold !== true) return;
+    if (s.camera == null) s.camera = 'none';
+    if (s.visual && s.visual.type === 'art' && s.visual.motion == null) s.visual.motion = 'none';
+    const p = R[i - 1];
+    if (p && p.hold === true) {
+      if (s.transition == null) s.transition = 'cut';
+      if (s.cut_sfx == null) s.cut_sfx = false;
+      if (s.visual && keys[i] === keys[i - 1] && s.visual.enter == null) { s.visual.enter = 'none'; if (s.visual.at == null) s.visual.at = 0; }
+    }
+  });
+  R.forEach((s, i) => (s.overlays || []).forEach(o => {
+    if (!o.carry || o._carried) return;
+    const max = typeof o.carry === 'number' ? o.carry : Infinity;
+    for (let j = i + 1, n = 0; j < R.length && n < max; j++, n++) {
+      if (typeof o.carry !== 'number' && keys[j] !== keys[i]) break;
+      const c = { ...JSON.parse(JSON.stringify(o)), enter: 'none', at: 0, _carried: true };
+      delete c.carry; delete c.sfx; delete c.until; delete c.label_at;
+      (R[j].overlays = R[j].overlays || []).unshift(c);
+    }
+  }));
+}
 let t = 0, fig = 0;
 const WPS = reel.voice?.words_per_sec || 2.7;
 const scenes = reel.scenes.map((s0, i) => {
@@ -409,12 +438,14 @@ function engagementCheck() {
   add(!!hl, 'Headline on screen at once', hl ? 'first scene has a headline' : 'first scene has no headline', 'give scene 1 a headline that states the question (works on mute)');
   // 4. pacing: a new visual every 2.5–4 s, nothing held longer than 5 s (8 s on 16:9 long-form)
   const ordered = [...scenes].sort((a, b) => a.start - b.start);
-  const shotsAll = ordered.map((x, i, arr) => ({ d: (i + 1 < arr.length ? arr[i + 1].start : TOTAL) - x.start, id: x.id }))
+  const isHold = x => x.hold === true || (x.overlays || []).some(o => o.type === 'countdown');        // play-along stills and "think" pauses are held on purpose
+  const shotsAll = ordered.map((x, i, arr) => ({ d: (i + 1 < arr.length ? arr[i + 1].start : TOTAL) - x.start, id: x.id, hold: isHold(x) }))
     .filter((o, i) => o.d > 0.05 && !(i === ordered.length - 1 && (WIDE || ordered[i].visual?.type === 'endcard')));   // end card holds on purpose
-  const shots = shotsAll.map(o => o.d), longestShot = shotsAll.reduce((a, b) => (b.d > a.d ? b : a), { d: 0, id: '' });
-  const avg = shots.reduce((a, b) => a + b, 0) / Math.max(1, shots.length), longest = Math.max(...shots), cap = WIDE ? 8 : 5;
+  const shots = shotsAll.map(o => o.d), free = shotsAll.filter(o => !o.hold), longestShot = free.reduce((a, b) => (b.d > a.d ? b : a), { d: 0, id: '' });
+  const cap = WIDE ? 8 : 5, nHold = shotsAll.filter(o => o.hold && o.d > cap + 0.5).length;
+  const avg = shots.reduce((a, b) => a + b, 0) / Math.max(1, shots.length), longest = longestShot.d;
   add(avg >= 2 && avg <= (WIDE ? 6 : 4.5), 'Visual changes every 2.5–4 s', `average ${avg.toFixed(1)} s per visual`, avg < 2 ? 'slow down: under 2 s per shot lowers retention (too fast to follow)' : 'add "beats" (a new visual mid-line) so something changes every 2.5–4 s');
-  add(longest <= cap + 0.5, `No visual held over ${cap} s`, `longest ${longest.toFixed(1)} s: ${longestShot.id}`, 'split the longest scene with beats or a cut-in (lens, chip, stamp)');
+  add(longest <= cap + 0.5, `No visual held over ${cap} s`, `longest ${longest.toFixed(1)} s: ${longestShot.id}${nHold ? ` (${nHold} intentional hold${nHold > 1 ? 's' : ''} not counted)` : ''}`, 'split the longest scene with beats or a cut-in (lens, chip, stamp)');
   // 5. length
   if (!WIDE) add(TOTAL >= 30 && TOTAL <= 90, 'Length 30–90 s (best 45–60)', `${TOTAL.toFixed(0)} s`, TOTAL > 180 ? 'over 3:00 is not shown to non-followers on Reels and is the Shorts maximum: cut it down' : TOTAL < 30 ? 'very short: data favour 30–60 s for reach' : 'aim for 45–60 s; trim weaker beats');
   // 6. narration pace
@@ -502,7 +533,7 @@ if (flag('stills') || opt('at')) {
   const safe = opt('at') ? [] : await page.evaluate(() => window.__safeCheck());
   await browser.close();
   const maxScene = reel.max_scene_seconds || (WIDE ? Math.max(8, SETTINGS.content?.max_scene_seconds || 0) : SETTINGS.content?.max_scene_seconds || 5);
-  const long = scenes.filter(x => !x._beatOf && x.visual?.type !== 'endcard' && x.dur > maxScene && !scenes.some(y => y._beatOf === x.id));
+  const long = scenes.filter(x => !x._beatOf && x.visual?.type !== 'endcard' && x.hold !== true && !(x.overlays || []).some(o => o.type === 'countdown') && x.dur > maxScene && !scenes.some(y => y._beatOf === x.id));
   if (safe.length) { console.warn(`! ${safe.length} layout warning(s): platform UI zones (covered by buttons/captions on Instagram/TikTok), cut-off, overlapping or low-contrast elements:`); for (const w of safe) console.warn(`   - ${w.scene}: "${w.what}" → ${w.zone}`); }
   // headline punch line that lands late: line 1 sits alone on screen until its first word is spoken
   const latePunch = [];

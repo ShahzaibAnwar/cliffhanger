@@ -166,6 +166,24 @@ t('stills check: contrast, touching labels, map names, late punch lines', () => 
   if (!/m: "NEMO" appears 3\.5 s in/.test(all)) throw new Error('late punch line not flagged');
   return 'dark-on-dark flagged, outlined art passes, touching chips, unknown map name, late punch line flagged';
 });
+t('hold scenes and carried overlays', () => {
+  const proj = path.join(tmpProj, 'hold'); fs.mkdirSync(path.join(proj, 'art'), { recursive: true });
+  fs.writeFileSync(path.join(proj, 'art', 'card.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200"><rect width="400" height="200" fill="#fff" stroke="#111" stroke-width="6"/><circle cx="320" cy="100" r="18" fill="#111"/></svg>');
+  const vis = { type: 'art', svg_file: 'art/card.svg', w: 800, y: 1000, shadow: false };
+  fs.writeFileSync(path.join(proj, 'reel.json'), JSON.stringify({ scenes: [
+    { id: 'intro', duration: 3, headline: ['LOOK'], visual: { type: 'art', svg_file: 'art/card.svg', w: 300 } },
+    { id: 'a', hold: true, duration: 3, headline: ['STARE'], visual: vis, overlays: [{ type: 'chip', text: 'KEEP STARING', x: 540, y: 1400, carry: true }] },
+    { id: 'b', hold: true, duration: 7, headline: ['STARE'], visual: vis, overlays: [{ type: 'chip', text: 'OWN CHIP', x: 560, y: 1405 }, { type: 'countdown', from: 3, at: 0.2, tick: false, y: 600 }] },
+    { id: 'c', duration: 3, headline: ['DONE'], visual: { type: 'art', svg_file: 'art/card.svg', w: 300 }, overlays: [{ type: 'chip', text: 'LAST', x: 560, y: 1405 }] }] }));
+  const r = spawnSync(process.execPath, [path.join(HERE, 'render.mjs'), proj, '--stills'], { encoding: 'utf8', cwd: ROOT, maxBuffer: 64 << 20 });
+  const all = (r.stdout || '') + (r.stderr || '');
+  if (/\[page error\]/.test(all) || r.status !== 0) throw new Error('render failed: ' + all.slice(-400));
+  if (!/b: "KEEP STARING" → overlaps or touches "OWN CHIP"/.test(all)) throw new Error('the carried chip is not in the next hold scene');
+  if (/c: "KEEP STARING"/.test(all)) throw new Error('the chip was carried past a change of visual');
+  if (!/1 intentional hold not counted/.test(all)) throw new Error('a 7 s hold scene still counts as held too long');
+  if (/b: 7\.0s/.test(all)) throw new Error('hold scene listed as too long');
+  return 'chip carried while the visual stays, hold not counted as too long';
+});
 t('caption styles: own class names, a gap between words', () => {
   const css = fs.readFileSync(path.join(HERE, 'engine', 'engine.css'), 'utf8');
   // the caption box carries the style name as a class ("subs tape"): a bare .tape{…} rule elsewhere would restyle it
