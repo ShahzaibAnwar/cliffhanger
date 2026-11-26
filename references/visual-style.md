@@ -136,3 +136,15 @@ torn yellow paint block, animated on twos so it feels hand-made. Turn it on with
 - **Point precisely:** run `node scripts/grid.mjs <image>` and read coordinates off the grid; a circle or lens
   that misses its target looks broken.
 - Don't mix: in a collage reel, use the collage finish on every scene's art.
+
+## AI image prompting lessons
+
+- Cut-out styles automatically ask for "the whole subject, complete and uncropped, centred with empty space all
+  around it"; still describe the full object (the whole planet, the whole device), because half-shown subjects
+  come back cropped and can't be cut out cleanly.
+- Dark-background styles automatically ask for front light. A subject in deep shadow (Saturn's night side) is
+  keyed out with the black background, leaving only the bright parts; prompt "brightly sunlit" when in doubt.
+- Labelled objects (vials, record labels, control panels, signs) come back with invented fake text. Draw those as
+  SVG, or ask for the object without its label and add the real label as an overlay.
+- `editorial-photo` is a realistic full-bleed style that leaves calm, darker space in the lower third for text
+  (photo-scene backgrounds with `bg_prompt`, covers).

@@ -10,6 +10,12 @@ use the **split layout** by default: the headline sits in the left column, art d
 full-width chapter cards. The safe-zone check watches the YouTube player bar instead of Reels buttons, and
 the final render also writes `out/thumbnail.jpg` (1280 × 720).
 
+16:9 recipe (used across several long videos): art slot centre x = 1380, y = 560 (`w` 560–900); chips, captions
+and big numbers at x = 480, y = 620–880; left-column captions ≤ 40 characters; chapter cards dark, ~1.7 s,
+`transition: "glitch"`, `headline_style: "center"`, `headline_y: 360`, `headline_size: 170`; end card `"min": 18`.
+Overlays are kept inside the canvas automatically (with room for the camera push), and the stills check
+reports anything that still runs off the edge.
+
 ```jsonc
 {
   "title": "Why your body jerks awake",      // used for output file name (or "slug")
@@ -38,6 +44,7 @@ the final render also writes `out/thumbnail.jpg` (1280 × 720).
 | `id` | unique id (also the VO file name) |
 | `theme` | `paper` (explain) · `dark` (tension/reveal) · `photo` (full-bleed `bg_image`) |
 | `section` | small mono label top-left ("THE BITE"); FIG. numbers are automatic |
+| `chapter` | starts a YouTube chapter here: the final render writes `out/chapters.txt` (`0:00 Title` lines). `reel.chapter_intro` names the first one if no chapter starts at 0 (default "Intro") |
 | `chrome` | `false` hides meta row + brand tag (use on end card) |
 | `vo` | the spoken line. Scene length = VO length + `pad` (0.08 s) unless `duration` is set |
 | `vo_tts` | optional alternate text sent to TTS (pronunciation fixes: spell out years and codes, e.g. vo "July 1969 … 1202" → vo_tts "July nineteen sixty-nine … twelve oh two"; the subtitles keep `vo`) |
@@ -97,9 +104,9 @@ true). `blend`: `multiply` (white-background PNGs on paper) / `screen` (black-ba
 
 **bars** — comparison bars. `rows: [{label, value, display, svg_file|image, mystery}]`, `y`, `max`, `stagger`.
 
-**notepad** — lined paper with a red pencil that writes. `y`, `title`, `rot`, `min_rows`(4),
+**notepad** — lined paper with a red pencil that writes. `x` (centre; default: art slot on 16:9), `y`, `w`, `title`, `rot`, `min_rows`(4),
 `pencil` (false hides). `lines: [{ text, at, write_dur, box, mark: "check"|"x", mark_at,
-strike, strike_at, replace, replace_at, highlight, highlight_at, circle, circle_at }]`.
+strike, strike_at, replace, replace_at, highlight, highlight_at, circle, circle_at }]` (plain strings work too).
 Myth-bust pattern: scene A writes the myth; scene B repeats the pad with `"enter":"none","at":0`,
 the line pre-written (`"write_dur":0.01`), then `strike` + `replace`.
 

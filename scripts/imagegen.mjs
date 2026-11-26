@@ -52,6 +52,8 @@ export const STYLES = {
     p: s => `Photorealistic studio photograph of ${s}. Isolated and centred on a plain pure white background, soft even lighting, sharp focus, generous empty margin. ${NO_TEXT}` },
   'photo-dark': { bg: 'dark', d: 'photoreal with rim light on black (dark scenes)',
     p: s => `Photorealistic photograph of ${s}, dramatic rim light, isolated and centred on a pure solid black background, generous empty margin. ${NO_TEXT}` },
+  'editorial-photo': { bg: 'full', d: 'photorealistic editorial photo with calm space for text (covers, photo scenes)',
+    p: s => `Photorealistic editorial photograph: ${s}. Natural, believable lighting, realistic detail, subtle film grain. The main subject in the upper two thirds; darker, calm, uncluttered space in the lower third for text. Absolutely no text, letters, numbers, captions, logos, signatures or watermark. No border or frame.` },
   cinematic: { bg: 'full', aspect: '9:16', d: 'full-bleed moody photo (photo-theme backgrounds)',
     p: s => `Cinematic moody photograph: ${s}. Shallow depth of field, warm practical lamp light, subtle film grain, vertical 9:16 composition with empty space in the top third for a headline. ${NO_TEXT}` },
 };
@@ -402,7 +404,11 @@ export async function generate(spec, theme, cfg, proj, { provider } = {}) {
   else order = ['cloudflare', 'gemini'];                        // FLUX.2 on Cloudflare handles references too
   order = order.filter(p => av[p]);
   if (!order.length) throw new Error('No image provider configured. Add a Cloudflare or Gemini key in the settings page (node scripts/settings.mjs → Images).');
-  const prompt = st.p(spec.image_prompt);
+  // cut-outs: ask for the complete subject with room around it (cropped subjects can't be cut out cleanly);
+  // on black backgrounds a shadowed subject gets keyed out with the background, so ask for front light
+  const subj = spec.image_prompt + (st.bg !== 'full' ? ', the whole subject, complete and uncropped, centred with empty space all around it' : '')
+    + (st.bg === 'dark' ? ', brightly lit from the front, no deep shadows on the subject' : '');
+  const prompt = st.p(subj);
   const seed = spec.image_seed ?? (parseInt(k.hash.slice(0, 6), 16) % 100000);
   let lastErr;
   const tries = 1 + Math.max(0, cfg.max_rerolls ?? 2);

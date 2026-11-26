@@ -34,6 +34,7 @@ settings, `voiceover.py` retries automatically with a simpler request.
 | `voice.provider` | `auto` (ElevenLabs if key, else Edge) · `elevenlabs` · `edge` |
 | `voice.ask_each_reel` | Claude asks which saved voice to use before each voiceover |
 | `voice.only_my_voices` | refuse ElevenLabs voices that aren't in `voice.elevenlabs.voices` |
+| `voice.tighten` | `[tempo, keep]`, e.g. `[1.14, 0.24]`: run `tighten.py` after every voiceover (faster delivery, shorter pauses, pitch kept). Empty = off |
 | `voice.elevenlabs.voices` | `[{voice_id, name, language, notes}]` |
 | `voice.elevenlabs.default_voice_id` | used when not asking / only one voice |
 | `voice.elevenlabs.model_id, stability, similarity_boost, style, speed` | delivery defaults |
@@ -51,7 +52,7 @@ settings, `voiceover.py` retries automatically with a simpler request.
 | `animation.transition, camera, film_fx, sketch_art, headline_fx` | motion defaults |
 | `output.projects_dir` | where new reel project folders go; also where `series.json` lives |
 | `subtitles.burn, style, lang, y, size, max_words` | burned-in subtitles |
-| `content.max_scene_seconds` | stills check warns above this (add beats) |
+| `content.max_scene_seconds` | stills check warns above this (add beats). 16:9 uses at least 8; `reel.max_scene_seconds` overrides per reel |
 | `images.max_rerolls` | automatic AI image re-rolls when the quality check fails |
 | `audio.bed, ai_music, music_prompt` | background mood / AI music |
 | `render.gpu` | **GPU first** (default `auto`): browser draws on the dedicated graphics card; the encoder goes dedicated GPU (NVIDIA NVENC → AMD AMF → Apple VideoToolbox) → integrated graphics (Intel Quick Sync → VAAPI → Windows Media Foundation) → CPU libx264 last. Force one with `nvidia` / `amd` / `apple` / `intel`, or `off` for CPU only. Env `CLIFFHANGER_GPU` overrides |

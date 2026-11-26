@@ -167,11 +167,14 @@ function resolveAssets(o) {
     } else resolveAssets(o[k]);
   }
 }
+let AI_MISSING = [];
 { // AI illustrations (image_prompt / bg_prompt) → generated files; svg_file stays as fallback
   const { resolveGenerated } = await import('./imagegen.mjs');
-  const missing = resolveGenerated(scenes, proj, SETTINGS.images || {}, reel.characters || null);
-  if (missing.length) console.warn(`! ${missing.length} AI image(s) not generated yet (using svg_file fallback where given). Run: node scripts/imagegen.mjs "${proj}"\n  ` + missing.join('\n  '));
+  AI_MISSING = resolveGenerated(scenes, proj, SETTINGS.images || {}, reel.characters || null);
+  if (AI_MISSING.length) console.warn(`! ${AI_MISSING.length} AI image(s) not generated yet (using svg_file fallback where given). Run: node scripts/imagegen.mjs "${proj}"\n  ` + AI_MISSING.join('\n  '));
 }
+// repeated as the last thing printed, so it can't scroll away unnoticed
+const aiMissingNote = () => { if (AI_MISSING.length) console.warn(`\n!!! ${AI_MISSING.length} AI image(s) were NOT generated: these scenes show the hand-drawn fallback.\n!!! Run  node scripts/imagegen.mjs "${proj}"  and render again.`); };
 resolveAssets(scenes);
 
 // canvas size: vertical by default; reel.format.width/height switches it (e.g. 1920x1080 for long-form)
@@ -258,6 +261,17 @@ async function openWorkers(n) {
   return out;
 }
 
+function chaptersText() {
+  const ch = scenes.filter(s => s.chapter && !s._beatOf).map(s => ({ t: s.start, title: String(s.chapter) }));
+  if (!ch.length) return null;
+  if (ch[0].t > 0.5) ch.unshift({ t: 0, title: reel.chapter_intro || 'Intro' });
+  ch[0].t = 0;
+  const fmt = t => { t = Math.floor(t); const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), sec = String(t % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`; };
+  const warn = [];
+  if (ch.length < 3) warn.push('YouTube needs at least 3 chapters');
+  ch.forEach((c, i) => { const end = i + 1 < ch.length ? ch[i + 1].t : TOTAL; if (end - c.t < 10) warn.push(`"${c.title}" is shorter than 10 s (YouTube minimum)`); });
+  return { text: ch.map(c => `${fmt(c.t)} ${c.title}`).join('\n') + '\n', warn };
+}
 const slug = (reel.slug || reel.title || path.basename(proj)).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'reel';
 const ff = (a, quiet = true) => {
   const r = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', quiet ? 'error' : 'info', '-y', ...a], { encoding: 'utf8', maxBuffer: 1 << 26 });
@@ -303,15 +317,19 @@ if (flag('stills') || opt('at')) {
   for (const sh of shots) fs.writeFileSync(path.join(dir, sh.name + '.png'), await grab(sh.tt, 'png'));
   const safe = opt('at') ? [] : await page.evaluate(() => window.__safeCheck());
   await browser.close();
-  const maxScene = SETTINGS.content?.max_scene_seconds || 5;
+  const maxScene = reel.max_scene_seconds || (WIDE ? Math.max(8, SETTINGS.content?.max_scene_seconds || 0) : SETTINGS.content?.max_scene_seconds || 5);
   const long = scenes.filter(x => !x._beatOf && x.visual?.type !== 'endcard' && x.dur > maxScene && !scenes.some(y => y._beatOf === x.id));
   if (safe.length) { console.warn(`! ${safe.length} element(s) in platform UI zones (covered by buttons/captions on Instagram/TikTok):`); for (const w of safe) console.warn(`   - ${w.scene}: "${w.what}" → ${w.zone}`); }
   if (long.length) { console.warn(`! ${long.length} scene(s) longer than ${maxScene}s on one visual (add "beats" for a new visual mid-line):`); for (const x of long) console.warn(`   - ${x.id}: ${x.dur.toFixed(1)}s`); }
   const cols = Math.min(6, shots.length), rows = Math.ceil(shots.length / cols);
   const contact = path.join(build, 'contact.jpg');
   ff(['-framerate', '1', '-start_number', '1', '-i', path.join(dir, '%02d.png'), '-vf', `scale=300:-1,tile=${cols}x${rows}:padding=6:color=white`, '-frames:v', '1', '-update', '1', contact]);
+  const chs = chaptersText();
   console.log(JSON.stringify({ mode: 'stills', dir, contact, total: TOTAL, frames: shots.map(s => `${s.name}.png = ${s.id} @${s.tt.toFixed(2)}s`),
-    scene_starts: scenes.map(s => `${s.id} ${s.start.toFixed(2)}${s.transition ? ' ' + s.transition : ''}`) }, null, 1));
+    scene_starts: scenes.map(s => `${s.id} ${s.start.toFixed(2)}${s.transition ? ' ' + s.transition : ''}`),
+    ...(chs ? { chapters: chs.text.trim().split('\n'), chapter_warnings: chs.warn } : {}),
+    ...(AI_MISSING.length ? { ai_images_missing: AI_MISSING } : {}) }, null, 1));
+  aiMissingNote();
   process.exit(0);
 }
 
@@ -329,7 +347,7 @@ const t0 = Date.now();
 const workers = await openWorkers(Math.min(WORKERS, Math.max(1, Math.ceil(nFrames / 30))));
 console.log(`capture: ${workers.length} parallel tab(s)`);
 // workers grab frames in any order; the writer feeds ffmpeg strictly in order, with a bounded buffer
-const ready = new Map(); let next = 0, written = 0, wake = null;
+const ready = new Map(); let next = 0, written = 0, wake = null, lastTick = 0, slowWarned = false;
 const RUN = 4;                                    // each tab renders short runs of consecutive frames
 const LIMIT = workers.length * RUN * 2;
 const waitFor = () => new Promise(r => { wake = r; });
@@ -339,7 +357,13 @@ const writer = (async () => {
     if (!ready.has(written)) { await waitFor(); continue; }
     const buf = ready.get(written); ready.delete(written); written++; poke();
     if (!enc.stdin.write(buf)) await once(enc.stdin, 'drain');
-    if (written % (fps * 5) === 0) process.stdout.write(`\rframe ${written}/${nFrames}  ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+    if (written % (fps * 5) === 0) {
+      const now = Date.now(), el = (now - t0) / 1000, rate = written / Math.max(el, 0.001);
+      const recent = (fps * 5) / Math.max((now - (lastTick || t0)) / 1000, 0.001); lastTick = now;
+      if (written > fps * 15 && recent < rate * 0.25 && !slowWarned) { slowWarned = true; console.warn(`\n! rendering slowed to ${recent.toFixed(1)} fps (was ${rate.toFixed(1)}): is the computer going to sleep or overheating? Keep it awake and plugged in.`); }
+      const eta = (nFrames - written) / Math.max(rate, 0.001);
+      process.stdout.write(`\rframe ${written}/${nFrames}  ${el.toFixed(0)}s  ${rate.toFixed(1)} fps  ETA ${eta >= 60 ? Math.floor(eta / 60) + 'm ' : ''}${Math.round(eta % 60)}s   `);
+    }
   }
 })();
 await Promise.all(workers.map(async w => {
@@ -471,4 +495,8 @@ ff(['-i', finalPath, '-vf', `fps=${Math.max(0.2, 24 / TOTAL).toFixed(3)},scale=2
 if (reel.series?.name && !preview) {        // keep the workspace's series memory current
   try { const { syncSeries } = await import('./series.mjs'); syncSeries(path.dirname(proj)); } catch (e) { console.warn('! series sync skipped: ' + e.message); }
 }
-console.log(JSON.stringify({ video: finalPath, srt: srtPath, contact: sheet, duration: TOTAL, fps, frames: nFrames }, null, 1));
+const chs = preview ? null : chaptersText();
+let chaptersPath = null;
+if (chs) { chaptersPath = path.join(outDir, 'chapters.txt'); fs.writeFileSync(chaptersPath, chs.text); for (const w of chs.warn) console.warn('! chapters: ' + w); }
+console.log(JSON.stringify({ video: finalPath, srt: srtPath, contact: sheet, duration: TOTAL, fps, frames: nFrames, ...(chaptersPath ? { chapters: chaptersPath } : {}), ...(AI_MISSING.length ? { ai_images_missing: AI_MISSING } : {}) }, null, 1));
+aiMissingNote();

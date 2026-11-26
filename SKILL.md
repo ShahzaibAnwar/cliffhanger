@@ -92,7 +92,9 @@ Create the project folder: `reel.json`, `art/`. Schema and every component are i
 - Every scene needs motion within 0.3 s and a payoff synced to a spoken word (`"at": "word:fall"`).
 - AI illustrations first, when available: run `node "$SKILL_DIR/scripts/imagegen.mjs" --check`. If
   it says `available`, give hero objects an `image_prompt` (subject only, since the style adds the look) **plus** an `svg_file`
-  fallback. Run `node "$SKILL_DIR/scripts/imagegen.mjs" <project>`, then review with
+  fallback. Run `node "$SKILL_DIR/scripts/imagegen.mjs" <project>` **before the first stills pass** (stills
+  don't generate images; un-generated ones show their hand-drawn fallback and are listed loudly at the end of
+  the render output and in its JSON as `ai_images_missing`), then review with
   `art-preview.mjs <project>/art/gen` and re-roll weak ones (`image_seed`). A person who appears in
   several scenes goes in `reel.characters` (with a `look`), and each object showing them gets
   `"character": "<name>"`, so it's the same face and clothes every time. Use `image_ref` to keep one
@@ -131,8 +133,15 @@ saved list (the script enforces it). One saved voice, or asking turned off → u
 
 ```bash
 python "$SKILL_DIR/scripts/voiceover.py" <project>            # cached; re-run after editing lines
+python "$SKILL_DIR/scripts/tighten.py" <project> 1.14 0.24     # pacing: trim long pauses, speed up (pitch kept)
 python "$SKILL_DIR/scripts/voiceover.py" --list-voices edge --lang hi   # browse voices
 ```
+
+**Tighten the pacing (ElevenLabs especially):** raw ElevenLabs delivery is too slow for reels. `tighten.py`
+shortens pauses to `keep` seconds and speeds speech up by `tempo` without changing pitch, remapping the word
+timings so animation stays synced. 1.10–1.16 with 0.22–0.28 is the usual range; re-running with new numbers
+starts again from the original clips (kept in `build/vo_raw/`). Set `voice.tighten: [1.14, 0.24]` in settings
+or reel.json to run it automatically after every voiceover.
 
 Settings, voice picks per language and delivery tips: `references/voiceover.md`.
 Use `vo_tts` on a scene to change pronunciation without changing the on-screen text logic.
@@ -205,11 +214,19 @@ Keep technical words in English where people say them that way.
 ## 7.55 Long videos (16:9, optional)
 
 For a long YouTube video, set `"format": { "width": 1920, "height": 1080 }`. Same engine, same scene types;
-the split layout puts headlines left and art right automatically (see reel-json.md → 16:9). Long-video habits
-that work: a chapter card per section (`headline_style: "center"`, ~1.7 s, `transition: "glitch"`), `vo_tts`
-for every year, number and code the voice would misread, `min` to give a visual beat time to land, and a
-generator script (`build_reel.py`) when a video has 40+ scenes, so positions stay consistent. Renders use the
-GPU and parallel tabs, so 5,000+ frames take a few minutes. The cover becomes `out/thumbnail.jpg`.
+the split layout puts headlines left and art right automatically (see reel-json.md → 16:9 recipe).
+- **Chapters:** put `"chapter": "Title"` on the first scene of each section (usually its chapter card:
+  `headline_style: "center"`, `headline_y: 360`, `headline_size: 170`, dark, ~1.7 s, `transition: "glitch"`).
+  The final render writes `out/chapters.txt` in YouTube format (`0:00 …`), ready for the description, and warns
+  about anything YouTube would reject (fewer than 3 chapters, a chapter under 10 s).
+- **Pronunciation:** `vo_tts` for every year, number and code the voice would misread.
+- **End card:** give the last scene `"min": 18` so it covers YouTube's end-screen window (last 5–20 s).
+- **Pacing check:** the long-scene warning uses 8 s on 16:9 (5 s on vertical); set `max_scene_seconds` on the
+  reel to change it.
+- **40+ scenes:** write a small generator script (`build_reel.py`) so positions stay consistent.
+- **Render time:** GPU + parallel tabs render 5,000+ frames in a few minutes. Keep the computer awake and
+  plugged in during long renders; the progress line shows fps and an ETA and warns if the frame rate collapses
+  (sleep or overheating). The cover becomes `out/thumbnail.jpg`.
 
 ## 7.6 Hook A/B variants (optional)
 

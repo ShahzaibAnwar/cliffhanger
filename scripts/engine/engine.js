@@ -474,7 +474,10 @@
   // ---------- notepad with a pencil that actually writes ----------
   function notepad(v, sc) {
     const pad = h('div', 'notepad', sc);
-    pad.style.top = (v.y || 640) + 'px';
+    pad.style.top = (v.y || (SPLIT ? 210 : 640)) + 'px';
+    const pw = v.w || 912, px = v.x != null ? v.x : (SPLIT ? ART_X : null);     // x = centre, like other elements
+    if (v.w) pad.style.width = (pw - 190) + 'px';                                // css width excludes padding
+    if (px != null) pad.style.left = Math.round(Math.min(W - pw - 16, Math.max(16, px - pw / 2))) + 'px';
     const rows = Math.max(v.min_rows || 4, (v.lines || []).length);
     pad.style.minHeight = (110 + rows * 100 + 70) + 'px';
     if (v.title) h('div', 'np-title', pad, esc(v.title));
@@ -482,7 +485,7 @@
     let tcur = a0.t0 + 0.4;
     const segs = [];   // pencil path segments (filled in layout pass)
     const todo = [];
-    (v.lines || []).forEach((ln) => {
+    (v.lines || []).map(l => typeof l === "string" ? { text: l } : l).forEach((ln) => {   // plain strings work too
       const row = h('div', 'np-row', pad);
       let box = null;
       if (ln.box || ln.mark) box = h('span', 'np-box', row);
@@ -590,6 +593,16 @@
     const x = o.x != null ? o.x : TXT_X, y = o.y != null ? o.y : Math.round(H * (SPLIT ? 0.72 : 0.78)), rot = o.rot || 0;
     const place = (el, defEnter, defDur) => {
       el.style.left = x + 'px'; el.style.top = y + 'px';
+      S._layout.push(() => {                 // keep it on the canvas: long captions near an edge used to lose letters
+        const w = el.offsetWidth, left = o.anchor === 'left';
+        if (!w) return;
+        // only fix what would really be cut off: keep 4 px inside the frame at this scene's largest camera zoom
+        const cam = S.camera || D.camera || 'push', k = { push: 1.035, pull: 1.04, pan: 1.05, tilt: 1.05, drift: 1.03, crash: 1.04, none: 1 }[cam] || 1.05;
+        const cx = W / 2, L = cx - (cx - 4) / k, R = cx + (W - 4 - cx) / k;
+        if (w > R - L) return;
+        const nx = left ? Math.min(Math.max(x, L), R - w) : Math.min(Math.max(x, L + w / 2), R - w / 2);
+        if (Math.abs(nx - x) > 0.5) el.style.left = Math.round(nx) + 'px';
+      });
       return enter(el, o, defEnter, 0.2, defDur || 0.4, o.anchor === 'left' ? 'translate(0,-50%)' : 'translate(-50%,-50%)', rot);
     };
     switch (o.type) {
@@ -942,6 +955,7 @@
       s._el.querySelectorAll('.hl,.ov,.term,.labfile,.stat .num,.notepad,.bars,.end .follow,.end .next,.obj .clean > *').forEach(el => {
         const r = el.getBoundingClientRect(); if (!r.width || getComputedStyle(el).opacity === '0') return;
         const isArt = el.closest('.obj'); const area = r.width * r.height;
+        if (!isArt && (r.left < -2 || r.right > W + 2 || r.top < -2 || r.bottom > H + 2)) out.push({ scene: s.id, zone: 'off canvas (cut off)', what: (el.innerText || el.className).replace(/\s+/g, ' ').trim().slice(0, 40) });
         for (const z of Z) { const a = hit(r, z); if (a > (isArt ? area * 0.2 : area * (z.x0 > 900 ? 0.08 : 0.03))) out.push({ scene: s.id, zone: z.n, what: (isArt ? 'illustration' : (el.innerText || el.className).replace(/\s+/g, ' ').trim().slice(0, 40)) }); }
       });
       if (subsEl) {                                           // overlays fighting with subtitles

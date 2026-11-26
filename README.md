@@ -158,6 +158,7 @@ references/
   social-captions.md        platform specs and captions template
 scripts/
   voiceover.py              TTS and word timings
+  tighten.py                pacing pass: shorter pauses, faster delivery, timings remapped
   render.mjs                HTML engine → frames → ffmpeg, with audio mix, SRT, cover and contact sheet
   sfx.mjs                   sound presets, ElevenLabs sound effects and cache, preview
   art-preview.mjs           review sheet for SVG drawings (paper, dark, mid-sketch)

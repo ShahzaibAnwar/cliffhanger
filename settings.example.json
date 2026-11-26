@@ -3,6 +3,7 @@
     "provider": "auto",
     "ask_each_reel": true,
     "only_my_voices": true,
+    "tighten": "",
     "elevenlabs": {
       "default_voice_id": "",
       "model_id": "eleven_multilingual_v2",

@@ -13,7 +13,7 @@ Provider is chosen by reel.json -> voice.provider: "elevenlabs" | "edge" | "auto
 "auto" uses ElevenLabs when ELEVENLABS_API_KEY is set, otherwise free Microsoft Edge neural voices.
 Writes build/vo/<scene>.mp3 and build/timings.json  {provider, scenes:{id:{file,duration,words:[{w,s,e}]}}}
 """
-import asyncio, base64, hashlib, json, os, subprocess, sys, urllib.request, urllib.error
+import asyncio, base64, hashlib, json, os, subprocess, sys, time, urllib.request, urllib.error
 
 ELEVEN_DEFAULT_VOICE = "nPczCjzI2devNBz1zQrb"   # "Brian" premade: deep, documentary narrator
 ELEVEN_DEFAULT_MODEL = "eleven_multilingual_v2"
@@ -69,11 +69,22 @@ def eleven_request(method, url, body=None):
     key = os.environ.get("ELEVENLABS_API_KEY")
     req = urllib.request.Request(url, method=method, headers={"xi-api-key": key, "Content-Type": "application/json", "Accept": "application/json"},
                                  data=json.dumps(body).encode() if body is not None else None)
-    try:
-        with urllib.request.urlopen(req, timeout=180) as r:
-            return json.loads(r.read().decode())
-    except urllib.error.HTTPError as e:
-        raise ElevenError(e.code, e.read().decode(errors="replace")[:800])
+    # network blips (DNS "getaddrinfo failed", resets, timeouts) and 429/5xx are retried with backoff
+    for attempt in range(5):
+        try:
+            with urllib.request.urlopen(req, timeout=180) as r:
+                return json.loads(r.read().decode())
+        except urllib.error.HTTPError as e:
+            body = e.read().decode(errors="replace")[:800]
+            if e.code in (429, 500, 502, 503, 504) and attempt < 4:
+                time.sleep(2 * (attempt + 1)); continue
+            raise ElevenError(e.code, body)
+        except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as e:
+            if attempt >= 4:
+                raise
+            wait = 2 * (attempt + 1)
+            print(f"    network problem ({getattr(e, 'reason', e)}); retrying in {wait}s")
+            time.sleep(wait)
 
 
 class ElevenError(Exception):
@@ -300,6 +311,12 @@ def main():
         json.dump({**old, **out, "scenes": {**old["scenes"], **out["scenes"]}}, open(tpath, "w", encoding="utf-8"), ensure_ascii=False, indent=1)  # checkpoint
     json.dump(out, open(tpath, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     print(f"voiceover: {provider}, {len(out['scenes'])} clips, {total:.1f}s of speech -> {tpath}")
+    # optional pacing pass: voice.tighten = [tempo, keep] (reel.json or settings), e.g. [1.14, 0.24]
+    tight = vcfg.get("tighten", svoice.get("tighten"))
+    if tight and "--no-tighten" not in a:
+        from tighten import tighten
+        t = tight if isinstance(tight, (list, tuple)) else [tight]
+        tighten(proj, float(t[0]), float(t[1]) if len(t) > 1 else 0.24, quiet=True)
 
 
 if __name__ == "__main__":
