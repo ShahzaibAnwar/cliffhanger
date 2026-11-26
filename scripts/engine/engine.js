@@ -120,6 +120,7 @@
           case 'swing': o = clamp(p * 3, 0, 1); tr = `rotate(${Math.exp(-5 * p) * Math.cos(12 * p) * -14}deg) translateY(${(1 - e) * 40}px)`; break;
           case 'drop': o = clamp(p * 4, 0, 1); tr = `translateY(${-(1 - E.bounce(p)) * 900}px)`; break;
           case 'zoom': o = e; tr = `scale(${1.4 - 0.4 * e})`; break;
+          case 'stick': tr = `scale(${1.25 - 0.25 * clamp(p * 1.0, 0, 1)})`; break;
           case 'blur': o = e; el.style.filter = p < 1 ? `blur(${(1 - e) * 26}px)` : ''; break;
           case 'wipe': el.style.clipPath = p < 1 ? `inset(-30% ${(1 - E.io(p)) * 105}% -30% -5%)` : 'none'; break;
           case 'wipeDown': el.style.clipPath = p < 1 ? `inset(-5% -5% ${(1 - E.io(p)) * 105}% -5%)` : 'none'; break;
@@ -164,20 +165,48 @@
     }
   }
 
+  // ---------- paper shapes ----------
+  function roughShape(kind, seed) {
+    const pts = [], r = k => rnd(seed * 13.7 + k);
+    if (kind === 'disc') {
+      for (let i = 0; i < 48; i++) { const a = i / 48 * Math.PI * 2, rr = 47 + (r(i) - 0.5) * 3.2; pts.push([50 + Math.cos(a) * rr, 50 + Math.sin(a) * rr]); }
+    } else {                                  // block / torn: a painted rectangle with brushy, torn edges
+      const n = 14, amp = kind === 'torn' ? 2.6 : 1.4;
+      for (let i = 0; i <= n; i++) pts.push([i / n * 100, 1.5 + (r(i) - 0.5) * amp]);
+      for (let i = 0; i <= n; i++) pts.push([98.5 + (r(i + 40) - 0.5) * amp, i / n * 100]);
+      for (let i = n; i >= 0; i--) pts.push([i / n * 100, 98.5 + (r(i + 80) - 0.5) * amp]);
+      for (let i = n; i >= 0; i--) pts.push([1.5 + (r(i + 120) - 0.5) * amp, i / n * 100]);
+    }
+    return 'polygon(' + pts.map(([x, y]) => `${x.toFixed(2)}% ${y.toFixed(2)}%`).join(',') + ')';
+  }
+
   // ---------- objects (art) ----------
   function obj(spec, parent, defs) {
     const o = Object.assign({ x: W / 2, y: Math.round(H * 0.615), w: WIDE ? 760 : 820, rot: 0, motion: 'float', enter: D.art_enter || 'fadeUp', at: 0.05, dur: 0.6, shadow: true }, defs || {}, spec);
     const wrap = h('div', 'obj', parent);
     wrap.style.left = o.x + 'px'; wrap.style.top = o.y + 'px'; wrap.style.width = o.w + 'px';
     if (o.z) wrap.style.zIndex = o.z;
-    if (o.blend) wrap.style.mixBlendMode = o.blend;
     if (o.feather && o.image) wrap.classList.add('feather');
     if (o.adapt && o.image) wrap.classList.add('adapt-' + o.adapt);     // shared image shown on the opposite theme
     if (o.fallback_svg) wrap._fallback = o.fallback_svg;
+    // collage look (paper cut-out): grayscale + halftone dots + paper sticker edge, on a torn paint block
+    const finish = o.finish || S.finish || D.finish;
+    const backing = o.backing || (finish === 'collage' && o.backing !== false && o.backing !== 'none' ? (S.backing || D.backing || 'block') : null);
+    if (backing && backing !== 'none') {
+      const bk = h('div', 'backing ' + backing, wrap);
+      bk.style.background = o.backing_color || S.backing_color || D.backing_color || 'var(--paint)';
+      bk.style.clipPath = roughShape(backing, (o.x * 7 + o.y * 3) % 997);
+      bk.style.transform = `translate(-50%,-50%) rotate(${o.backing_rot != null ? o.backing_rot : -2.5}deg) scale(${o.backing_scale || 1})`;
+      enter(bk, { at: o.at, enter: 'slam', dur: 0.28 }, 'slam', o.at, 0.28, 'translate(-50%,-50%)', o.backing_rot != null ? o.backing_rot : -2.5);
+      cue('paper', T(o.at, 0.05), 0.25);
+    }
+    if (finish === 'collage') wrap.classList.add('finish-collage');
+    if (o.blend && finish !== 'collage') wrap.style.mixBlendMode = o.blend;    // collage cut-outs are opaque paper
     const inner = h('div', 'inner', wrap);
     const content = o.svg || (o.image ? `<img src="${o.image}" alt="">` : (o.html || ''));
     const clean = h('div', 'clean', inner, content);
-    if (o.shadow && S.theme !== 'photo') wrap.insertBefore(h('div', 'gshadow'), inner);
+    if (finish === 'collage' && o.halftone === false) wrap.classList.add('no-ht');
+    if (o.shadow && S.theme !== 'photo' && finish !== 'collage') wrap.insertBefore(h('div', 'gshadow'), inner);
     const sketch = o.enter === 'sketch' && !!o.svg;
     enter(wrap, o, sketch ? 'fade' : o.enter, o.at, sketch ? 0.12 : o.dur, 'translate(-50%,-50%)', o.rot);
     if (sketch) {        // whiteboard effect: every outline draws itself, then colour and hatching fade in
@@ -654,6 +683,22 @@
         });
         break;
       }
+      case 'ransom': {   // letters cut from different papers, stuck down one per frame
+        const r = h('div', 'ov ransom', sc);
+        r.style.left = (o.x != null ? o.x : W / 2) + 'px'; r.style.top = (o.y != null ? o.y : Math.round(H * 0.5)) + 'px';
+        if (o.align !== 'left') r.style.transform = 'translateX(-50%)';
+        const size = o.size || 130, t0 = T(o.at, 0.1), every = o.every || 1 / 30;
+        const looks = ['rn-a', 'rn-b', 'rn-c', 'rn-d', 'rn-e'];
+        [...String(o.text || '')].forEach((ch, i) => {
+          if (ch === ' ') { h('span', 'rn-sp', r).style.width = size * 0.35 + 'px'; return; }
+          const L = h('span', 'rn ' + looks[(i * 3 + 1) % looks.length], r, esc(ch));
+          L.style.fontSize = (size * (0.9 + rnd(i * 7.3 + size) * 0.22)).toFixed(0) + 'px';
+          const rot = (rnd(i * 3.1 + 2) - 0.5) * 12, dy = (rnd(i * 5.7 + 4) - 0.5) * size * 0.18;
+          A(L, 'in', t0 + i * every * 2, 0.1, { style: 'stick', pre: `translateY(${dy.toFixed(1)}px)`, rot });
+          if (i % 2 === 0) sfx('pop', t0 + i * every * 2, 0.12);
+        });
+        break;
+      }
       case 'flash': { const f = h('div', 'flash', sc); A(f, 'flash', T(o.at, 0), o.dur || 0.25, { max: o.max || 0.85 }); cue(o.sfx || 'boom', T(o.at, 0), o.sfx_vol != null ? o.sfx_vol : 0.45); break; }
       default: console.warn('unknown overlay', o.type);
     }
@@ -664,14 +709,22 @@
   const defs = h('div', '', stage);
   defs.innerHTML = `<svg width="0" height="0" style="position:absolute"><filter id="cf-pixelate" x="0" y="0" width="100%" height="100%">
     <feFlood x="12" y="12" height="2" width="2"/><feComposite width="30" height="30"/><feTile result="a"/>
-    <feComposite in="SourceGraphic" in2="a" operator="in"/><feMorphology operator="dilate" radius="15"/></filter></svg>` + ART_KIT;
+    <feComposite in="SourceGraphic" in2="a" operator="in"/><feMorphology operator="dilate" radius="15"/></filter>
+    <filter id="cf-halftone" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feColorMatrix in="SourceGraphic" type="saturate" values="0" result="g"/>
+      <feComponentTransfer in="g" result="gc"><feFuncR type="linear" slope="1.28" intercept="-0.1"/><feFuncG type="linear" slope="1.28" intercept="-0.1"/><feFuncB type="linear" slope="1.28" intercept="-0.1"/></feComponentTransfer>
+      <feImage href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Ccircle cx='3' cy='3' r='1.45' fill='%23151412'/%3E%3C/svg%3E" x="0" y="0" width="6" height="6" result="dot"/>
+      <feTile in="dot" result="dots"/>
+      <feComposite in="dots" in2="SourceAlpha" operator="in" result="dm"/>
+      <feColorMatrix in="dm" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.4 0" result="dm2"/>
+      <feBlend in="dm2" in2="gc" mode="multiply"/></filter></svg>` + ART_KIT;
 
-  const TD = { cut: 0, whip: 0.3, slide: 0.42, zoom: 0.34, glitch: 0.24, flash: 0.22, page: 0.5 };
-  const TSFX = { whip: 'whoosh', slide: 'paper', zoom: 'whoosh_low', glitch: 'glitch', flash: 'boom', page: 'paper' };
+  const TD = { cut: 0, whip: 0.3, slide: 0.42, zoom: 0.34, glitch: 0.24, flash: 0.22, page: 0.5, scribble: 0.62 };
+  const TSFX = { whip: 'whoosh', slide: 'paper', zoom: 'whoosh_low', glitch: 'glitch', flash: 'boom', page: 'paper', scribble: 'scribble' };
   const rnd = n => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 
   scenes.forEach((s, i) => {
-    S = s; s._anims = []; s._conts = []; s._layout = []; s._pencils = []; s._shk = { x: 0, y: 0 };
+    S = s; s._anims = []; s._conts = []; s._layout = []; s._pencils = []; s._shk = { x: 0, y: 0 }; s._boil = [];
     const sc = h('div', 'scene theme-' + s.theme, stage);
     s._el = sc;
     const shaker = h('div', 'shaker', sc); s._shaker = shaker;
@@ -679,8 +732,19 @@
     // transition into this scene
     const prev = scenes[i - 1];
     let tr = s.transition || D.transition || 'auto';
-    if (tr === 'auto') tr = !prev ? 'cut' : prev.theme !== s.theme ? (s.theme === 'dark' ? 'glitch' : 'whip') : 'cut';
+    if (tr === 'auto') tr = !prev ? 'cut' : prev.theme !== s.theme ? (D.finish === 'collage' ? 'scribble' : s.theme === 'dark' ? 'glitch' : 'whip') : 'cut';
     s._tr = TD[tr] != null ? tr : 'cut'; s._td = prev ? TD[s._tr] : 0;
+    if (s._tr === 'scribble' && prev) {      // marker scribble that covers the old scene, then wipes off
+      const rows = 7, bh = H / rows; let d = `M ${-80} ${bh * 0.4}`;
+      for (let k = 0; k < rows; k++) {
+        const y = bh * (k + 0.5), x0 = k % 2 ? W + 80 : -80, x1 = k % 2 ? -80 : W + 80, teeth = 5;
+        for (let j = 1; j <= teeth; j++) { const x = x0 + (x1 - x0) * j / teeth; d += ` L ${x.toFixed(0)} ${(y + (j % 2 ? -bh * 0.35 : bh * 0.35) + (rnd(i * 9 + k * 5 + j) - 0.5) * 40).toFixed(0)}`; }
+      }
+      const svg = sv('svg', { class: 'scrib', viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none' }, sc);
+      const pth = sv('path', { d, fill: 'none', stroke: s.transition_color || D.transition_color || 'var(--paint)', 'stroke-width': bh * 1.55, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, svg);
+      sc._scrib = { svg, pth, len: 0 };
+      s._layout.push(() => { sc._scrib.len = pth.getTotalLength(); pth.style.strokeDasharray = sc._scrib.len; pth.style.strokeDashoffset = sc._scrib.len; });
+    }
     if (prev && s.cut_sfx !== false) {
       if (TSFX[s._tr]) sfx(TSFX[s._tr], s.start - (s._tr === 'whip' ? 0.08 : 0), 0.4);
       else sfx('swish', s.start, 0.16);
@@ -738,6 +802,7 @@
     });
     for (const s of scenes) {
       S = s; s._el.style.display = 'block';
+      if (s.stop_motion != null ? s.stop_motion : D.stop_motion) s._boil = [...s._el.querySelectorAll('.obj,.ov,.hl,.backing')];
       for (const f of s._layout) f();
       s._el.style.display = 'none';
     }
@@ -772,10 +837,18 @@
   }
   function frame(s, t) {
     s._shk.x = 0; s._shk.y = 0;
-    for (const a of s._anims) apply(a, t, s);
-    for (const c of s._conts) applyC(c, t, s);
-    for (const p of s._pencils) applyPencil(p, t);
-    s._shaker.style.transform = `translate(${s._shk.x}px,${s._shk.y}px) ${camera(s, t)}`;
+    // stop-motion: hold every pose for N frames (2 = "on twos"), like paper animated by hand.
+    // Texture (grain, dust) keeps moving every frame, so it still feels alive.
+    const sm = s.stop_motion != null ? s.stop_motion : D.stop_motion;
+    const ts = sm ? s.start + Math.floor((t - s.start) * 30 / sm + 1e-6) * sm / 30 : t;
+    for (const a of s._anims) apply(a, ts, s);
+    for (const c of s._conts) applyC(c, ts, s);
+    for (const p of s._pencils) applyPencil(p, ts);
+    if (sm && s._boil.length) {               // boil: hand-placed pieces shift a hair every 0.2 s
+      const st = Math.floor((t - s.start) * 5);
+      s._boil.forEach((el, k) => { el.style.translate = `${((rnd(st * 31 + k * 7) - 0.5) * 3).toFixed(2)}px ${((rnd(st * 17 + k * 11) - 0.5) * 3).toFixed(2)}px`; el.style.rotate = `${((rnd(st * 13 + k * 5) - 0.5) * 0.6).toFixed(2)}deg`; });
+    }
+    s._shaker.style.transform = `translate(${s._shk.x}px,${s._shk.y}px) ${camera(s, ts)}`;
     const f = Math.floor(t * 24);                       // living grain: re-seed texture every frame
     s._grain.style.backgroundPosition = `${Math.floor(rnd(f) * 260)}px ${Math.floor(rnd(f + 7) * 260)}px`;
     if (s._specks.length) {
@@ -811,6 +884,20 @@
         if (p < 0.6 && f % 3 === 1) { const a = rnd(f + 1) * 70; B.style.clipPath = `inset(${a}% 0 ${Math.max(0, 85 - a - rnd(f + 2) * 25)}% 0)`; B.style.opacity = 1; }
         break; }
       case 'flash': A_.style.opacity = 0; B.style.filter = `brightness(${1 + (1 - E.out(p)) * 3})`; break;
+      case 'scribble': {
+        const sc_ = B._scrib, cover = 0.55, step = Math.floor(p * 20) / 20;     // drawn on twos
+        if (!sc_) break;
+        const sh = B.querySelector('.shaker');
+        if (step < cover) {
+          sh.style.visibility = 'hidden';
+          sc_.pth.style.strokeDashoffset = sc_.len * (1 - E.io(step / cover));
+          sc_.svg.style.clipPath = 'none';
+        } else {
+          A_.style.opacity = 0; sh.style.visibility = '';
+          sc_.svg.style.clipPath = 'none';           // the marker retracts along its own stroke, revealing the scene
+          sc_.pth.style.strokeDashoffset = -sc_.len * E.io((step - cover) / (1 - cover));
+        }
+        break; }
     }
   }
   // ---------- burned-in subtitles (one layer over all scenes) ----------
@@ -868,6 +955,7 @@
       const vis = x === s || (inTr && x === prev);
       x._el.style.display = vis ? 'block' : 'none';
       if (vis) { const st = x._el.style; st.transform = st.filter = st.opacity = st.clipPath = st.boxShadow = ''; st.zIndex = x === s ? 2 : 1; }
+      if (x._el._scrib) { x._el._scrib.svg.style.clipPath = 'inset(0 0 0 101%)'; const sh = x._el.querySelector('.shaker'); if (sh) sh.style.visibility = ''; }
     }
     frame(s, t);
     if (inTr) { frame(prev, t); transition(s._tr, prev._el, s._el, (t - s.start) / s._td, t); }

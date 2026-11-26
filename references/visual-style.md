@@ -121,3 +121,18 @@ background) or `"screen"` (black background).
 
 `--paper #ECE8DF` · `--ink #1B1A18` · `--accent #C8302A` (brand.accent) · `--dark #1C1B19` ·
 `--dark-ink #EFEAE0` · highlighter `#F4D33A`. Change the accent per brand; keep everything else.
+
+## Collage look (paper cut-out explainer)
+
+An alternative to the notebook style: black-and-white halftone cut-outs with a thin paper edge, slapped on a
+torn yellow paint block, animated on twos so it feels hand-made. Turn it on with `"animation": { "look": "collage" }`.
+
+- **Pictures:** `image_style: "archival"` makes 1950s-style black-and-white documentary photos on a plain grey
+  backdrop. Their background is removed by a flood fill from the image edge, so white shirts and pale faces stay
+  solid. Keep the whole subject in frame with space around it; waist-up people work best.
+- **Insides:** engravings (`image_style: "engraving"`) on `"backing": "disc"` read as the "how it works" plate.
+- **One accent:** the paint yellow (`--paint`) plus the brand accent for the headline. No extra colours.
+- **Payoff:** one `ransom` overlay on the answer word, timed to the spoken word.
+- **Point precisely:** run `node scripts/grid.mjs <image>` and read coordinates off the grid; a circle or lens
+  that misses its target looks broken.
+- Don't mix: in a collage reel, use the collage finish on every scene's art.

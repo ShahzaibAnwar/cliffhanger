@@ -3,10 +3,12 @@
      node scripts/doctor.mjs
    Never prints key values: only whether each key is set. */
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readEnv, loadSettings } from './settings-lib.mjs';
+import { gpuPref, pickEncoder } from './gpu.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -21,6 +23,14 @@ const INSTALL = {
   ffmpeg: { windows: 'winget install Gyan.FFmpeg', mac: 'brew install ffmpeg', linux: 'sudo apt install ffmpeg' },
   python: { windows: 'winget install Python.Python.3.12', mac: 'brew install python', linux: 'sudo apt install python3 python3-pip' },
 };
+
+function listGpus() {
+  try {
+    if (WIN) return (run('powershell', ['-NoProfile', '-Command', '(Get-CimInstance Win32_VideoController).Name']) || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    if (OS === 'mac') return [...(run('system_profiler', ['SPDisplaysDataType']) || '').matchAll(/Chipset Model:\s*(.+)/g)].map(m => m[1].trim());
+    return (run('sh', ['-c', 'lspci | grep -iE "vga|3d|display"']) || '').split('\n').map(l => l.replace(/^.*?:\s*/, '').trim()).filter(Boolean);
+  } catch { return []; }
+}
 
 export function pythonCmd() {
   if (process.env.PYTHON) return process.env.PYTHON;
@@ -58,6 +68,21 @@ async function main() {
       try { const b = await chromium.launch(o); await b.close(); found = name; break; } catch { /* next */ }
     }
     found ? ok('Browser for rendering', found) : fail('No browser Playwright can launch', 'install Google Chrome, or run: npx playwright-core install chromium   (or set CHROME_PATH)');
+  }
+
+  console.log('\nRendering (GPU first: dedicated GPU → integrated graphics → CPU)');
+  const gpus = listGpus();
+  if (gpus.length) gpus.forEach(g => ok('Graphics', g)); else soft('Graphics', 'could not list graphics hardware');
+  if (run('ffmpeg', ['-version'])) {
+    const pref = gpuPref(loadSettings()), enc = pickEncoder(false, pref);
+    const tier = /nvenc|amf|videotoolbox/.test(enc.name) ? 'dedicated GPU' : /qsv|vaapi|_mf/.test(enc.name) ? 'integrated graphics' : 'CPU';
+    (tier === 'CPU' && pref !== 'off' ? soft : ok)('Video encoder', `${enc.name} (${tier})`);
+    for (const w of enc.why) {
+      const fix = /minimum required nvidia driver/i.test(w) ? 'update the NVIDIA driver (nvidia.com/drivers), then run the doctor again' : 'update the graphics driver';
+      soft('Skipped ' + w.split(':')[0], `${w.split(':').slice(1).join(':').trim()}  → ${fix}`);
+    }
+    const cpus = os.cpus().length;
+    ok('Parallel capture', `${Math.max(2, Math.min(8, Math.floor(cpus / 3)))} tabs by default (${cpus} CPU threads; render.workers to change)`);
   }
 
   console.log('\nOptional');

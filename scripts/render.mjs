@@ -12,6 +12,7 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { pathToFileURL, fileURLToPath } from 'node:url';
+import { gpuPref, browserGpuArgs, pickEncoder as pickEncoderFor } from './gpu.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -181,6 +182,10 @@ const data = {
   scenes, total: TOTAL,
   transition: ANIM.transition || 'auto', camera: ANIM.camera || 'push', film_fx: ANIM.film_fx !== false,
   art_enter: ANIM.sketch_art ? 'sketch' : (ANIM.art_enter || 'fadeUp'), headline_fx: ANIM.headline_fx || null,
+  // collage look (from paper cut-out explainers): cut-out finish, stop-motion on twos, scribble wipes
+  finish: ANIM.finish || (ANIM.look === 'collage' ? 'collage' : null),
+  stop_motion: ANIM.stop_motion != null ? ANIM.stop_motion : (ANIM.look === 'collage' ? 2 : null),
+  backing: ANIM.backing || null, backing_color: ANIM.backing_color || null, transition_color: ANIM.transition_color || null,
   subtitles: SUBS.burn ? SUBS : null, subs: SUBS.burn ? subtitleChunks() : [],
 };
 const css = fs.readFileSync(path.join(HERE, 'engine', 'engine.css'), 'utf8');
@@ -194,41 +199,10 @@ const html = pageHtml(data);
 const htmlPath = path.join(build, 'index.html');
 fs.writeFileSync(htmlPath, html);
 
-// ---------- GPU first ----------
-// Rule: dedicated GPU first, then integrated graphics, then the CPU. The browser draws on the
-// high-performance (discrete) GPU, and the encoder is chosen by a real test encode in this order:
-//   1. dedicated GPU      NVIDIA NVENC → AMD AMF → Apple VideoToolbox (macOS)
-//   2. integrated graphics Intel Quick Sync → VAAPI (Linux) → Windows Media Foundation
-//   3. CPU                libx264
-// Override with settings.render.gpu or env CLIFFHANGER_GPU: auto (default) | nvidia | amd | apple | intel | off.
-const GPU = String(process.env.CLIFFHANGER_GPU || SETTINGS.render?.gpu || 'auto').toLowerCase();
-const GPU_ARGS = GPU === 'off' ? [] : ['--ignore-gpu-blocklist', '--enable-gpu-rasterization', '--enable-zero-copy',
-  ...(GPU === 'intel' ? [] : ['--force_high_performance_gpu']), ...(process.platform === 'win32' ? ['--use-angle=d3d11'] : [])];
-function pickEncoder(prev) {
-  const q = prev ? { x: '24', hw: '26', rate: '4M' } : { x: '19', hw: '20', rate: '8M' };
-  const cands = {
-    nvidia: { name: 'h264_nvenc', args: ['-c:v', 'h264_nvenc', '-preset', prev ? 'p2' : 'p5', '-tune', 'hq', '-rc', 'vbr', '-cq', q.hw, '-b:v', '0', '-maxrate', q.rate, '-bufsize', '16M', '-profile:v', 'high', '-vf', 'scale=out_range=tv,format=yuv420p', '-color_range', 'tv'] },
-    intel: { name: 'h264_qsv', args: ['-c:v', 'h264_qsv', '-preset', prev ? 'veryfast' : 'medium', '-global_quality', q.hw, '-vf', 'scale=out_range=tv,format=nv12', '-color_range', 'tv'] },
-    amd: { name: 'h264_amf', args: ['-c:v', 'h264_amf', '-quality', prev ? 'speed' : 'quality', '-rc', 'qvbr', '-qvbr_quality_level', q.hw, '-maxrate', q.rate, '-bufsize', '16M', '-vf', 'scale=out_range=tv,format=yuv420p', '-color_range', 'tv'] },
-    apple: { name: 'h264_videotoolbox', args: ['-c:v', 'h264_videotoolbox', '-q:v', prev ? '55' : '68', '-maxrate', q.rate, '-bufsize', '16M', '-profile:v', 'high', '-vf', 'scale=out_range=tv,format=yuv420p', '-color_range', 'tv'] },
-    vaapi: { name: 'h264_vaapi', args: ['-vaapi_device', '/dev/dri/renderD128', '-vf', 'format=nv12,hwupload', '-c:v', 'h264_vaapi', '-qp', q.hw] },
-    mf: { name: 'h264_mf (Windows)', args: ['-c:v', 'h264_mf', '-hw_encoding', '1', '-rate_control', 'u_vbr', '-b:v', prev ? '4M' : '8M', '-vf', 'scale=out_range=tv,format=nv12', '-color_range', 'tv'] },
-  };
-  // tier order: dedicated GPU, then integrated graphics, then CPU
-  const tiers = { darwin: ['apple', 'nvidia', 'amd', 'intel'], linux: ['nvidia', 'amd', 'intel', 'vaapi'], win32: ['nvidia', 'amd', 'intel', 'mf'] }[process.platform] || ['nvidia', 'amd', 'intel'];
-  const cpu = { name: 'libx264 (CPU)', args: ['-c:v', 'libx264', '-preset', prev ? 'veryfast' : 'medium', '-crf', q.x, '-maxrate', q.rate, '-bufsize', '16M', '-vf', 'scale=out_range=tv,format=yuv420p', '-color_range', 'tv'] };
-  if (GPU === 'off') return { ...cpu, why: [] };
-  const order = GPU in cands ? [GPU, ...tiers.filter(k => k !== GPU)] : tiers;
-  const why = [];
-  for (const k of order) {      // a real 0.2 s test encode: listed encoders can still fail (old driver, no device)
-    const t = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', ...(k === 'vaapi' ? cands[k].args.slice(0, 2) : []), '-f', 'lavfi', '-i', 'color=black:s=256x256:d=0.2', ...(k === 'vaapi' ? cands[k].args.slice(2) : cands[k].args), '-f', 'null', '-'], { encoding: 'utf8' });
-    if (t.status === 0) return { ...cands[k], why };
-    const lines = (t.stderr || '').split('\n');
-    const msg = lines.find(l => /minimum required/i.test(l)) || lines.find(l => /driver|not supported|No device|Cannot load|failed/i.test(l)) || 'unavailable';
-    if (k === 'nvidia' || k === 'amd' || k === 'apple' || /minimum required/i.test(msg)) why.push(`${cands[k].name}: ${msg.replace(/^\[[^\]]*\]\s*/, '').trim()}`);
-  }
-  return { ...cpu, why };
-}
+// ---------- GPU first (see gpu.mjs): dedicated GPU → integrated graphics → CPU ----------
+const GPU = gpuPref(SETTINGS);
+const GPU_ARGS = browserGpuArgs(GPU);
+const pickEncoder = prev => pickEncoderFor(prev, GPU);
 
 // ---------- browser ----------
 const { chromium } = await import('playwright-core');
@@ -356,7 +330,8 @@ const workers = await openWorkers(Math.min(WORKERS, Math.max(1, Math.ceil(nFrame
 console.log(`capture: ${workers.length} parallel tab(s)`);
 // workers grab frames in any order; the writer feeds ffmpeg strictly in order, with a bounded buffer
 const ready = new Map(); let next = 0, written = 0, wake = null;
-const LIMIT = workers.length * 8;
+const RUN = 4;                                    // each tab renders short runs of consecutive frames
+const LIMIT = workers.length * RUN * 2;
 const waitFor = () => new Promise(r => { wake = r; });
 const poke = () => { if (wake) { const w = wake; wake = null; w(); } };
 const writer = (async () => {
@@ -370,10 +345,9 @@ const writer = (async () => {
 await Promise.all(workers.map(async w => {
   while (true) {
     while (next - written > LIMIT) await new Promise(r => setTimeout(r, 4));
-    const f = next++;
-    if (f >= nFrames) return;
-    ready.set(f, await grabOn(w.pg, w.cdp, f / fps));
-    poke();
+    const f0 = next; next += RUN;
+    if (f0 >= nFrames) return;
+    for (let f = f0; f < Math.min(f0 + RUN, nFrames); f++) { ready.set(f, await grabOn(w.pg, w.cdp, f / fps)); poke(); }
   }
 }));
 await writer;

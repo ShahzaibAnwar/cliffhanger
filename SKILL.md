@@ -110,6 +110,14 @@ Create the project folder: `reel.json`, `art/`. Schema and every component are i
   push, and film dust on dark scenes. Per scene, pick a stronger `camera` (`crash` on shocks,
   `drift` on fear beats), `"enter": "sketch"` for a key object's first appearance, and
   `headline_fx` for the 2–3 biggest punch words. Don't use every effect in every scene.
+- **Collage look** (paper cut-out explainer, optional): `"animation": { "look": "collage" }` turns art into
+  grayscale halftone cut-outs with a paper edge on a torn paint block (`backing`: `block` · `disc` · `torn`),
+  animates on twos (stop-motion, pieces "boil" a little) and uses a marker-scribble wipe on theme changes.
+  Pair it with `image_style: "archival"` (black-and-white documentary photos that cut out cleanly) and one
+  `ransom` overlay on the payoff word. See `references/visual-style.md` → "Collage look".
+- **Point at the right spot:** before placing a `lens`, `pins` or anything that points at part of an
+  image, run `node "$SKILL_DIR/scripts/grid.mjs" <image>` and Read the `_grid.jpg`; take `fx`/`fy` (0–1)
+  or pixel positions from it instead of guessing.
 
 ## 5. Voiceover
 
@@ -166,12 +174,15 @@ Outputs in `<project>/out/`: `<slug>.mp4`, `<slug>.srt` (upload as subtitles), `
 low suspense drone, ducked under the voice. `reel.audio.music` swaps the drone for a licensed track.
 `--remux` re-mixes the audio without re-rendering frames (use it after sound-only changes).
 
-**GPU first, always.** Rendering uses the graphics card before the CPU: Chrome is launched on the
-high-performance (discrete) GPU, and the encoder is chosen by a real test encode in the order
-NVIDIA NVENC → Intel QSV → AMD AMF → CPU libx264. The first line of every render says what was used
-(`gpu: draw = … · encode = …`); a `! GPU encoder skipped →` line explains any fallback (e.g. an NVIDIA
-driver too old for this ffmpeg's NVENC; fix by updating the driver). Never add `--disable-gpu`.
-Setting: `render.gpu` (`auto` · `nvidia` · `intel` · `amd` · `off`). Read
+**GPU first, always: dedicated GPU → integrated graphics → CPU.** Chrome draws on the high-performance
+(dedicated) GPU, and the encoder is chosen by a real test encode in tier order: dedicated GPU (NVIDIA
+NVENC → AMD AMF → Apple VideoToolbox) → integrated graphics (Intel Quick Sync → VAAPI on Linux → Windows
+Media Foundation) → CPU libx264 last. Frames are captured by several browser tabs in parallel
+(`--workers N`, default from the CPU thread count), about 2–3× faster than one tab. The first lines of
+every render say what was used (`gpu: draw = … · encode = …`, `capture: N parallel tab(s)`); a
+`! GPU encoder skipped →` line explains any fallback (an NVIDIA driver older than 610 can't run this
+ffmpeg's NVENC: update the driver). `node scripts/doctor.mjs` shows the same. Never add `--disable-gpu`.
+Settings: `render.gpu` (`auto` · `nvidia` · `amd` · `apple` · `intel` · `off`), `render.workers`. Read
 `out/contact.jpg` and spot-check 2–3 frames with `--at`, including one mid-transition, before delivering.
 
 - **Subtitles**: `subtitles.burn` (settings or reel) burns word-by-word captions in; Urdu/Hindi cuts show
@@ -217,7 +228,7 @@ Offer the Part-2 script as the next episode — the series engine is the growth 
   scripts. The *style* is a genre; the brand comes from `reel.brand`.
 - Facts over drama: dramatize the delivery, never the data. Mark estimates.
 - Keep reels 35–75 s (sweet spot 45–60 s), 120–170 spoken words in English.
-- GPU first: render on the graphics card; the CPU is only the fallback.
+- GPU first: dedicated GPU, then integrated graphics, then the CPU as the last fallback.
 - Don't publish or post anywhere; the user uploads.
 
 ---

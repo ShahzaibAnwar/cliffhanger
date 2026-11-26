@@ -1,7 +1,7 @@
 /* Cliffhanger render engine — "case file" look.
    Canvas is always 1080x1920 CSS px; render.mjs scales via deviceScaleFactor if needed. */
 :root{
-  --paper:#ECE8DF; --paper-line:rgba(70,90,130,.075); --ink:#1B1A18; --muted:#8C877D;
+  --paper:#ECE8DF; --paint:#EDBD2E; --paper-line:rgba(70,90,130,.075); --ink:#1B1A18; --muted:#8C877D;
   --dark:#1C1B19; --dark-ink:#EFEAE0; --dark-muted:#77726A;
   --accent:#C8302A; --tape:#F3F1EC; --hl:#F4D33A;
   --head:'Anton', 'Bebas Neue', Impact, 'Arial Narrow', sans-serif;
@@ -57,7 +57,7 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .hl{position:absolute;left:72px;right:90px;top:196px;font-family:var(--head);line-height:1.02;text-transform:uppercase;letter-spacing:.004em;z-index:20}
 .hl .ln{display:block;white-space:nowrap}
 .hl .l2{color:var(--accent)}
-.hl .w{display:inline-block;will-change:transform,opacity}
+.hl .w{display:inline-block}
 .hl .lt{position:relative;display:inline-block;isolation:isolate}
 .hl-ul{position:absolute;left:-2%;width:100%;bottom:-.1em;height:.16em;overflow:visible;color:var(--accent)}
 .hl-mk{position:absolute;left:-.1em;top:48%;height:44%;width:0;background:var(--hl);z-index:-1;transform:skewX(-6deg);opacity:.9}
@@ -70,7 +70,7 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 
 /* ---------- stage / visuals ---------- */
 .vis{position:absolute;left:0;right:0;top:520px;bottom:150px;display:flex;align-items:center;justify-content:center}
-.obj{position:absolute;left:0;top:0;will-change:transform,opacity}
+.obj{position:absolute;left:0;top:0}
 .obj .inner{position:relative;width:100%}
 .obj svg,.obj img{display:block;width:100%;height:auto}
 .gshadow{position:absolute;left:12%;right:12%;bottom:-36px;height:46px;border-radius:50%;
@@ -153,7 +153,7 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
   font:700 44px 'Segoe UI','Helvetica Neue',Arial,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4)}
 
 /* ---------- overlays ---------- */
-.ov{position:absolute;left:0;top:0;z-index:25;will-change:transform,opacity}
+.ov{position:absolute;left:0;top:0;z-index:25}
 .chip{font:600 27px var(--mono);letter-spacing:.14em;text-transform:uppercase;background:#1C1B19;color:#F2EEE6;padding:10px 20px;border:2px solid rgba(255,255,255,.25);outline:3px solid #1C1B19;white-space:nowrap}
 .chip.red{background:var(--accent);outline-color:var(--accent);border-color:rgba(255,255,255,.55)}
 .chip.light{background:#F6F4EF;color:#1C1B19;outline-color:#1C1B19;border-color:#1C1B19}
@@ -218,3 +218,27 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .pin{position:absolute;width:56px;z-index:26;text-align:center}
 .pin svg{width:56px;height:78px;display:block;filter:drop-shadow(0 6px 6px rgba(0,0,0,.3))}
 .pin span{position:absolute;left:50%;top:-6px;transform:translate(-50%,-100%);white-space:nowrap;font:600 24px var(--mono);letter-spacing:.12em;text-transform:uppercase;background:#1C1B19;color:#F2EEE6;padding:6px 12px}
+
+/* ---- collage finish (paper cut-outs) ---- */
+.backing{position:absolute;left:50%;top:50%;width:112%;height:108%;z-index:0}
+.backing.disc{width:96%;height:auto;aspect-ratio:1}
+.backing::after{content:'';position:absolute;inset:0;mix-blend-mode:multiply;opacity:.35;
+  background:repeating-linear-gradient(97deg,rgba(0,0,0,.10) 0 2px,transparent 2px 9px),repeating-linear-gradient(-8deg,rgba(255,255,255,.12) 0 3px,transparent 3px 14px)}
+.finish-collage .inner{z-index:1}
+.finish-collage .clean{position:relative}
+.finish-collage .clean img{filter:url(#cf-halftone)
+  drop-shadow(3px 0 0 #F3EFE6) drop-shadow(-3px 0 0 #F3EFE6) drop-shadow(0 3px 0 #F3EFE6) drop-shadow(0 -3px 0 #F3EFE6)
+  drop-shadow(0 7px 7px rgba(40,30,10,.28))}
+.finish-collage .clean svg{filter:drop-shadow(3px 0 0 #F3EFE6) drop-shadow(-3px 0 0 #F3EFE6) drop-shadow(0 3px 0 #F3EFE6) drop-shadow(0 -3px 0 #F3EFE6) drop-shadow(0 7px 7px rgba(40,30,10,.28))}
+.finish-collage.no-ht .clean img{filter:grayscale(1) contrast(1.28) drop-shadow(3px 0 0 #F3EFE6) drop-shadow(-3px 0 0 #F3EFE6) drop-shadow(0 3px 0 #F3EFE6) drop-shadow(0 -3px 0 #F3EFE6) drop-shadow(0 7px 7px rgba(40,30,10,.28))}
+/* ---- ransom-note word ---- */
+.ransom{display:flex;align-items:flex-end;gap:6px;white-space:nowrap}
+.rn{display:inline-block;line-height:1;padding:.1em .13em .05em;box-shadow:0 3px 4px rgba(40,30,10,.25)}
+.rn-sp{display:inline-block}
+.rn-a{background:#1B1A18;color:#F1EDE4;font-family:'Playfair Display',Georgia,serif;font-weight:900}
+.rn-b{background:#F1EDE4;color:#1B1A18;font-family:Anton,Impact,sans-serif}
+.rn-c{background:var(--paint);color:#1B1A18;font-family:'Playfair Display',Georgia,serif;font-weight:900}
+.rn-d{background:#F1EDE4;color:#1B1A18;font-family:'JetBrains Mono',monospace;font-weight:700}
+.rn-e{background:#1B1A18;color:var(--paint);font-family:Anton,Impact,sans-serif}
+/* ---- scribble transition ---- */
+.scrib{position:absolute;inset:0;width:100%;height:100%;z-index:60;pointer-events:none;clip-path:inset(0 0 0 101%)}

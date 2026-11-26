@@ -54,7 +54,11 @@ settings, `voiceover.py` retries automatically with a simpler request.
 | `content.max_scene_seconds` | stills check warns above this (add beats) |
 | `images.max_rerolls` | automatic AI image re-rolls when the quality check fails |
 | `audio.bed, ai_music, music_prompt` | background mood / AI music |
-| `render.gpu` | **GPU first** (default `auto`): browser draws on the discrete graphics card; video encodes on NVIDIA NVENC → Intel QSV → AMD AMF, CPU (libx264) only if none works. Force one with `nvidia` / `intel` / `amd`, or `off` for CPU only. Env `CLIFFHANGER_GPU` overrides |
+| `render.gpu` | **GPU first** (default `auto`): browser draws on the dedicated graphics card; the encoder goes dedicated GPU (NVIDIA NVENC → AMD AMF → Apple VideoToolbox) → integrated graphics (Intel Quick Sync → VAAPI → Windows Media Foundation) → CPU libx264 last. Force one with `nvidia` / `amd` / `apple` / `intel`, or `off` for CPU only. Env `CLIFFHANGER_GPU` overrides |
+| `render.workers` | parallel capture tabs (default: CPU threads ÷ 3, 2–8). `--workers N` per render |
+| `render.browsers` | spread the tabs over this many browser processes (default 1; more is slightly faster and uses much more memory). Env `CLIFFHANGER_BROWSERS` |
+| `animation.look` | `collage`: cut-out finish + stop-motion on twos + scribble wipes on theme changes |
+| `animation.finish, stop_motion, backing, backing_color, transition_color` | the collage parts one by one (`finish: "collage"`, `stop_motion: 2`, `backing: "block"/"disc"/"torn"`) |
 
 Image keys (`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `GEMINI_API_KEY`) are also stored in `.env`
 through the settings page → **Images**, which also has a "Try it" button that generates a test image.

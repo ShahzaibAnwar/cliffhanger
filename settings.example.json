@@ -37,12 +37,12 @@
     "feather": false,
     "max_rerolls": 2
   },
-  "animation": { "transition": "auto", "camera": "push", "film_fx": true, "sketch_art": false, "headline_fx": "" },
+  "animation": { "look": "", "transition": "auto", "camera": "push", "film_fx": true, "sketch_art": false, "headline_fx": "" },
   "captions": {
     "platforms": ["instagram", "tiktok", "youtube", "facebook", "x", "linkedin", "threads"],
     "always_hashtags": [],
     "emoji": "light"
   },
   "output": { "projects_dir": "" },
-  "render": { "gpu": "auto" }
+  "render": { "gpu": "auto", "workers": 0, "browsers": 1 }
 }

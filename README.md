@@ -70,6 +70,18 @@ automatically so images sit on the paper or dark page, and hand-drawn SVGs remai
 
 ![the same character in two scenes](examples/character-consistency.jpg)
 
+**Collage look:** one setting (`"animation": { "look": "collage" }`) switches to a paper cut-out explainer
+style: black-and-white halftone cut-outs with a paper edge on torn paint blocks, stop-motion animation on
+twos, marker-scribble wipes and ransom-note payoff words. The `archival` image style makes documentary
+photos whose backgrounds are removed without eating white shirts or pale faces.
+
+![collage look: cut-out, scribble wipe, ransom word](examples/collage-look.jpg)
+
+**Fast, GPU-first rendering:** the browser draws on the dedicated graphics card, and video is encoded on the
+dedicated GPU first (NVIDIA NVENC, AMD AMF, Apple VideoToolbox), then integrated graphics (Intel Quick
+Sync, VAAPI, Windows Media Foundation), and the CPU only as the last resort. Frames are captured by several
+browser tabs at once, about 2–3× faster than one. `npm run doctor` shows which GPU and encoder you'll get.
+
 ## Install
 
 ```bash
@@ -151,6 +163,8 @@ scripts/
   series.mjs                series memory (series.json) for a workspace
   localize.mjs              one-command language versions
   variants.mjs              hook A/B variants
+  gpu.mjs                   GPU-first encoder choice (dedicated GPU → integrated graphics → CPU)
+  grid.mjs                  coordinate grid for an image, to place lenses, pins and arrows precisely
   doctor.mjs                setup check (npm run doctor)
   test.mjs                  smoke test (npm test)
   check-secrets.mjs         secret guard used by the pre-commit hook
@@ -194,7 +208,8 @@ git config core.hooksPath .githooks
 
 Built with Node.js, Playwright, FFmpeg, ElevenLabs, Microsoft Edge neural voices, Cloudflare Workers AI
 (FLUX), Google Fonts (Anton, JetBrains Mono, Caveat, Playfair Display) and Claude.
-Style inspired by the "case file" explainer genre on Instagram and YouTube Shorts.
+Style inspired by the "case file" explainer genre on Instagram and YouTube Shorts; the collage look by
+the paper-collage explainer genre.
 
 ## License
 

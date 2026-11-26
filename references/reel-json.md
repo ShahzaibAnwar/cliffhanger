@@ -74,6 +74,8 @@ Any object/overlay can carry `"sfx": "impact"` or `"sfx": {"prompt": "...", "fal
 `assets/art/`) | `svg` (inline string) | `image` (png/jpg path) | **`image_prompt`** (AI-generated
 by `imagegen.mjs`; keep an `svg_file` as fallback). AI keys: `image_style`, `image_seed`,
 `image_ref` (reference image for a consistent variant), `character` (a name from `reel.characters`),
+`finish` (`collage`: grayscale halftone cut-out with a paper edge), `backing` (`block` · `disc` · `torn` · `none`,
+a paint shape behind the art; `backing_color`, `backing_rot`, `backing_scale`), `halftone` (false to skip the dots),
 `image_provider` (`cloudflare`/`gemini`),
 `feather` (soft oval edge). Photo scenes: `bg_prompt`, `bg_style`, `bg_seed`.
 Keys: `x`(540) `y`(1180) `w`(820) `motion`: `float`(default) · `hover` (insects) · `kenburns` ·
@@ -157,7 +159,10 @@ turned red), `highlight_at`, `x`, `y`, `w`, `rot`.
 **timeline**: `items: [{year, text, at}]`, `x`, `y`, `gap`, `stagger`.
 
 Overlay **lens**: zoom callout on the scene's main `art`: `fx`, `fy` (0–1 point in the art), `x`, `y`
-(lens centre), `r`, `zoom`, `text`, `at`. Overlay **pins**: `items: [{x, y, label, at}]`, for maps
+(lens centre), `r`, `zoom`, `text`, `at`. Read `fx`/`fy` off `node scripts/grid.mjs <image>` instead of guessing.
+Overlay **ransom**: a ransom-note word, letters cut from different papers and stuck down one per frame:
+`text` (≤ 10 characters reads best), `at`, `x`, `y`, `size` (130), `align` (`center`/`left`).
+Overlay **pins**: `items: [{x, y, label, at}]`, for maps
 (use an `image_prompt` like "vintage engraved world map" as the visual).
 
 ## Images shared across scenes
@@ -179,6 +184,13 @@ first generated image of the character becomes the reference image for all later
 clothes carry over. `"ref": "none"` turns the reference off; `"ref": "art/me.png"` uses your own picture
 as the reference instead. Use `image_key` (above) when you want the identical picture, and `character`
 when you want the same person in a new pose.
+
+## Collage look
+
+`"animation": { "look": "collage" }` (or settings → animation) sets `finish: "collage"` on every art object,
+`stop_motion: 2` (poses held for 2 frames, like paper animated by hand; grain still moves every frame) and
+scribble wipes when the theme changes. Per scene: `"stop_motion": 0` to turn it off, `"transition": "scribble"`
+for a marker-scribble wipe anywhere (`transition_color` sets its colour; default paint yellow).
 
 ## Reel-level extras
 

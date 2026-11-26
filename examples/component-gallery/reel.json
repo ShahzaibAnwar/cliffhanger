@@ -300,6 +300,35 @@
           ]
         }
       ]
+    },
+    {
+      "id": "collage",
+      "theme": "paper",
+      "section": "Collage look",
+      "duration": 3.2,
+      "transition": "scribble",
+      "stop_motion": 2,
+      "headline": [
+        "PAPER",
+        "CUT-OUTS"
+      ],
+      "visual": {
+        "type": "art",
+        "svg_file": "@lib/brain.svg",
+        "finish": "collage",
+        "backing": "disc",
+        "y": 1120,
+        "w": 760
+      },
+      "overlays": [
+        {
+          "type": "ransom",
+          "text": "SURPRISE!",
+          "at": 0.9,
+          "y": 1620,
+          "size": 118
+        }
+      ]
     }
   ]
 }

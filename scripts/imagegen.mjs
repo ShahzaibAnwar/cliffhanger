@@ -28,6 +28,8 @@ import { readEnv, loadSettings } from './settings-lib.mjs';
 const NO_TEXT = 'Absolutely no text, letters, numbers, captions, labels, signatures or watermark. No border, no frame, no plate lines, no box around the subject.';
 // bg: what the image background will be → how it blends into the reel (multiply on paper, screen on dark)
 export const STYLES = {
+  archival: { bg: 'light', cut: 'flood', d: 'black-and-white 1950s documentary photo, plain grey backdrop (collage cut-outs)',
+    p: s => `Authentic 1950s black-and-white documentary photograph of ${s}. Plain light grey studio backdrop, even soft studio light, silver gelatin print, strong film grain, slightly faded contrast. One subject, centred, the whole subject inside the frame with space around it. ${NO_TEXT}` },
   engraving: { bg: 'light', d: 'vintage medical engraving, cross-hatching (paper scenes)',
     p: s => `Vintage scientific engraving illustration of ${s}. Detailed cross-hatching and fine ink line work, muted natural colours with deep red accents, in the style of 19th-century scientific engraving. One isolated subject, centred, on a plain flat off-white paper background with a generous empty margin. ${NO_TEXT}` },
   'engraving-dark': { bg: 'dark', d: 'same engraving look on black (dark scenes)',
@@ -237,6 +239,50 @@ export function knockOutBackground(src, dst, similarity = 0.14) {
   const r = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', src, '-vf', `format=rgba,colorkey=0x${hex}:${similarity}:0.12`, '-frames:v', '1', dst], { encoding: 'utf8' });
   return r.status === 0;
 }
+// Photo-safe background removal: only background CONNECTED TO THE IMAGE EDGE is removed (flood fill from the
+// border), so a white shirt or a pale face inside the subject stays opaque. A 6 px edge margin is always removed,
+// which also clears the thin frame lines generators sometimes leave at the edges.
+export function floodKnockout(src, dst) {
+  const [W, H] = spawnSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', src], { encoding: 'utf8' }).stdout.trim().split(',').map(Number);
+  if (!W || !H) return false;
+  const raw = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-i', src, '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'], { maxBuffer: W * H * 3 + 1024 });
+  if (raw.status !== 0 || !raw.stdout || raw.stdout.length < W * H * 3) return false;
+  const P = raw.stdout, N = W * H, M = 6;
+  // background colour = median of an 8 px border band (sampled)
+  const sam = [[], [], []];
+  for (let y = 0; y < H; y += 3) for (let x = 0; x < W; x += 3) {
+    if (x > 8 && x < W - 9 && y > 8 && y < H - 9) continue;
+    const i = (y * W + x) * 3; sam[0].push(P[i]); sam[1].push(P[i + 1]); sam[2].push(P[i + 2]);
+  }
+  const med = sam.map(a => a.sort((p, q) => p - q)[a.length >> 1]);
+  const dist = i => Math.hypot(P[i * 3] - med[0], P[i * 3 + 1] - med[1], P[i * 3 + 2] - med[2]);
+  const bd = []; for (let k = 0; k < sam[0].length; k++) bd.push(Math.hypot(sam[0][k] - med[0], sam[1][k] - med[1], sam[2][k] - med[2]));
+  bd.sort((p, q) => p - q);
+  const thr = Math.max(16, bd[Math.floor(bd.length * 0.8)] * 1.6 + 8);
+  const LOCAL = 9;
+  const bg = new Uint8Array(N), q = new Int32Array(N); let qh = 0, qt = 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (x < M || y < M || x >= W - M || y >= H - M) { const i = y * W + x; bg[i] = 1; q[qt++] = i; }
+  }
+  while (qh < qt) {
+    const i = q[qh++], x = i % W, y = (i - x) / W;
+    const nb = [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, y > 0 ? i - W : -1, y < H - 1 ? i + W : -1];
+    // grow only across smooth areas (neighbour nearly identical) and only through background-like colour:
+    // the subject's outline is a wall even where a white shirt meets a pale grey backdrop
+    for (const j of nb) if (j >= 0 && !bg[j] && dist(j) < thr && Math.abs(P[j * 3] - P[i * 3]) + Math.abs(P[j * 3 + 1] - P[i * 3 + 1]) + Math.abs(P[j * 3 + 2] - P[i * 3 + 2]) < LOCAL) { bg[j] = 1; q[qt++] = j; }
+  }
+  // RGBA out, with a 1 px soft edge
+  const out = Buffer.alloc(N * 4);
+  for (let i = 0; i < N; i++) {
+    out[i * 4] = P[i * 3]; out[i * 4 + 1] = P[i * 3 + 1]; out[i * 4 + 2] = P[i * 3 + 2];
+    if (bg[i]) { out[i * 4 + 3] = 0; continue; }
+    const x = i % W; let edge = 0;
+    if (x > 0 && bg[i - 1]) edge++; if (x < W - 1 && bg[i + 1]) edge++; if (i >= W && bg[i - W]) edge++; if (i < N - W && bg[i + W]) edge++;
+    out[i * 4 + 3] = edge ? 150 : 255;
+  }
+  const r = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${W}x${H}`, '-i', '-', '-frames:v', '1', dst], { input: out, maxBuffer: 1 << 20 });
+  return r.status === 0;
+}
 // Crop empty (transparent) margins so the subject fills the slot it's given; keeps a small border.
 export function autoTrim(file, marginPct = 0.04) {
   const [W, H] = spawnSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', file], { encoding: 'utf8' }).stdout.trim().split(',').map(Number);
@@ -315,9 +361,10 @@ export function assessCutout(file) {
   if (lines >= 3) return { ok: false, reason: 'box or frame around the subject' };
   return { ok: true };
 }
-export function postProcess(orig, out, bg) {
+export function postProcess(orig, out, bg, cut) {
   if (bg === 'full') { fs.copyFileSync(orig, out); return { ok: true }; }
-  if (!knockOutBackground(orig, out, bg === 'dark' ? 0.1 : 0.14)) { fs.copyFileSync(orig, out); return { ok: true }; }
+  const keyed = cut === 'flood' ? floodKnockout(orig, out) : knockOutBackground(orig, out, bg === 'dark' ? 0.1 : 0.14);
+  if (!keyed) { fs.copyFileSync(orig, out); return { ok: true }; }
   cleanSpecks(out);
   const q = assessCutout(out);
   autoTrim(out);
@@ -359,7 +406,7 @@ export async function generate(spec, theme, cfg, proj, { provider } = {}) {
         const orig = k.base + '.orig' + res.ext;
         fs.writeFileSync(orig, res.buf);
         file = k.base + (st.bg === 'full' ? res.ext : '.png');
-        q = postProcess(orig, file, st.bg);
+        q = postProcess(orig, file, st.bg, st.cut);
         if (q.ok) break;
         console.warn(`  ↻ ${spec.image_prompt.slice(0, 50)}: ${q.reason}${attempt + 1 < tries ? ', re-rolling' : ', keeping the last try (review it)'}`);
       }
@@ -407,7 +454,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       if (!orig) continue;
       let src = orig;
       if (!/\.orig\./.test(orig)) { src = k.base + '.orig' + path.extname(orig); fs.renameSync(orig, src); }
-      postProcess(src, k.base + (st.bg === 'full' ? path.extname(src) : '.png'), st.bg);
+      postProcess(src, k.base + (st.bg === 'full' ? path.extname(src) : '.png'), st.bg, st.cut);
       console.log(`  ~ ${it.scene}: reprocessed`);
     }
     process.exit(0);
