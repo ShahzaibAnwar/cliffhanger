@@ -284,6 +284,17 @@ Write `lines.<lang>.json` (per scene: `vo` in the native script, `roman` for Rom
 It copies visuals and AI images, picks the series' voice for that language, places every unmapped
 cue at the same spot in the translated line, and writes `<project>-ur/`. Then voiceover → render.
 Keep technical words in English where people say them that way.
+- **Text on screen:** headlines, chips, tags and the end card stay as in the source unless `lines.<lang>.json`
+  replaces them per scene: `"headline"`, `"section"`, `"visual"` (merged, e.g. the end card's `kicker`/`title`/`next`),
+  `"overlays"` (by position; `false` leaves one out), and the same inside `"beats"` (by position). localize lists
+  what still shows the source's words.
+- **Longer lines:** translations usually run longer, so a scene may now hold one visual over 5 s. `--stills` names
+  each one with a ready beat (`"at": "word:…"` near the middle); beats only add a visual, so no new voiceover.
+- **Another channel:** a top-level `"reel"` block in `lines.<lang>.json` (or `--brand brand.json`, one file per
+  channel) sets `brand`, `series`, `cover`, `css`, `title`… With `--out` in the other channel's folder, the voice
+  comes from that folder's `series.json` (then the source's, then your default; `--voice` always wins).
+- **Cue words:** a cue uses its first word and the first spoken word that matches it; localize warns when that word
+  appears more than once in the line (Urdu "دو" in both "دو ہزار دو" and "دوسرا"), so map it to a word said once.
 
 ## 7.55 Long videos (16:9, optional)
 

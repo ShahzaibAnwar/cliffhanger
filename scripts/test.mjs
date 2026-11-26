@@ -174,7 +174,8 @@ t('hold scenes and carried overlays', () => {
     { id: 'intro', duration: 3, headline: ['LOOK'], visual: { type: 'art', svg_file: 'art/card.svg', w: 300 } },
     { id: 'a', hold: true, duration: 3, headline: ['STARE'], visual: vis, overlays: [{ type: 'chip', text: 'KEEP STARING', x: 540, y: 1400, carry: true }] },
     { id: 'b', hold: true, duration: 7, headline: ['STARE'], visual: vis, overlays: [{ type: 'chip', text: 'OWN CHIP', x: 560, y: 1405 }, { type: 'countdown', from: 3, at: 0.2, tick: false, y: 600 }] },
-    { id: 'c', duration: 3, headline: ['DONE'], visual: { type: 'art', svg_file: 'art/card.svg', w: 300 }, overlays: [{ type: 'chip', text: 'LAST', x: 560, y: 1405 }] }] }));
+    { id: 'c', duration: 3, headline: ['DONE'], visual: { type: 'art', svg_file: 'art/card.svg', w: 300 }, overlays: [{ type: 'chip', text: 'LAST', x: 560, y: 1405 }] },
+    { id: 'end', duration: 3, visual: { type: 'endcard', kicker: 'TOMORROW', title: 'GOOSEBUMPSXX', next: 'Why?' } }] }));
   const r = spawnSync(process.execPath, [path.join(HERE, 'render.mjs'), proj, '--stills'], { encoding: 'utf8', cwd: ROOT, maxBuffer: 64 << 20 });
   const all = (r.stdout || '') + (r.stderr || '');
   if (/\[page error\]/.test(all) || r.status !== 0) throw new Error('render failed: ' + all.slice(-400));
@@ -182,7 +183,8 @@ t('hold scenes and carried overlays', () => {
   if (/c: "KEEP STARING"/.test(all)) throw new Error('the chip was carried past a change of visual');
   if (!/1 intentional hold not counted/.test(all)) throw new Error('a 7 s hold scene still counts as held too long');
   if (/b: 7\.0s/.test(all)) throw new Error('hold scene listed as too long');
-  return 'chip carried while the visual stays, hold not counted as too long';
+  if (/end: "GOOSEBUMPSXX[^"]*" → off canvas/.test(all)) throw new Error('long end-card title runs off the frame');
+  return 'chip carried while the visual stays, hold not counted as too long, long end-card title fits';
 });
 t('caption styles: own class names, a gap between words', () => {
   const css = fs.readFileSync(path.join(HERE, 'engine', 'engine.css'), 'utf8');
@@ -194,6 +196,32 @@ t('caption styles: own class names, a gap between words', () => {
   }
   if (!/\.subs i\{[^}]*display:inline-block[^}]*margin:0 \.1/.test(css)) throw new Error('caption words lost their margin (the outline paints over a plain space)');
   return 'no clashes; words keep a margin';
+});
+t('localize: channel block, text overrides, cue warnings, destination voice', () => {
+  const ws1 = path.join(tmpProj, 'loc-a'), ws2 = path.join(tmpProj, 'loc-b'), srcP = path.join(ws1, 'ep1');
+  fs.mkdirSync(srcP, { recursive: true }); fs.mkdirSync(ws2, { recursive: true });
+  fs.writeFileSync(path.join(srcP, 'reel.json'), JSON.stringify({ title: 'Onions', brand: { name: 'A' }, series: { name: 'S1' }, scenes: [
+    { id: 'hook', vo: 'Why do onions make you cry?', headline: ['WHY', 'ONIONS'], overlays: [{ type: 'tag', kicker: 'SERIES A', text: 'EP 01', at: 'word:cry' }, { type: 'big', text: '?' }] },
+    { id: 'mid', vo: 'Yawns spread.', headline: ['YAWNS'], beats: [{ at: '50%', overlays: [{ type: 'chip', text: 'DID YOU YAWN?' }] }] },
+    { id: 'end', vo: 'Follow.', visual: { type: 'endcard', kicker: 'TOMORROW', title: 'YAWNS', next: 'Why yawn?' } }] }));
+  fs.writeFileSync(path.join(ws2, 'series.json'), JSON.stringify({ series: { 'S2': { voices: { ur: { voice_id: 'dest-voice-ur' } } } } }));
+  const lp = path.join(tmpProj, 'lines.ur.json');
+  fs.writeFileSync(lp, JSON.stringify({ reel: { brand: { name: 'B' }, series: { name: 'S2' }, title: 'Pyaz' },
+    hook: { vo: 'دو بار دو آنسو کیوں آتے ہیں؟', cues: { cry: 'دو' }, headline: ['KYUN', 'PYAZ'], overlays: [{ kicker: 'SILSILA B' }, false] },
+    mid: { vo: 'جمائی پھیلتی ہے۔', beats: [{ overlays: [{ text: 'JAMAAI AAYI?' }] }] },
+    end: { vo: 'فالو کریں۔', visual: { title: 'JAMAAI' } } }));
+  const r = spawnSync(process.execPath, [path.join(HERE, 'localize.mjs'), srcP, '--lang', 'ur', '--lines', lp, '--out', path.join(ws2, 'ep1-ur')], { encoding: 'utf8', cwd: ROOT });
+  const all = (r.stdout || '') + (r.stderr || '');
+  if (r.status !== 0) throw new Error(all.slice(-400));
+  const o = JSON.parse(fs.readFileSync(path.join(ws2, 'ep1-ur', 'reel.json'), 'utf8')), [h, m, e] = o.scenes;
+  if (m.beats[0].overlays[0].text !== 'JAMAAI AAYI?') throw new Error('beat overlay override not applied');
+  if (!/mid headline/.test(all) || /mid beat 0 chip/.test(all)) throw new Error('leftover list wrong for beats');
+  if (o.brand.name !== 'B' || o.series.name !== 'S2' || o.title !== 'Pyaz') throw new Error('reel block not applied: ' + JSON.stringify([o.brand, o.series, o.title]));
+  if (h.headline[0] !== 'KYUN' || h.overlays.length !== 1 || h.overlays[0].kicker !== 'SILSILA B' || h.overlays[0].text !== 'EP 01') throw new Error('overlay overrides wrong: ' + JSON.stringify(h.overlays));
+  if (e.visual.title !== 'JAMAAI' || e.visual.kicker !== 'TOMORROW') throw new Error('end card merge wrong');
+  if (o.voice.elevenlabs.voice_id !== 'dest-voice-ur') throw new Error('voice not taken from the destination series.json');
+  if (!/cue "cry" → "دو" uses "دو", which matches/.test(all)) throw new Error('repeated cue word not warned');
+  return 'brand/series/title, overlays (merge + drop), beats, end card, destination voice, cue warning';
 });
 const { pickStyle } = await import('./style.mjs');
 t('auto style picks a look from the topic', () => {

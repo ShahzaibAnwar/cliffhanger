@@ -1,14 +1,20 @@
 #!/usr/bin/env node
 /* One-command language versions.
-     node localize.mjs <source-project> --lang ur --lines lines.ur.json [--out <dir>] [--voice <elevenlabs id>]
+     node localize.mjs <source-project> --lang ur --lines lines.ur.json [--out <dir>] [--voice <elevenlabs id>] [--brand brand.json]
 
    lines.<lang>.json (Claude writes it):  { "<scene id>": { "vo": "...", "roman": "...", "cues": { "frozen": "جم" } }, ... }
+   Another channel or brand: a top-level "reel" block is merged into reel.json (brand, series, cover, css, look,
+   subtitles…), and each scene can replace its own text: "headline", "section", "chapter", "visual" (merged: end card
+   kicker/title/next…), "overlays" (by position: [{ "text": "…" }, {}, { "kicker": "…", "text": "…" }] or { "2": {…} }; false leaves one out),
+   and "beats": [{ "headline": …, "overlays": […], "visual": {…} }, …] (by position) for the text inside beats.
+   --brand brand.json: the same as a "reel" block, kept in one file per channel (lines' own "reel" block wins).
    - vo:    the spoken line in the target language (native script; English terms in Latin are fine)
    - roman: optional romanised line → out/<slug>-roman.srt
    - cues:  optional, English cue word → target word. Cue words you don't map are placed automatically at the
             same relative position in the line ("vo:0.42"), using the source voiceover's word timings.
    Visuals, art (and AI images in art/gen) are copied unchanged; headlines stay as they are.
-   Voice: --voice, else the series' voice for this language (series.json), else your default. */
+   Voice: --voice, else the series' voice for this language (series.json in the destination's workspace, then the
+   source's), else your default. */
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadSettings } from './settings-lib.mjs';
@@ -23,16 +29,24 @@ const EDGE = { ur: 'ur-PK-AsadNeural', hi: 'hi-IN-MadhurNeural', ar: 'ar-SA-Hame
 const read = p => JSON.parse(fs.readFileSync(p, 'utf8').replace(/^﻿/, ''));
 const reel = read(path.join(src, 'reel.json'));
 const lines = read(path.resolve(linesPath));
+const isObj = o => o && typeof o === 'object' && !Array.isArray(o);
+const merge = (a, b) => { if (!isObj(a) || !isObj(b)) return b; const o = { ...a }; for (const [k, v] of Object.entries(b)) o[k] = isObj(v) && isObj(a[k]) ? merge(a[k], v) : v; return o; };
+// channel / brand changes: --brand file, then lines' own "reel" block (a scene can't be called "reel" then)
+const brandFile = opt('brand'), reelBlock = isObj(lines.reel) && !reel.scenes.some(s => s.id === 'reel') ? lines.reel : null;
+const changed = [];
+for (const b of [brandFile ? read(path.resolve(brandFile)) : null, reelBlock]) if (b) { Object.assign(reel, merge(reel, b)); changed.push(...Object.keys(b)); }
+if (reelBlock) delete lines.reel;
 const timings = fs.existsSync(path.join(src, 'build', 'timings.json')) ? read(path.join(src, 'build', 'timings.json')).scenes : {};
 const out = path.resolve(opt('out', path.join(path.dirname(src), `${reel.slug || path.basename(src)}-${lang}`)));
 
-// voice for this language
-let voiceId = opt('voice');
-if (!voiceId) {
-  const sj = path.join(path.dirname(src), 'series.json');
-  if (fs.existsSync(sj) && reel.series?.name) voiceId = read(sj).series?.[reel.series.name]?.voices?.[lang]?.voice_id;
+// voice for this language: --voice, else the series' voice in the destination workspace (a new channel), then the source's
+let voiceId = opt('voice'), voiceFrom = voiceId ? '--voice' : '';
+if (!voiceId && reel.series?.name) for (const ws of [...new Set([path.dirname(out), path.dirname(src)])]) {
+  const sj = path.join(ws, 'series.json');
+  const v = fs.existsSync(sj) ? read(sj).series?.[reel.series.name]?.voices?.[lang]?.voice_id : null;
+  if (v) { voiceId = v; voiceFrom = `series "${reel.series.name}" in ${sj}`; break; }
 }
-if (!voiceId) voiceId = loadSettings().voice?.elevenlabs?.default_voice_id || reel.voice?.elevenlabs?.voice_id;
+if (!voiceId) { voiceId = loadSettings().voice?.elevenlabs?.default_voice_id || reel.voice?.elevenlabs?.voice_id; voiceFrom = 'your default voice (no series voice for this language: pass --voice, or add one to series.json)'; }
 
 const norm = w => String(w).toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}']+/gu, '');
 function autoPos(sceneId, vo, word) {                 // relative position of an English cue word in its line
@@ -45,8 +59,9 @@ function autoPos(sceneId, vo, word) {                 // relative position of an
   const toks = String(vo || '').split(/\s+/); const i = toks.findIndex(t => norm(t).startsWith(n));
   return i >= 0 ? i / Math.max(1, toks.length) : 0.4;
 }
-let explicit = 0, auto = 0;
-const missing = [];
+let explicit = 0, auto = 0, overridden = 0;
+const missing = [], warnings = [];
+const norm2 = w => String(w).toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '');   // the engine's word match
 for (const s of reel.scenes) {
   const L = lines[s.id];
   if (!L) { if (s.vo) missing.push(s.id); continue; }
@@ -63,12 +78,43 @@ for (const s of reel.scenes) {
   };
   for (const k of ['headline_at', 'punch_at', 'visual', 'overlays', 'sfx', 'ambience', 'beats', 'subtitles']) if (s[k] !== undefined) s[k] = remap(s[k]);
   s.vo = L.vo; if (L.roman) s.vo_roman = L.roman; else delete s.vo_roman;
-  delete s.vo_tts;
+  if (L.vo_tts) s.vo_tts = L.vo_tts; else delete s.vo_tts;
+  // text the viewer reads, for this language / channel: the scene, and each of its beats ("beats": [{…}, {…}] by position)
+  const applyText = (tgt, Lx, where) => {
+    for (const k of ['headline', 'section', 'chapter']) if (Lx[k] !== undefined) { tgt[k] = Lx[k]; overridden++; }
+    if (isObj(Lx.visual)) { tgt.visual = merge(tgt.visual || {}, Lx.visual); overridden++; }
+    if (Lx.overlays) {
+      const ov = Array.isArray(tgt.overlays) ? tgt.overlays : [];
+      const ent = Array.isArray(Lx.overlays) ? Lx.overlays.map((v, i) => [i, v]) : Object.entries(Lx.overlays).map(([i, v]) => [+i, v]);
+      const drop = new Set();
+      for (const [i, v] of ent) if (v === false || (isObj(v) && Object.keys(v).length)) {
+        if (!ov[i]) { warnings.push(`${where}: overlay ${i} doesn't exist (it has ${ov.length})`); continue; }
+        if (v === false) drop.add(i); else ov[i] = merge(ov[i], v);           // false: leave that overlay out
+        overridden++;
+      }
+      if (drop.size) tgt.overlays = ov.filter((_, i) => !drop.has(i));
+    }
+  };
+  applyText(s, L, s.id);
+  if (Array.isArray(L.beats)) L.beats.forEach((Lb, i) => {
+    if (!isObj(Lb) || !Object.keys(Lb).length) return;
+    if (!s.beats?.[i]) { warnings.push(`${s.id}: beat ${i} doesn't exist (the scene has ${s.beats?.length || 0})`); return; }
+    applyText(s.beats[i], Lb, `${s.id} beat ${i}`);
+  });
+  // a cue must point at one place: the engine takes the cue's first word and the first spoken word that matches it
+  const toks = String(L.vo).split(/\s+/).filter(Boolean), tn = toks.map(norm2);
+  const hits = w => { const n = norm2(w); return n ? tn.map((m, i) => (m && (m === n || (m.startsWith(n) && n.length >= 3) || (n.startsWith(m) && m.length >= 4)) ? i : -1)).filter(i => i >= 0) : []; };
+  for (const [k, v] of Object.entries(L.cues || {})) {
+    const words = String(v).split(/\s+/).filter(Boolean), first = words[0], h = hits(first);
+    const better = words.find(w => hits(w).length === 1);
+    if (!h.length) warnings.push(`${s.id}: cue "${k}" → "${v}" isn't in the line, so it falls back to 40% of the scene`);
+    else if (h.length > 1) warnings.push(`${s.id}: cue "${k}" → "${v}" uses "${first}", which matches ${h.map(i => `"${toks[i]}" (word ${i + 1})`).join(' and ')}; the first one wins${better && better !== first ? `: map it to "${better}"` : ': map it to a word that appears once'}`);
+  }
 }
 if (missing.length) { console.error('Missing lines for scenes: ' + missing.join(', ')); process.exit(1); }
 
 reel.slug = `${reel.slug || path.basename(src)}-${lang}`;
-reel.title = `${reel.title} (${LANG[lang] || lang})`;
+if (!changed.includes('title')) reel.title = `${reel.title} (${LANG[lang] || lang})`;
 reel.voice = reel.voice || {};
 reel.voice.elevenlabs = { ...(reel.voice.elevenlabs || {}), voice_id: voiceId, language_code: lang };
 reel.voice.edge = { voice: EDGE[lang] || reel.voice.edge?.voice, rate: '+6%' };
@@ -79,4 +125,21 @@ fs.copyFileSync(path.resolve(linesPath), path.join(out, `lines.${lang}.json`));
 if (fs.existsSync(path.join(src, 'art'))) fs.cpSync(path.join(src, 'art'), path.join(out, 'art'), { recursive: true });
 const rows = reel.scenes.map((s, i) => `| ${i + 1} | ${s.vo || ''} | ${s.vo_roman || ''} | ${(s.headline || []).join(' / ') || 'end card'} |`);
 fs.writeFileSync(path.join(out, 'script.md'), `# ${reel.title}\n\nBuilt from \`${path.basename(src)}\` with localize.mjs. Visuals and facts are identical to the source (see its facts.md).\nVoice: ElevenLabs ${voiceId} (${lang}).\n\n| # | spoken | roman | headline |\n|---|---|---|---|\n${rows.join('\n')}\n`);
-console.log(`${out}\n  ${reel.scenes.length} scenes · cues: ${explicit} mapped by you, ${auto} placed automatically · voice ${voiceId}\n  next: voiceover.py → (tighten) → render.mjs   (Roman subtitles are written automatically when lines have "roman")`);
+// what the viewer still reads in the source's words (fine for names; otherwise translate it in lines.<lang>.json)
+const kept = [];
+for (const s of reel.scenes) {
+  const L = lines[s.id] || {}, ov = L.overlays || {};
+  if (s.headline && L.headline === undefined) kept.push(`${s.id} headline`);
+  (s.overlays || []).forEach((o, i) => { if ((o.text || o.kicker) && !(isObj(ov[i]) && Object.keys(ov[i]).length)) kept.push(`${s.id} ${o.type}`); });
+  if (s.visual?.type === 'endcard' && !isObj(L.visual)) kept.push(`${s.id} end card`);
+  (s.beats || []).forEach((b, bi) => {
+    const Lb = (Array.isArray(L.beats) && isObj(L.beats[bi]) ? L.beats[bi] : {}), bov = Lb.overlays || {};
+    if (b.headline && Lb.headline === undefined) kept.push(`${s.id} beat ${bi} headline`);
+    (b.overlays || []).forEach((o, i) => { if ((o.text || o.kicker) && !(isObj(bov[i]) && Object.keys(bov[i]).length)) kept.push(`${s.id} beat ${bi} ${o.type}`); });
+  });
+}
+if (warnings.length) { console.warn(`! ${warnings.length} warning(s):`); for (const w of warnings) console.warn('   - ' + w); }
+console.log(`${out}\n  ${reel.scenes.length} scenes · cues: ${explicit} mapped by you, ${auto} placed automatically · ${overridden} text override(s)${changed.length ? ` · reel: ${[...new Set(changed)].join(', ')}` : ''}`);
+console.log(`  voice ${voiceId}: ${voiceFrom}`);
+if (kept.length) console.log(`  still in the source's words (${kept.length}): ${kept.slice(0, 12).join(', ')}${kept.length > 12 ? ', …' : ''}\n    → to change them: "headline" / "overlays" / "visual" on those scenes in lines.${lang}.json, a "reel" block for brand, series, cover`);
+console.log(`  next: voiceover.py → (tighten) → render.mjs   (Roman subtitles are written automatically when lines have "roman")`);

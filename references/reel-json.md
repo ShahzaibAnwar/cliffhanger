@@ -125,7 +125,7 @@ the line pre-written (`"write_dur":0.01`), then `strike` + `replace`.
 
 **question** — giant red "?" (`mark` to change) with optional `art` on top.
 
-**endcard** — `kicker` ("DECODED IN"), `title` ("PART 2"), `sub`, `brand` (defaults to brand.name;
+**endcard** — `kicker` ("DECODED IN"), `title` ("PART 2"; a long word shrinks to fit the frame), `sub`, `brand` (defaults to brand.name;
 false hides), `next` (next-episode teaser), `next_label`, `cta` ("Follow"; false hides), `y`.
 
 **none** — headline + overlays only.

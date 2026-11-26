@@ -20,6 +20,17 @@ const args = process.argv.slice(2);
 const proj = path.resolve(args.find(a => !a.startsWith('--')) || '.');
 const flag = n => args.includes('--' + n);
 const opt = (n, d) => { const i = args.indexOf('--' + n); return i >= 0 ? args[i + 1] : d; };
+// never stop silently: an error, or a wait that can never finish (a download or the browser hanging up), is printed on
+// both stdout and stderr (output is often piped through grep) and the exit code is non-zero
+let FINISHED = false;
+const say = m => { console.log(m); console.error(m); };
+process.on('unhandledRejection', e => { say('! render failed: ' + (e?.stack || e)); process.exit(1); });
+process.on('uncaughtException', e => { say('! render failed: ' + (e?.stack || e)); process.exit(1); });
+process.on('exit', code => {
+  if (FINISHED) return;
+  say(`! render.mjs stopped before it finished (exit code ${code || 13})${code ? '' : ': something it was waiting for never answered (a download, or the browser). Run it again; --offline skips downloads'}.`);
+  if (!code) process.exitCode = 13;
+});
 
 const reelPath = path.join(proj, 'reel.json');
 if (!fs.existsSync(reelPath)) { console.error('No reel.json in ' + proj); process.exit(1); }
@@ -432,7 +443,10 @@ function engagementCheck() {
   if (firstWord != null) add(firstWord <= 0.6, 'Hook starts immediately', `first word at ${firstWord.toFixed(2)} s`, 'start the voice by 0.5 s: no intro, logo or silence at the start (lead: 0)');
   // 2. hook line: short curiosity line (best ~9 words in informational niches)
   const hookWords = String(first.vo || '').trim().split(/\s+/).filter(Boolean).length;
-  if (hookWords) add(hookWords <= 14, 'Short hook line', `${hookWords} words in the first line`, 'cut the first line to a 6–12 word question or surprising claim');
+  // measured in seconds of speech, so it works in every language (Urdu needs more words than English for the same line)
+  const hookSec = timings.scenes[first.id]?.duration;
+  if (hookWords && hookSec) add(hookSec <= 5.2, 'Short hook line', `${hookSec.toFixed(1)} s to say the first line (${hookWords} words)`, 'cut the first line to a short question or surprising claim, said in under ~5 s');
+  else if (hookWords) add(hookWords <= 14, 'Short hook line', `${hookWords} words in the first line`, 'cut the first line to a 6–12 word question or surprising claim');
   // 3. headline on screen within 1 s
   const hl = first.headline && (Array.isArray(first.headline) ? first.headline.length : 1);
   add(!!hl, 'Headline on screen at once', hl ? 'first scene has a headline' : 'first scene has no headline', 'give scene 1 a headline that states the question (works on mute)');
@@ -513,7 +527,7 @@ async function makeCover() {
   else ff(['-i', png, '-vf', 'crop=1080:1440:0:240', '-frames:v', '1', '-update', '1', '-q:v', '3', path.join(outDir, 'cover-grid.jpg')]);   // what the profile grid shows
   return png;
 }
-if (flag('cover')) { const c = await makeCover(); await browser.close(); console.log(JSON.stringify({ cover: c, grid: path.join(outDir, WIDE ? 'thumbnail.jpg' : 'cover-grid.jpg') }, null, 1)); process.exit(0); }
+if (flag('cover')) { const c = await makeCover(); await browser.close(); FINISHED = true; console.log(JSON.stringify({ cover: c, grid: path.join(outDir, WIDE ? 'thumbnail.jpg' : 'cover-grid.jpg') }, null, 1)); process.exit(0); }
 
 // ---------- QA modes ----------
 if (flag('stills') || opt('at')) {
@@ -550,7 +564,14 @@ if (flag('stills') || opt('at')) {
     if (t != null && t > (WIDE ? 5.5 : 3)) latePunch.push(`${s.id}: "${L[ai]}" appears ${t.toFixed(1)} s in, line 1 waits alone until then (fine for a deliberate reveal; otherwise set "punch_at", e.g. 0.6)`);
   }
   if (latePunch.length) { console.warn(`! ${latePunch.length} headline punch line(s) land late:`); for (const w of latePunch) console.warn('   - ' + w); }
-  if (long.length) { console.warn(`! ${long.length} scene(s) longer than ${maxScene}s on one visual (add "beats" for a new visual mid-line):`); for (const x of long) console.warn(`   - ${x.id}: ${x.dur.toFixed(1)}s`); }
+  if (long.length) {
+    console.warn(`! ${long.length} scene(s) longer than ${maxScene}s on one visual (add "beats" for a new visual mid-line; the voice doesn't change):`);
+    for (const x of long) {
+      const mid = x.dur / 2, w = [...(x.words || [])].filter(q => q.s > 1.2 && q.s < x.dur - 1.2 && nzw(q.w).length >= 3).sort((p, q) => Math.abs(p.s - mid) - Math.abs(q.s - mid))[0];
+      const uniq = w && x.words.filter(q => { const m = nzw(q.w), n = nzw(w.w); return m === n || (m.startsWith(n) && n.length >= 3); })[0] === w;
+      console.warn(`   - ${x.id}: ${x.dur.toFixed(1)}s${w && uniq ? ` → e.g. "beats": [{ "at": "word:${String(w.w).replace(/[^\p{L}\p{N}'-]/gu, '')}", "visual": {…} }]  (${w.s.toFixed(1)} s in)` : ` → e.g. "beats": [{ "at": "50%", "visual": {…} }]`}`);
+    }
+  }
   const cols = Math.min(6, shots.length), rows = Math.ceil(shots.length / cols);
   const contact = path.join(build, 'contact.jpg');
   ff(['-framerate', '1', '-start_number', '1', '-i', path.join(dir, '%02d.png'), '-vf', `scale=300:-1,tile=${cols}x${rows}:padding=6:color=white`, '-frames:v', '1', '-update', '1', contact]);
@@ -563,7 +584,7 @@ if (flag('stills') || opt('at')) {
     ...(AI_MISSING.length ? { ai_images_missing: AI_MISSING } : {}), ...(eng ? { engagement: eng.score } : {}) }, null, 1));
   if (eng) printEngagement(eng);
   aiMissingNote();
-  process.exit(0);
+  FINISHED = true; process.exit(0);
 }
 
 // ---------- full render: video ----------
@@ -797,3 +818,4 @@ let chaptersPath = null;
 if (chs) { chaptersPath = path.join(outDir, 'chapters.txt'); fs.writeFileSync(chaptersPath, chs.text); for (const w of chs.warn) console.warn('! chapters: ' + w); }
 console.log(JSON.stringify({ video: finalPath, srt: srtPath, contact: sheet, duration: TOTAL, fps, frames: nFrames, ...(chaptersPath ? { chapters: chaptersPath } : {}), ...(creditsPath ? { credits: creditsPath } : {}), ...(AI_MISSING.length ? { ai_images_missing: AI_MISSING } : {}) }, null, 1));
 aiMissingNote();
+FINISHED = true;

@@ -568,7 +568,14 @@
       else if (H < 1500) { e.style.top = Math.round(H * 0.2) + 'px'; e.style.transform = `scale(${(H / 1750).toFixed(3)})`; e.style.transformOrigin = '50% 0'; }   // 16:9: fit the shorter frame
       const parts = [];
       if (v.kicker) parts.push(h('div', 'k', e, esc(v.kicker)));
-      if (v.title) parts.push(h('div', 't', e, esc(v.title)));
+      if (v.title) {
+        const tt = h('div', 't', e, esc(v.title)); parts.push(tt);
+        S._layout.push(() => {           // long titles ("GOOSEBUMPS") shrink to fit the frame (the 16:9 card is scaled down as a whole)
+          const k = parseFloat((e.style.transform.match(/scale\(([\d.]+)\)/) || [])[1]) || 1, max = (W - 120) / k;
+          tt.style.display = 'inline-block'; const w = tt.offsetWidth; tt.style.display = '';
+          if (w > max) tt.style.fontSize = Math.floor(parseFloat(getComputedStyle(tt).fontSize) * max / w) + 'px';
+        });
+      }
       if (v.sub) parts.push(h('div', 's', e, esc(v.sub)));
       if (v.brand !== false) parts.push(h('div', 'b', e, esc(v.brand || D.brand.name)));
       if (v.next) { const n = h('div', 'next', h('div', '', e)); h('small', '', n, esc(v.next_label || 'NEXT PART')); h('span', '', n, esc(v.next)); parts.push(n); }
@@ -1195,7 +1202,7 @@
     for (const s of scenes) {
       window.__seek(Math.max(s.start, s.end - 0.06));
       const tight = el => { if (!el.children.length && el.textContent.trim()) { const rg = document.createRange(); rg.selectNodeContents(el); const rr = rg.getBoundingClientRect(); if (rr.width) return rr; } return el.getBoundingClientRect(); };
-      s._el.querySelectorAll('.hl,.ov,.term,.labfile,.stat .num,.notepad,.bars,.end .follow,.end .next,.obj .clean > *').forEach(el => {
+      s._el.querySelectorAll('.hl,.ov,.term,.labfile,.stat .num,.notepad,.bars,.end .t,.end .follow,.end .next,.obj .clean > *').forEach(el => {
         const r = tight(el); if (!r.width || getComputedStyle(el).opacity === '0') return;
         const isArt = el.closest('.obj'); const area = r.width * r.height;
         if (!isArt && (r.left < -2 || r.right > W + 2 || r.top < -2 || r.bottom > H + 2)) out.push({ scene: s.id, zone: 'off canvas (cut off)', what: (el.innerText || el.className).replace(/\s+/g, ' ').trim().slice(0, 40) });

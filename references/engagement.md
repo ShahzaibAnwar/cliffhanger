@@ -11,7 +11,8 @@ Research summary dated November 2026.
 **Hook**
 1. ✓ Narration starts by 0.5 s, the headline is on screen and something moves by 1 s. No logo, title card
    or silence at the start. People recall feed content after 0.25 s; on mobile they spend ~1.7 s per item. [S] (M1)
-2. ✓ The first line states the why/how question or the surprising claim, short (best ~9 words in
+2. ✓ The first line states the why/how question or the surprising claim, short: checked as said in ≤ 5.2 s, so it
+   works in every language (Urdu needs more words than English for the same line); best ~9 words in
    informational niches). Curiosity gaps and urgency beat "how to"/"you need to" phrasing. [S, single preprint] (MI)
 3. Instagram's Reels model predicts whether a viewer watches less than 3 s; YouTube shows "stayed to watch
    vs swiped away". No platform publishes a target percentage. [P] (MT, YT1)
