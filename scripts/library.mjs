@@ -152,7 +152,8 @@ export async function searchMusic(mood, { licence = 'safe', minS = 60, maxS = 48
 // ---------- credits ----------
 export function creditLine(c) {
   const lic = LICENCE_NAME[c.licence] || c.licence.toUpperCase();
-  return `"${c.title}"${c.creator ? ' by ' + c.creator : ''} · ${lic}${c.licence_version ? ' ' + c.licence_version : ''} · ${c.source} · ${c.page}`;
+  const ver = c.licence_version && !lic.includes(String(c.licence_version)) ? ' ' + c.licence_version : '';   // "CC0 1.0 (public domain)" already has it
+  return `"${c.title}"${c.creator ? ' by ' + c.creator : ''} · ${lic}${ver} · ${c.source} · ${c.page}`;
 }
 // Credits for one project: <project>/credits.json (machine) → written to out/credits.txt by render.mjs
 export function addCredit(proj, kind, file, c) {

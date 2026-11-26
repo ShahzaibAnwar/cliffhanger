@@ -300,19 +300,27 @@ def main():
             total += cached["duration"]
             print(f"  = {sid} cached ({cached['duration']:.2f}s)")
             continue
+        if cached and cached.get("said") == say and cached.get("cfg") == hashlib.sha1(json.dumps(pcfg, sort_keys=True).encode()).hexdigest()[:12] and provider == "elevenlabs":
+            print(f"  ~ {sid}: re-voiced although its text is unchanged: the line before it changed (ElevenLabs reads it for intonation), so its timing may shift")
         if provider == "elevenlabs":
             words = eleven_tts(say, pcfg, mp3, prev_t, next_t)
         else:
             words = edge_tts_synth(say, pcfg, mp3)
         dur = probe_duration(mp3)
-        out["scenes"][sid] = {"file": rel, "duration": round(dur, 3), "hash": h, "words": [{"w": w["w"], "s": round(w["s"], 3), "e": round(w["e"], 3)} for w in words]}
+        out["scenes"][sid] = {"file": rel, "duration": round(dur, 3), "hash": h, "said": say, "cfg": hashlib.sha1(json.dumps(pcfg, sort_keys=True).encode()).hexdigest()[:12], "words": [{"w": w["w"], "s": round(w["s"], 3), "e": round(w["e"], 3)} for w in words]}
         total += dur
         print(f"  + {sid} {dur:.2f}s  {len(words)} words  | {text[:60]}")
         json.dump({**old, **out, "scenes": {**old["scenes"], **out["scenes"]}}, open(tpath, "w", encoding="utf-8"), ensure_ascii=False, indent=1)  # checkpoint
     json.dump(out, open(tpath, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     print(f"voiceover: {provider}, {len(out['scenes'])} clips, {total:.1f}s of speech -> {tpath}")
     # optional pacing pass: voice.tighten = [tempo, keep] (reel.json or settings), e.g. [1.14, 0.24]
-    tight = vcfg.get("tighten", svoice.get("tighten"))
+    # reel.json wins, then settings; unset (or "" / "auto") on ElevenLabs → the usual [1.14, 0.24], since its pacing is slow for reels.
+    # false / 0 turns it off.
+    tight = vcfg["tighten"] if vcfg.get("tighten") not in (None, "", "auto") or vcfg.get("tighten") is False else svoice.get("tighten")
+    if tight in (None, "", "auto"):
+        tight = [1.14, 0.24] if provider == "elevenlabs" else None
+        if tight and "--no-tighten" not in a:
+            print("pacing pass: ElevenLabs default tighten [1.14, 0.24] (set voice.tighten in reel.json or settings to change, false to skip)")
     if tight and "--no-tighten" not in a:
         from tighten import tighten
         t = tight if isinstance(tight, (list, tuple)) else [tight]

@@ -118,9 +118,9 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .np-text{position:relative;display:inline-block}
 .np-text .t{position:relative;z-index:2;display:inline-block}
 .np-hl{position:absolute;left:-8px;top:18%;height:64%;background:var(--hl);opacity:.85;width:0;z-index:1;transform:skewX(-8deg)}
-.np-strike{position:absolute;left:-6px;top:52%;height:7px;background:var(--accent);width:0;z-index:3;border-radius:4px;transform:rotate(-2deg)}
+.np-strike{position:absolute;left:-6px;top:52%;height:7px;background:#C8302A;width:0;z-index:3;border-radius:4px;transform:rotate(-2deg)}
 .np-circ{position:absolute;left:-30px;top:-22px;right:-30px;bottom:-22px;z-index:3;overflow:visible}
-.np-new{position:absolute;left:0;top:-58px;font:700 54px var(--hand);color:var(--accent);z-index:4;white-space:nowrap}
+.np-new{position:absolute;left:0;top:-58px;font:700 54px var(--hand);color:#C8302A;z-index:4;white-space:nowrap}
 .pencil{position:absolute;width:300px;height:44px;z-index:30;left:0;top:0;transform-origin:0 50%;pointer-events:none}
 
 /* terminal */
@@ -156,13 +156,14 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .ov{position:absolute;left:0;top:0;z-index:25}
 .chip{font:600 27px var(--mono);letter-spacing:.14em;text-transform:uppercase;background:#1C1B19;color:#F2EEE6;padding:10px 20px;border:2px solid rgba(255,255,255,.25);outline:3px solid #1C1B19;white-space:nowrap}
 .chip.red{background:var(--accent);outline-color:var(--accent);border-color:rgba(255,255,255,.55)}
+.obj.cmp-card .clean{background:#FBF8F1;padding:26px;border-radius:8px;box-shadow:0 16px 34px rgba(0,0,0,.32)}
 .chip.light{background:#F6F4EF;color:#1C1B19;outline-color:#1C1B19;border-color:#1C1B19}
 .stamp{font:400 76px/1 var(--head);color:var(--accent);border:7px solid var(--accent);padding:12px 26px 8px;text-transform:uppercase;white-space:nowrap;
   background:rgba(255,255,255,.04);mix-blend-mode:multiply;
   -webkit-mask-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence baseFrequency='.9' numOctaves='2'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -2.2 2.1'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
 .theme-dark .stamp{mix-blend-mode:normal}
 .stamp.big{font-size:120px;border-width:9px}
-.tag{background:var(--tape);color:var(--ink);padding:18px 30px 14px;box-shadow:0 12px 26px rgba(0,0,0,.28);text-transform:uppercase;white-space:nowrap}
+.tag{background:var(--tape);color:#1B1A18;padding:18px 30px 14px;box-shadow:0 12px 26px rgba(0,0,0,.28);text-transform:uppercase;white-space:nowrap}
 .tag small{display:block;font:600 22px var(--mono);letter-spacing:.2em;color:#666}
 .tag span{font:400 76px/1 var(--head)}
 .tag.red span{color:var(--accent)}
@@ -202,7 +203,7 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .cmp-lab b{display:block;font:400 64px/1 var(--head);text-transform:uppercase}
 .cmp-lab span{display:block;font:500 28px var(--mono);letter-spacing:.14em;margin-top:8px;text-transform:uppercase;opacity:.85}
 .cmp-win{display:block;height:8px;background:var(--accent);width:0;margin:10px auto 0;border-radius:4px}
-.cmp-vs{position:absolute;left:540px;font:400 130px/1 var(--head);color:var(--accent);z-index:5}
+.cmp-vs{position:absolute;left:540px;font:400 130px/1 var(--head);color:var(--accent);z-index:30}
 /* ---------- timeline ---------- */
 .tl-line{color:var(--ink)}.theme-dark .tl-line{color:var(--dark-ink)}
 .tl-row{position:absolute;display:flex;gap:30px;align-items:flex-start;width:800px}
@@ -319,6 +320,7 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .subs.karaoke i.on:not(.now){--fill:100%}
 /* pop: words pop in one by one; key words are bigger and in the accent colour */
 .subs.pop i{display:inline-block;opacity:0;transform-origin:50% 70%;margin:0 .14em}
+.subs.pop i[data-k]{font-size:1.18em;margin:0 .1em}   /* key words grow in layout, so they never overlap neighbours */
 .subs.pop i.on{opacity:1}
 .subs.pop i.key.on{color:var(--hl)}
 /* box: the current word sits in a highlight box (the "short-form app" look) */
@@ -375,3 +377,8 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .theme-dark .countdown .cd-num{color:var(--dark-ink)}
 .countdown{font-size:150px}
 .countdown .cd-lab{position:absolute;bottom:-56px;font:600 26px var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+
+/* maps on coloured looks: land drawn in the look's own line colour (blueprint: light cyan lines, chalkboard: chalk) */
+.scene.look-blueprint .map .land path{fill:rgba(190,230,255,.16);stroke:rgba(214,240,255,.9);stroke-width:1.6}
+.scene.look-chalkboard .map .land path{fill:rgba(255,255,255,.12);stroke:rgba(242,240,230,.8);stroke-width:1.6}
+.scene.look-vhs .map .land path,.scene.look-comic.theme-dark .map .land path{fill:rgba(255,255,255,.12);stroke:rgba(255,255,255,.55)}

@@ -194,8 +194,8 @@ python "$SKILL_DIR/scripts/voiceover.py" --list-voices edge --lang hi   # browse
 **Tighten the pacing (ElevenLabs especially):** raw ElevenLabs delivery is too slow for reels. `tighten.py`
 shortens pauses to `keep` seconds and speeds speech up by `tempo` without changing pitch, remapping the word
 timings so animation stays synced. 1.10–1.16 with 0.22–0.28 is the usual range; re-running with new numbers
-starts again from the original clips (kept in `build/vo_raw/`). Set `voice.tighten: [1.14, 0.24]` in settings
-or reel.json to run it automatically after every voiceover.
+starts again from the original clips (kept in `build/vo_raw/`). ElevenLabs voiceovers get `[1.14, 0.24]` automatically
+when neither reel.json nor settings sets `voice.tighten`; set your own numbers there, or `false` to skip it.
 
 Settings, voice picks per language and delivery tips: `references/voiceover.md`.
 Use `vo_tts` on a scene to change pronunciation without changing the on-screen text logic.

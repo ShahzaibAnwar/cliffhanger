@@ -47,11 +47,11 @@ reports anything that still runs off the edge.
 | `chapter` | starts a YouTube chapter here: the final render writes `out/chapters.txt` (`0:00 Title` lines). `reel.chapter_intro` names the first one if no chapter starts at 0 (default "Intro") |
 | `chrome` | `false` hides meta row + brand tag (use on end card) |
 | `vo` | the spoken line. Scene length = VO length + `pad` (0.08 s) unless `duration` is set |
-| `vo_tts` | optional alternate text sent to TTS (pronunciation fixes: spell out years and codes, e.g. vo "July 1969 … 1202" → vo_tts "July nineteen sixty-nine … twelve oh two"; the subtitles keep `vo`) |
+| `vo_tts` | optional alternate text sent to TTS (pronunciation fixes: spell out years and codes, e.g. vo "July 1969 … 1202" → vo_tts "July nineteen sixty-nine … twelve oh two"; the subtitles keep `vo`: each script word takes the timing of the words spoken for it, and `word:` cues match `vo` words) |
 | `duration`, `min`, `pad`, `lead` | timing overrides; `lead` delays the VO inside the scene |
 | `headline` | `["LINE ONE", "PUNCH LINE"]` — line 2 is red. One string = one line |
 | `accent_line` | which line is red (default 1) |
-| `punch_at` | when the red line appears. Default: when its first word is spoken |
+| `punch_at` | when the red line appears. Default: when its first word is spoken (`--stills` warns when that's over 3 s in, 5.5 s on 16:9) |
 | `headline_at` | force line-1 time (default: each word appears as it is spoken) |
 | `headline_style` | `""` · `label` (white tape label, default on photo) · `center` |
 | `headline_size`, `headline_y` | override auto-fit size / top position |
@@ -132,16 +132,16 @@ false hides), `next` (next-episode teaser), `next_label`, `cta` ("Follow"; false
 | type | keys | notes |
 |---|---|---|
 | `art` | as art component (`w` default 400) | extra objects, hands, icons |
-| `chip` | `text`, `style`: "" (black) · `red` · `light` | mono caption pill: "FEMALE · DRINKS BLOOD" |
+| `chip` | `text`, `style`: "" (black) · `red` (accent) · `light`, `color` | mono caption pill: "FEMALE · DRINKS BLOOD". Text turns dark on light accents/colours automatically |
 | `stamp` | `text`, `size`: "" · `big`, `rot` | slams in with a thud + screen shake |
 | `tag` | `text`, `kicker`, `style`: `red` | torn tape label: "DAY 06" |
 | `caption` | `text` | small grey mono line |
 | `big` | `text`, `size`, `style`: `red` | huge condensed word / symbol |
-| `counter` | `value` ("x 4", "100x"), `size`, `count_dur` | big counting number |
+| `counter` | `value` ("x 4", "100x", "DAY 10", "-272°C"), `size`, `count_dur` | big counting number: the number inside the text counts up (decimals kept: "3.5 KM"), the words around it stay; without `size`, long values shrink to fit the frame |
 | `terminal` | as terminal component + `x`,`y` | |
 | `labfile` | as labfile component | |
 | `progress` | `text`, `from`, `value` (0–1), `color`, `fill_at`, `fill_dur` | "BODY WATER", draining bars |
-| `callout` | `x`,`y`,`r`, `text`, `tx`,`ty`, `label_at`, `color` | red ring drawn around a detail |
+| `callout` | `x`,`y`,`r`, `text`, `tx`,`ty`, `label_at`, `color`, `leader` | ring drawn around a detail; the label takes the ring's `color`, and a line joins them when the label sits away from the ring (`"leader": false` hides it) |
 | `arrow` | `x1,y1,x2,y2`, `dashed`, `color`, `stroke` | hand-drawn red arrow |
 | `ecg` | `x`,`y`,`w`,`beats` | heartbeat line drawing itself |
 | `path` | `d` (SVG path in canvas coords), `dashed` | any drawn line (trails, zig-zags) |
@@ -174,7 +174,7 @@ keeps the current one on screen.
 **newspaper**: `masthead`, `date`, `issue`, `headline`, `lines` (per column), `highlight` (line indexes
 turned red), `highlight_at`, `x`, `y`, `w`, `rot`.
 
-**compare**: `left` / `right` = `{svg_file|image|image_prompt, label, value, w, at}`, `vs`, `winner`
+**compare**: `left` / `right` = `{svg_file|image|image_prompt, label, value, w, at}`, `vs`, `winner`, `cards` (true: each side on a light card, a "this vs that" split)
 (`left`/`right` gets a red underline at `winner_at`), `y`.
 
 **timeline**: `items: [{year, text, at}]`, `x`, `y`, `gap`, `stagger`.
@@ -219,9 +219,9 @@ for a marker-scribble wipe anywhere (`transition_color` sets its colour; default
 ## Reel-level extras
 
 - `"subtitles": { "burn": true, "style": "word"|"karaoke"|"pop"|"box"|"tape"|"line", "y": 1500, "size": 60, "max_words": 4, "lang": "auto"|"vo" }`
-  (karaoke: a colour fill sweeps through each word · pop: words pop in, key words bigger and highlighted · box: the
+  (karaoke: a colour fill sweeps through each word · pop: words pop in, one key word per caption (two in long ones; headline words first) bigger and highlighted · box: the
   spoken word in an accent box). See them all in `gallery/index.html`. `y` defaults to 1500 on 9:16 and just above
-  the player bar on 16:9; a `y` that doesn't fit the canvas is ignored. Stills are taken while a caption is showing.
+  the player bar on 16:9; a `y` that doesn't fit the canvas is ignored. Stills are taken while a caption is showing, and the stills report lists each frame's caption text.
 - `"look": "case-file"|"collage"|"chalkboard"|"blueprint"|"comic"|"vhs"|"newsprint"`: the visual world (any scene can
   override with its own `look`). Each works on paper and dark scenes. `"look": "auto"` (+ `"topic": "…"`) picks look,
   caption style and music mood from the topic with the style map (`style.mjs`); values set in the reel are kept.
@@ -233,7 +233,7 @@ for a marker-scribble wipe anywhere (`transition_color` sets its colour; default
 
 ## Maps and charts
 
-**map** — `highlight` (ISO-3 codes or country names; `highlight_style`: `solid` · `soft`, automatic soft fill when the
+**map** — `highlight` (ISO-3 codes or country names, as in Natural Earth; unknown names are warned about with close matches; Antarctica isn't included; `highlight_style`: `solid` · `soft`, automatic soft fill when the
 view sits inside a highlighted country), `route: [[lon, lat], …]` (`route_at`, `route_dur`, `curve`:
 false for straight lines, `dashed`), `points: [{lon, lat, label, at}]`, `bounds: [west, south, east, north]`, `x`,
 `y`, `w`, `h`, `at`. Outlines: Natural Earth 1:110m (public domain), bundled in `assets/geo/`: right for countries and

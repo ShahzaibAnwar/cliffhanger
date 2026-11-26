@@ -110,6 +110,7 @@
     const el = a.el, P = a.p;
     const p = a.dur > 0 ? clamp((t - a.t0) / a.dur, 0, 1) : (t >= a.t0 ? 1 : 0);
     switch (a.type) {
+      case 'show': el.style.opacity = t < a.t0 ? 0 : p; break;          // opacity only: keeps the element's own CSS transform
       case 'in': {
         if (t < a.t0) { el.style.opacity = 0; if (P.style === 'wipe') el.style.clipPath = 'inset(-30% 100% -30% -5%)'; return; }
         const e = E.out(p); let o = 1, tr = '';
@@ -145,7 +146,7 @@
       }
       case 'count': {
         const v = P.from + (P.to - P.from) * E.out(t < a.t0 ? 0 : p);
-        el.textContent = P.prefix + P.fmt.format(Math.round(v)) + P.suffix;
+        el.textContent = P.prefix + P.fmt.format(P.dec ? v : Math.round(v)) + P.suffix;
         break;
       }
       case 'draw': el.style.strokeDashoffset = el._rev ? P.len * (t < a.t0 ? 0 : p) : P.len * (1 - (t < a.t0 ? 0 : E.io(p))); break;
@@ -188,6 +189,20 @@
     }
     return 'polygon(' + pts.map(([x, y]) => `${x.toFixed(2)}% ${y.toFixed(2)}%`).join(',') + ')';
   }
+
+  // relative luminance of a computed colour ("rgb(…)" / "rgba(…)"); null when (nearly) transparent
+  const lumOf = c => { const m = String(c).match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/); if (!m || (m[4] != null && +m[4] < 0.3)) return null;
+    const f = x => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(+m[1]) + 0.7152 * f(+m[2]) + 0.0722 * f(+m[3]); };
+  // chips on a coloured background: dark text on light accents (violet, cyan…), light text on dark ones
+  const inkChip = el => S._layout.push(() => { const L = lumOf(getComputedStyle(el).backgroundColor); if (L != null && L > 0.3) { el.style.color = '#16141A'; el.style.borderColor = 'rgba(0,0,0,.35)'; } });
+
+  // shrink a big number/word so its final text fits the frame (measured with the final text, before animation)
+  const fitWidth = (el, finalText) => S._layout.unshift(() => {
+    const keep = el.textContent; el.textContent = finalText;
+    const w = el.offsetWidth, max = W - 120;
+    if (w > max) el.style.fontSize = Math.floor(parseFloat(getComputedStyle(el).fontSize) * max / w) + 'px';
+    el.textContent = keep;
+  });
 
   // ---------- objects (art) ----------
   function obj(spec, parent, defs) {
@@ -300,7 +315,7 @@
     const punchDef = s.punch_at != null ? s.punch_at : null;
     let cursor = 0;                       // search VO words in order
     const ws = s.words || [];
-    let punchT = null;
+    let punchT = null, firstT = null;
     lines.forEach((ln, i) => {
       const L0 = h('span', 'ln' + (i === accentLine ? ' l2' : ''), hl);
       const L = h('span', 'lt', L0);
@@ -323,8 +338,10 @@
         if (i !== accentLine && !s.headline_static) t = Math.min(t, s.start + 0.9 + j * 0.07);   // setup line is never late
         A(sp, 'in', t, 0.3, { style: i === accentLine ? 'pop' : 'fadeUp', pre: '', rot: 0 });
         if (i === accentLine && punchT == null) punchT = t;
+        if (firstT == null || t < firstT) firstT = t;
       });
     });
+    if (!hl.classList.contains('label') && !s.headline_static && firstT != null && firstT > s.start + 0.15) A(hl, 'show', firstT - 0.04, 0.12);
     // punch emphasis: "underline" (hand-drawn red stroke) | "marker" (highlighter swipe) | "shake"
     const fx = s.headline_fx || D.headline_fx;
     const PL = S._punchLine; S._punchLine = null;
@@ -375,7 +392,7 @@
       const y = v.y || 1100;
       [['left', 280, 'slideL'], ['right', 800, 'slideR']].forEach(([k, x, en], i) => {
         const o = v[k]; if (!o) return;
-        if (o.svg || o.image) obj(Object.assign({ x, y, w: o.w || 400, motion: 'float', enter: en, at: (o.at != null ? o.at : 0.1 + i * 0.35) }, o), sc);
+        if (o.svg || o.image) { const ob = obj(Object.assign({ x, y, w: o.w || (v.cards ? 330 : 400), motion: 'float', enter: en, at: (o.at != null ? o.at : 0.1 + i * 0.35) }, o), sc); if (v.cards) ob.classList.add('cmp-card'); }
         const lab = h('div', 'cmp-lab', sc, `<b>${esc(o.label || '')}</b><span>${esc(o.value || '')}</span>`);
         lab.style.left = x + 'px'; lab.style.top = (y + (o.label_dy || 300)) + 'px';
         enter(lab, { at: o.at != null ? o.at : 0.3 + i * 0.35 }, 'fadeUp', 0, 0.4, 'translate(-50%,0)', 0);
@@ -715,7 +732,7 @@
     };
     switch (o.type) {
       case 'art': obj(o, sc, { w: 400, motion: 'none', shadow: false }); break;
-      case 'chip': { const e = h('div', 'ov chip ' + (o.style || ''), sc, esc(o.text)); place(e, 'pop', 0.35); sfx('pop', T(o.at, 0.2), 0.18); break; }
+      case 'chip': { const e = h('div', 'ov chip ' + (o.style || ''), sc, esc(o.text)); if (o.color) { e.style.background = o.color; e.style.outlineColor = o.color; } inkChip(e); place(e, 'pop', 0.35); sfx('pop', T(o.at, 0.2), 0.18); break; }
       case 'stamp': {
         const e = h('div', 'ov stamp ' + (o.size || ''), sc, esc(o.text));
         const a = place(e, 'slam', 0.22);
@@ -725,13 +742,15 @@
       }
       case 'tag': { const e = h('div', 'ov tag ' + (o.style || ''), sc); if (o.kicker) h('small', '', e, esc(o.kicker)); h('span', '', e, esc(o.text)); place(e, 'slideL', 0.45); sfx('swish', T(o.at, 0.2), 0.25); break; }
       case 'caption': { const e = h('div', 'ov cap', sc, esc(o.text)); place(e, 'fade', 0.5); break; }
-      case 'big': { const e = h('div', 'ov big ' + (o.style || ''), sc, esc(o.text)); if (o.size) e.style.fontSize = o.size + 'px'; place(e, 'pop', 0.35); break; }
+      case 'big': { const e = h('div', 'ov big ' + (o.style || ''), sc, esc(o.text)); if (o.size) e.style.fontSize = o.size + 'px'; else fitWidth(e, o.text); place(e, 'pop', 0.35); break; }
       case 'counter': {
         const e = h('div', 'ov big ' + (o.style || 'red'), sc); if (o.size) e.style.fontSize = o.size + 'px';
         const a = place(e, 'pop', 0.3);
         const m = String(o.value).match(/^([^\d]*)([\d,.]+)(.*)$/);
-        const indian = /\d,\d\d,\d{3}/.test(m[2]);
-        A(e, 'count', a.t0, o.count_dur || 1, { from: 0, to: parseFloat(m[2].replace(/,/g, '')), prefix: m[1], suffix: m[3], fmt: new Intl.NumberFormat(indian ? 'en-IN' : 'en-US') });
+        if (!m) { e.textContent = String(o.value ?? ''); break; }        // no number in it ("DAY TEN"): shown as text
+        const indian = /\d,\d\d,\d{3}/.test(m[2]), dec = (m[2].split('.')[1] || '').length;
+        A(e, 'count', a.t0, o.count_dur || 1, { from: 0, to: parseFloat(m[2].replace(/,/g, '')), prefix: m[1], suffix: m[3], dec, fmt: new Intl.NumberFormat(indian ? 'en-IN' : 'en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }) });
+        if (!o.size) fitWidth(e, String(o.value));     // long values ("2,688 KM") shrink to fit the frame
         break;
       }
       case 'terminal': terminal(o, sc, o); break;
@@ -748,7 +767,19 @@
         const c = sv('circle', { cx: x, cy: y, r, fill: 'none', stroke: o.color || 'var(--accent)', 'stroke-width': o.stroke || 8 }, svgLayer);
         S._layout.push(() => { const len = 2 * Math.PI * r; c.style.strokeDasharray = len; c.style.strokeDashoffset = len; A(c, 'draw', T(o.at, 0.3), 0.5, { len }); });
         if (!o.sfx) sfx('ding', T(o.at, 0.3) + 0.35, 0.16);
-        if (o.text) { const e = h('div', 'ov chip red', sc, esc(o.text)); e.style.left = (o.tx != null ? o.tx : x) + 'px'; e.style.top = (o.ty != null ? o.ty : y + r + 50) + 'px'; enter(e, { at: o.label_at != null ? o.label_at : o.at, enter: 'pop' }, 'pop', 0.5, 0.3, 'translate(-50%,-50%)', 0); }
+        if (o.text) {
+          const lx = o.tx != null ? o.tx : x, ly = o.ty != null ? o.ty : y + r + 50;
+          const e = h('div', 'ov chip red', sc, esc(o.text)); e.style.left = lx + 'px'; e.style.top = ly + 'px';
+          if (o.color) { e.style.background = o.color; e.style.outlineColor = o.color; } inkChip(e);
+          const la = o.label_at != null ? o.label_at : o.at;
+          enter(e, { at: la, enter: 'pop' }, 'pop', 0.5, 0.3, 'translate(-50%,-50%)', 0);
+          const dx = lx - x, dy = ly - y, dist = Math.hypot(dx, dy);
+          if (o.leader !== false && dist > r + 70) {          // label away from its ring: a line joins them (it runs under the label)
+            const sx = x + dx / dist * (r + 6), sy = y + dy / dist * (r + 6);
+            const ln = sv('line', { x1: sx, y1: sy, x2: lx, y2: ly, stroke: o.color || 'var(--accent)', 'stroke-width': Math.max(4, (o.stroke || 8) * 0.6), 'stroke-linecap': 'round' }, svgLayer);
+            S._layout.push(() => { const len = Math.hypot(lx - sx, ly - sy); ln.style.strokeDasharray = len; ln.style.strokeDashoffset = len; A(ln, 'draw', Math.max(T(o.at, 0.3) + 0.35, T(la, 0.5) - 0.1), 0.3, { len }); });
+          }
+        }
         break;
       }
       case 'arrow': {
@@ -1094,14 +1125,20 @@
   const SUBSTYLE = SUB ? (SUB.style || 'word') : null;
   const sc0 = c => scenes.find(x => c.t0 + 0.06 >= x.start && c.t0 + 0.06 < x.end) || scenes[0];
   // key words: in the scene's headline, or long content words (shown bigger / in the accent colour by "pop")
-  const isKey = (w, s) => { const n = norm(w); if (n.length < 3) return false; const hl = [].concat(s.headline || []).join(' ').split(/\s+/).map(norm); return hl.includes(n) || n.length >= 7; };
+  const STOPK = new Set('the and that this with from they them their there these those what when where which while about would could should because people really'.split(' '));
+  const keysOf = c => {           // at most 1 key word per caption (2 with 6+ words): headline words first, then the longest 8+ letter word
+    if (c._keys) return c._keys;
+    const s = sc0(c), hl = [].concat(s.headline || []).join(' ').split(/\s+/).map(norm);
+    const cand = c.words.map((w, i) => { const n = norm(w.w); return { i, sc: n.length < 3 || STOPK.has(n) ? 0 : hl.includes(n) ? 100 + n.length : n.length >= 8 ? n.length : 0 }; }).filter(x => x.sc > 0).sort((a, b) => b.sc - a.sc);
+    return (c._keys = new Set(cand.slice(0, c.words.length >= 6 ? 2 : 1).map(x => x.i)));
+  };
   function drawSubs(t) {
     if (!subsEl) return;
     const c = D.subs.find(x => t >= x.t0 && t < x.t1 + 0.12) || null;
     if (c !== subCur) {
       subCur = c;
       if (c) { const sc = scenes.find(x => c.t0 + 0.06 >= x.start && c.t0 + 0.06 < x.end) || scenes[0]; subsEl.style.top = (sc._subY || SUBY) + 'px'; }
-      subsEl.innerHTML = c ? '<span class="sl">' + c.words.map(w => `<i${isKey(w.w, sc0(c)) ? ' data-k="1"' : ''}>` + esc(w.w) + '</i>').join(' ') + '</span>' : '';
+      subsEl.innerHTML = c ? '<span class="sl">' + c.words.map((w, i) => `<i${keysOf(c).has(i) ? ' data-k="1"' : ''}>` + esc(w.w) + '</i>').join(' ') + '</span>' : '';
     }
     if (!c) return;
     const ws = subsEl.querySelectorAll('i');
@@ -1109,7 +1146,7 @@
       const el = ws[i], on = t >= w.s, now = on && t < w.e + 0.05;
       el.className = (on ? (now ? 'on now' : 'on') : '') + (el.dataset.k ? ' key' : '');
       if (SUBSTYLE === 'karaoke') el.style.setProperty('--fill', (clamp((t - w.s) / Math.max(0.08, w.e - w.s), 0, 1) * 100).toFixed(1) + '%');
-      if (SUBSTYLE === 'pop') { const q = clamp((t - w.s) / 0.16, 0, 1); el.style.transform = on ? `scale(${(el.dataset.k ? 1.18 : 1) * (0.6 + 0.4 * E.back(q))})` : 'scale(.6)'; }
+      if (SUBSTYLE === 'pop') { const q = clamp((t - w.s) / 0.16, 0, 1); el.style.transform = on ? `scale(${0.6 + 0.4 * E.back(q)})` : 'scale(.6)'; }
     });
     const p = clamp((t - c.t0) / 0.14, 0, 1);
     subsEl.firstChild.style.transform = `scale(${0.92 + 0.08 * E.back(p)})`; subsEl.firstChild.style.opacity = p;
@@ -1132,15 +1169,28 @@
         for (const z of Z) { const a = hit(r, z); if (a > (isArt ? area * 0.2 : area * (z.x0 > 900 ? 0.08 : 0.03))) out.push({ scene: s.id, zone: z.n, what: (isArt ? 'illustration' : (el.innerText || el.className).replace(/\s+/g, ' ').trim().slice(0, 40)) }); }
       });
       // illustration vs page: mostly dark ink on a dark scene (or pale on paper) disappears
-      const lum = c => { const m = String(c).match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/); if (!m || (m[4] != null && +m[4] < 0.3)) return null;
-        const f = x => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(+m[1]) + 0.7152 * f(+m[2]) + 0.0722 * f(+m[3]); };
-      const bgL = lum(getComputedStyle(s._bg).backgroundColor) ?? (s.theme === 'dark' ? 0.02 : 0.8);
+      // flagged only when both the filled area and the outlines blend into the page: dark outlines on pale fills read fine
+      // on paper, and art drawn on its own light cards reads fine on a dark page
+      const bgL = lumOf(getComputedStyle(s._bg).backgroundColor) ?? (s.theme === 'dark' ? 0.02 : 0.8);
+      const near = L => (Math.max(L, bgL) + 0.05) / (Math.min(L, bgL) + 0.05) < 1.6;
       s._el.querySelectorAll('.obj .clean svg').forEach(svgEl => {
-        const ls = []; [...svgEl.querySelectorAll('path,circle,ellipse,rect,polygon,polyline,line')].slice(0, 300).forEach(el => { const cs = getComputedStyle(el); for (const k of ['fill', 'stroke']) { const L = lum(cs[k]); if (L != null) ls.push(L); } });
-        if (ls.length < 4) return;
-        const close = ls.filter(L => (Math.max(L, bgL) + 0.05) / (Math.min(L, bgL) + 0.05) < 1.6).length / ls.length;
-        if (close > 0.6) out.push({ scene: s.id, zone: 'low contrast with the page (art may vanish): use the paper theme or lighter art', what: 'illustration' });
+        let tot = 0, closeA = 0, n = 0, sn = 0, sc = 0;
+        [...svgEl.querySelectorAll('path,circle,ellipse,rect,polygon,polyline,line')].slice(0, 300).forEach(el => {
+          const cs = getComputedStyle(el), L = lumOf(cs.fill), Ls = lumOf(cs.stroke);
+          if (Ls != null && parseFloat(cs.strokeWidth) > 0) { sn++; if (near(Ls)) sc++; }
+          if (L == null) return;
+          const r = el.getBoundingClientRect(), a = r.width * r.height; if (!a) return;
+          n++; tot += a; if (near(L)) closeA += a;
+        });
+        if (n + sn < 4 || !tot) return;
+        if (closeA / tot > 0.6 && (!sn || sc / sn > 0.6)) out.push({ scene: s.id, zone: 'low contrast with the page (art may vanish): use the paper theme or lighter art', what: 'illustration' });
       });
+      // text overlays on top of each other (two chips on one line, a label over a stamp…)
+      const txt = [...s._el.querySelectorAll('.ov')].filter(el => !el.closest('.obj') && el.innerText && el.innerText.trim() && getComputedStyle(el).opacity !== '0').map(el => ({ el, r: el.getBoundingClientRect() })).filter(o => o.r.width);
+      for (let i = 0; i < txt.length; i++) for (let j = i + 1; j < txt.length; j++) {
+        const a = txt[i].r, b = txt[j].r, ov = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left) + 10) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) + 10);   // touching (< 10 px apart) counts
+        if (ov > 0) out.push({ scene: s.id, zone: `overlaps or touches "${txt[j].el.innerText.replace(/\s+/g, ' ').trim().slice(0, 30)}" (move one: x/y)`, what: txt[i].el.innerText.replace(/\s+/g, ' ').trim().slice(0, 30) });
+      }
       if (subsEl) {                                           // overlays fighting with subtitles
         const sy = s._subY || SUBY, band = { x0: 60, x1: W - 60, y0: sy - 4, y1: sy + (SUB.size || 60) * 2.4 };
         s._el.querySelectorAll('.ov,.term,.labfile').forEach(el => { const r = el.getBoundingClientRect(); if (r.width && hit(r, band) > 0) out.push({ scene: s.id, zone: 'subtitle band', what: (el.innerText || el.className).replace(/\s+/g, ' ').trim().slice(0, 40) }); });

@@ -78,7 +78,25 @@ t('character references (offline)', () => {
 const { prepare } = await import('./photos.mjs');
 const { findSound } = await import('./sfx.mjs');
 const tmpProj = fs.mkdtempSync(path.join(os.tmpdir(), 'cliff-media-'));
-const { relevance } = await import('./library.mjs');
+const { alignWords } = await import('./align.mjs');
+t('captions keep the script words when vo_tts differs', () => {
+  const mk = s => s.split(' ').map((w, i) => ({ w, s: i, e: i + 0.9 }));
+  const cases = [['In 2007, they flew.', 'IN TWO THOUSAND SEVEN they flew.', 'In|2007,|they|flew.', [1, 3.9]],
+    ['This is WonderByte.', 'This is Wonder Byte.', 'This|is|WonderByte.', [2, 3.9]],
+    ['NASA flew it on Foton-M3.', 'Nasa flew it on Foton M three.', 'NASA|flew|it|on|Foton-M3.', [4, 6.9]]];
+  for (const [vo, said, want, span] of cases) {
+    const r = alignWords(vo, mk(said)), got = r.map(w => w.w).join('|');
+    if (got !== want) throw new Error(`"${said}" → ${got}, expected ${want}`);
+    const w = r.find(x => /\d|Byte/.test(x.w)); if (Math.abs(w.s - span[0]) > 0.01 || Math.abs(w.e - span[1]) > 0.01) throw new Error(`${w.w} timed ${w.s}-${w.e}, expected ${span}`);
+  }
+  return 'numbers, joined words and re-spellings take the spoken timing';
+});
+const { relevance, creditLine } = await import('./library.mjs');
+t('credit lines name the licence version once', () => {
+  const l = creditLine({ title: 'Tardigrade', creator: 'X', licence: 'cc0', licence_version: '1.0', source: 'Flickr', page: 'https://example.org' });
+  if (/1\.0.*1\.0/.test(l)) throw new Error(l);
+  return l.split(' · ')[1];
+});
 t('photo search keeps on-topic results only', () => {
   const cases = [['naked mole rat', { title: 'Naked Mole Rats' }, 1], ['greenland shark', { title: 'Bowl Depicting Shark', tags: 'ceramics' }, 0.5],
     ['axolotl', { title: 'Self-Portrait', tags: 'painting portrait' }, 0], ['axolotl', { title: 'IMG_2231', tags: 'axolotl amphibian' }, 1]];
@@ -129,6 +147,24 @@ t('looks, map and chart render', () => {
   const out = sh(process.execPath, [path.join(HERE, 'render.mjs'), proj, '--at', '1.8,3.8']);
   if (/\[page error\]/.test(out)) throw new Error('page errors');
   return 'comic + blueprint, map + CSV chart + countdown';
+});
+t('stills check: contrast, touching labels, map names, late punch lines', () => {
+  const proj = path.join(tmpProj, 'lowc'); fs.mkdirSync(path.join(proj, 'art'), { recursive: true });
+  fs.writeFileSync(path.join(proj, 'art', 'dark.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect x="40" y="40" width="320" height="320" fill="#141826" stroke="#10131F" stroke-width="6"/><circle cx="200" cy="200" r="90" fill="#1A1F33" stroke="#0E1120" stroke-width="6"/><circle cx="200" cy="200" r="30" fill="#161A2A"/><path d="M60 300 L340 300" stroke="#121624" stroke-width="8"/></svg>');
+  fs.writeFileSync(path.join(proj, 'art', 'outlined.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect x="40" y="40" width="320" height="320" fill="#EFE8D6" stroke="#111" stroke-width="8"/><circle cx="200" cy="200" r="90" fill="#E8E0CC" stroke="#111" stroke-width="8"/><circle cx="200" cy="200" r="30" fill="#F2EEE6" stroke="#111" stroke-width="6"/></svg>');
+  fs.writeFileSync(path.join(proj, 'reel.json'), JSON.stringify({ scenes: [
+    { id: 'a', theme: 'dark', duration: 2, headline: ['DARK', 'ART'], visual: { type: 'art', svg_file: 'art/dark.svg', w: 700 } },
+    { id: 'b', theme: 'paper', duration: 2, headline: ['OUTLINED'], visual: { type: 'art', svg_file: 'art/outlined.svg', w: 700 },
+      overlays: [{ type: 'chip', text: 'LEFT CHIP', x: 400, y: 900 }, { type: 'chip', text: 'RIGHT CHIP', x: 560, y: 905, style: 'red' }] },
+    { id: 'm', theme: 'dark', look: 'blueprint', duration: 4, headline: ['POINT', 'NEMO'], punch_at: 3.5, visual: { type: 'map', bounds: [-180, -70, -65, 5], highlight: ['Chille'] } }] }));
+  const r = spawnSync(process.execPath, [path.join(HERE, 'render.mjs'), proj, '--stills'], { encoding: 'utf8', cwd: ROOT, maxBuffer: 64 << 20 });
+  const all = (r.stdout || '') + (r.stderr || '');
+  if (!/- a: "illustration" → low contrast/.test(all)) throw new Error('dark art on a dark page not flagged');
+  if (/- b: "illustration" → low contrast/.test(all)) throw new Error('outlined pale art on paper flagged');
+  if (!/overlaps or touches "RIGHT CHIP"/.test(all)) throw new Error('touching chips not flagged');
+  if (!/highlight "Chille".*did you mean "Chile"/.test(all)) throw new Error('unknown map highlight not flagged');
+  if (!/m: "NEMO" appears 3\.5 s in/.test(all)) throw new Error('late punch line not flagged');
+  return 'dark-on-dark flagged, outlined art passes, touching chips, unknown map name, late punch line flagged';
 });
 const { pickStyle } = await import('./style.mjs');
 t('auto style picks a look from the topic', () => {

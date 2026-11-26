@@ -13,6 +13,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { gpuPref, browserGpuArgs, pickEncoder as pickEncoderFor } from './gpu.mjs';
+import { alignWords } from './align.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -73,13 +74,11 @@ const scenes = reel.scenes.map((s0, i) => {
 const TOTAL = +(t + (reel.tail != null ? reel.tail : 0.25)).toFixed(3);
 scenes[scenes.length - 1].end = TOTAL;
 
-// restore punctuation/casing on TTS word timings from the script (needed for subtitles and SRT)
+// subtitles, SRT and "word:" cues use the script's own words (vo), on the timing of what was spoken (vo_tts or vo):
+// "2007," ← "two thousand seven", "WonderByte." ← "Wonder Byte". Each vo token takes the start of its first spoken
+// word and the end of its last; several vo tokens on one spoken word share its time.
 const nzw = x => String(x).toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '');
-for (const s of scenes) {
-  if (!s.words.length || !s.vo) continue;
-  const toks = String(s.vo).split(/\s+/).filter(Boolean); let k = 0;
-  s.words = s.words.map(w => { for (let j = k; j < Math.min(toks.length, k + 4); j++) { const a = nzw(toks[j]), b = nzw(w.w); if (a && b && (a === b || a.startsWith(b) || b.startsWith(a))) { k = j + 1; return { ...w, w: toks[j] }; } } return w; });
-}
+for (const s of scenes) if (s.words.length && s.vo) s.words = alignWords(s.vo, s.words);
 
 // time spec in Node (same rules as the engine): number | "40%" | "word:x(+0.2)" | "vo:0.4" | "end-0.5"
 function atTime(s, spec, def = 0) {
@@ -256,6 +255,12 @@ if (reel.mascot && (reel.mascot.image || reel.mascot.svg_file)) {
 let GEO = null;
 for (const s of scenes) for (const v of [s.visual, ...(s.beats || []).map(b => b.visual)].filter(Boolean)) {
   if (v.type === 'map' && !GEO) GEO = JSON.parse(fs.readFileSync(path.join(HERE, '..', 'assets', 'geo', 'world-110m.json'), 'utf8'));
+  if (v.type === 'map') for (const hn of [].concat(v.highlight || [])) {
+    const q = String(hn).toLowerCase();
+    if (GEO.countries.some(c => String(c.iso).toLowerCase() === q || String(c.n).toLowerCase() === q)) continue;
+    const near = GEO.countries.filter(c => String(c.n).toLowerCase().includes(q.slice(0, 4))).slice(0, 3).map(c => `"${c.n}" (${c.iso})`);
+    console.warn(`! scene "${s.id}": map highlight "${hn}" isn't in the bundled map${q.startsWith('antarc') ? ' (Antarctica is left out: Mercator stretches it to fill the frame; use a photo or drawing)' : near.length ? `; did you mean ${near.join(', ')}?` : '; use a country name or ISO code (e.g. "CHL")'}`.replace(/\?$/, '?').replace(/([^?])$/, '$1.'));
+  }
   if (v.type === 'map' && v.bounds && Math.min(v.bounds[2] - v.bounds[0], v.bounds[3] - v.bounds[1]) < 6)
     console.warn(`! scene "${s.id}": map zoomed to city level; the bundled outlines are coarse (1:110m) there. Zoom out, or use a photo/illustrated map for this scene.`);
   if (v.type === 'chart' && v.csv && !v.data) {
@@ -404,11 +409,12 @@ function engagementCheck() {
   add(!!hl, 'Headline on screen at once', hl ? 'first scene has a headline' : 'first scene has no headline', 'give scene 1 a headline that states the question (works on mute)');
   // 4. pacing: a new visual every 2.5–4 s, nothing held longer than 5 s (8 s on 16:9 long-form)
   const ordered = [...scenes].sort((a, b) => a.start - b.start);
-  const shots = ordered.map((x, i, arr) => (i + 1 < arr.length ? arr[i + 1].start : TOTAL) - x.start)
-    .filter((d, i) => d > 0.05 && !(i === ordered.length - 1 && (WIDE || ordered[i].visual?.type === 'endcard')));   // end card holds on purpose
+  const shotsAll = ordered.map((x, i, arr) => ({ d: (i + 1 < arr.length ? arr[i + 1].start : TOTAL) - x.start, id: x.id }))
+    .filter((o, i) => o.d > 0.05 && !(i === ordered.length - 1 && (WIDE || ordered[i].visual?.type === 'endcard')));   // end card holds on purpose
+  const shots = shotsAll.map(o => o.d), longestShot = shotsAll.reduce((a, b) => (b.d > a.d ? b : a), { d: 0, id: '' });
   const avg = shots.reduce((a, b) => a + b, 0) / Math.max(1, shots.length), longest = Math.max(...shots), cap = WIDE ? 8 : 5;
   add(avg >= 2 && avg <= (WIDE ? 6 : 4.5), 'Visual changes every 2.5–4 s', `average ${avg.toFixed(1)} s per visual`, avg < 2 ? 'slow down: under 2 s per shot lowers retention (too fast to follow)' : 'add "beats" (a new visual mid-line) so something changes every 2.5–4 s');
-  add(longest <= cap + 0.5, `No visual held over ${cap} s`, `longest ${longest.toFixed(1)} s`, 'split the longest scene with beats or a cut-in (lens, chip, stamp)');
+  add(longest <= cap + 0.5, `No visual held over ${cap} s`, `longest ${longest.toFixed(1)} s: ${longestShot.id}`, 'split the longest scene with beats or a cut-in (lens, chip, stamp)');
   // 5. length
   if (!WIDE) add(TOTAL >= 30 && TOTAL <= 90, 'Length 30–90 s (best 45–60)', `${TOTAL.toFixed(0)} s`, TOTAL > 180 ? 'over 3:00 is not shown to non-followers on Reels and is the Shorts maximum: cut it down' : TOTAL < 30 ? 'very short: data favour 30–60 s for reach' : 'aim for 45–60 s; trim weaker beats');
   // 6. narration pace
@@ -497,13 +503,30 @@ if (flag('stills') || opt('at')) {
   await browser.close();
   const maxScene = reel.max_scene_seconds || (WIDE ? Math.max(8, SETTINGS.content?.max_scene_seconds || 0) : SETTINGS.content?.max_scene_seconds || 5);
   const long = scenes.filter(x => !x._beatOf && x.visual?.type !== 'endcard' && x.dur > maxScene && !scenes.some(y => y._beatOf === x.id));
-  if (safe.length) { console.warn(`! ${safe.length} element(s) in platform UI zones (covered by buttons/captions on Instagram/TikTok):`); for (const w of safe) console.warn(`   - ${w.scene}: "${w.what}" → ${w.zone}`); }
+  if (safe.length) { console.warn(`! ${safe.length} layout warning(s): platform UI zones (covered by buttons/captions on Instagram/TikTok), cut-off, overlapping or low-contrast elements:`); for (const w of safe) console.warn(`   - ${w.scene}: "${w.what}" → ${w.zone}`); }
+  // headline punch line that lands late: line 1 sits alone on screen until its first word is spoken
+  const latePunch = [];
+  for (const s of scenes) {
+    const L = Array.isArray(s.headline) ? s.headline : null; if (!L || L.length < 2 || s.headline_static) continue;
+    const ai = s.accent_line != null ? s.accent_line : 1; if (!L[ai]) continue;
+    let t = null;
+    if (s.punch_at != null) t = atTime(s, s.punch_at) - s.start;
+    else {
+      let k = 0; const find = w => { const n = nzw(w); for (let j = k; j < s.words.length && n; j++) { const m = nzw(s.words[j].w); if (m === n || (m.startsWith(n) && n.length >= 3) || (n.startsWith(m) && m.length >= 3)) { k = j + 1; return s.words[j].s; } } return null; };
+      for (let i = 0; i < ai; i++) String(L[i]).split(/\s+/).forEach(find);
+      t = find(String(L[ai]).split(/\s+/)[0]);
+    }
+    if (t != null && t > (WIDE ? 5.5 : 3)) latePunch.push(`${s.id}: "${L[ai]}" appears ${t.toFixed(1)} s in, line 1 waits alone until then (fine for a deliberate reveal; otherwise set "punch_at", e.g. 0.6)`);
+  }
+  if (latePunch.length) { console.warn(`! ${latePunch.length} headline punch line(s) land late:`); for (const w of latePunch) console.warn('   - ' + w); }
   if (long.length) { console.warn(`! ${long.length} scene(s) longer than ${maxScene}s on one visual (add "beats" for a new visual mid-line):`); for (const x of long) console.warn(`   - ${x.id}: ${x.dur.toFixed(1)}s`); }
   const cols = Math.min(6, shots.length), rows = Math.ceil(shots.length / cols);
   const contact = path.join(build, 'contact.jpg');
   ff(['-framerate', '1', '-start_number', '1', '-i', path.join(dir, '%02d.png'), '-vf', `scale=300:-1,tile=${cols}x${rows}:padding=6:color=white`, '-frames:v', '1', '-update', '1', contact]);
   const chs = chaptersText(), eng = opt('at') ? null : engagementCheck();
-  console.log(JSON.stringify({ mode: 'stills', dir, contact, total: TOTAL, frames: shots.map(s => `${s.name}.png = ${s.id} @${s.tt.toFixed(2)}s`),
+  // burned captions: the caption on screen in each still, so wrong caption text shows up without opening images
+  const capAt = tt => { const c = (data.subs || []).find(x => tt >= x.t0 && tt < x.t1 + 0.12); return c ? ` | caption: "${c.words.map(w => w.w).join(' ')}"` : ''; };
+  console.log(JSON.stringify({ mode: 'stills', dir, contact, total: TOTAL, frames: shots.map(s => `${s.name}.png = ${s.id} @${s.tt.toFixed(2)}s${capAt(s.tt)}`),
     scene_starts: scenes.map(s => `${s.id} ${s.start.toFixed(2)}${s.transition ? ' ' + s.transition : ''}`),
     ...(chs ? { chapters: chs.text.trim().split('\n'), chapter_warnings: chs.warn } : {}),
     ...(AI_MISSING.length ? { ai_images_missing: AI_MISSING } : {}), ...(eng ? { engagement: eng.score } : {}) }, null, 1));
@@ -709,7 +732,16 @@ ff(['-i', finalPath, '-vf', `fps=${Math.max(0.2, 24 / TOTAL).toFixed(3)},scale=2
 if (reel.series?.name && !preview) {        // keep the workspace's series memory current
   try { const { syncSeries } = await import('./series.mjs'); syncSeries(path.dirname(proj)); } catch (e) { console.warn('! series sync skipped: ' + e.message); }
 }
-const { readCredits, creditLine } = await import('./library.mjs');
+const { readCredits, creditLine, addCredit: addCredit2 } = await import('./library.mjs');
+{ // an "image" fetched by photos.mjs (maybe for another reel) carries its licence in a .json beside it: credit it here too
+  const have = new Set(readCredits(proj).map(c => c.file)), seen = new Set();
+  const walk = o => { if (!o || typeof o !== 'object') return; for (const [k, v] of Object.entries(o)) {
+    if ((k === 'image' || k === 'bg_image' || k === 'fallback_image') && typeof v === 'string' && !/^(https?|data):/.test(v) && !seen.has(v)) { seen.add(v);
+      const f = v.startsWith('file:') ? fileURLToPath(v) : path.resolve(proj, v), side = f.replace(/\.[a-z0-9]+$/i, '.json'), rel = path.relative(proj, f).replace(/\\/g, '/');
+      if (!have.has(rel) && fs.existsSync(side)) { try { const c = JSON.parse(fs.readFileSync(side, 'utf8')); if (c.licence && (c.page || c.url)) addCredit2(proj, 'photo', rel, { ...c, page: c.page || c.url }); } catch { /* not a photo sidecar */ } } }
+    else walk(v); } };
+  walk(scenes);
+}
 const credits = readCredits(proj);
 let creditsPath = null;
 if (credits.length && !preview) {
