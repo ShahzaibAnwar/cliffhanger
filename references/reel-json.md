@@ -87,7 +87,8 @@ Any object/overlay can carry `"sfx": "impact"` or `"sfx": {"prompt": "...", "fal
 
 **art** — an illustration. `svg_file` (`"@lib/heart.svg"` uses the shared library in
 `assets/art/`) | `svg` (inline string) | `image` (png/jpg path) | **`image_prompt`** (AI-generated
-by `imagegen.mjs`; keep an `svg_file` as fallback). AI keys: `image_style`, `image_seed`,
+by `imagegen.mjs`; keep an `svg_file` as fallback; `"ai_label": true` at the top of the reel, or a text, marks every
+generated picture "AI ILLUSTRATION" in its corner, and `"ai_label": false` on one object hides it there). AI keys: `image_style`, `image_seed`,
 `image_ref` (reference image for a consistent variant), `character` (a name from `reel.characters`),
 `finish` (`collage`: grayscale halftone cut-out with a paper edge · `print`: photo print with a white border and
 tape · `torn`: torn-paper edges · `tone: "bw"` makes a print black and white), `photo_query` (real free-licence photo,

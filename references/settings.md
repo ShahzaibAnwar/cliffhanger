@@ -44,6 +44,7 @@ settings, `voiceover.py` retries automatically with a simpler request.
 | `content.target_seconds, niche, series_name, series_promise, end_cta` | story defaults |
 | `audio.bed` (`drone`/`none`), `bed_volume`, `music`, `music_volume`, `sfx`, `lufs` | mix defaults |
 | `captions.platforms, always_hashtags, emoji` (`none`/`light`/`heavy`) | captions.md defaults |
+| `images.ai_label` | `true` or a text: every AI-generated picture gets a small "AI ILLUSTRATION" mark in its corner (reel.json `"ai_label"` overrides; off by default) |
 | `images.provider` | `auto` (Cloudflare first, Gemini second) · `cloudflare` · `gemini` · `off` |
 | `images.style` | default look: `auto` (engraving; engraving-dark on dark scenes) · `engraving` · `diagram` · `photo` · `xray` |
 | `images.cloudflare_model, cloudflare_steps, gemini_model, feather` | provider models (FLUX schnell, up to 8 steps; Gemini 2.5 Flash Image) and soft-edge option |
@@ -54,7 +55,7 @@ settings, `voiceover.py` retries automatically with a simpler request.
 | `subtitles.burn, style, lang, y, size, max_words` | burned-in subtitles; style `word` · `karaoke` · `pop` · `box` · `tape` · `line` |
 | `style.auto, style.map` | automatic style per video: `auto: true` picks look + caption style + music mood from the topic using `map` (`[{look, keywords, captions: {vertical, wide}, music_mood}]`; built-in default shown by `node scripts/style.mjs show`). captions picked by auto style are burned in (set `captions.burn: false` in a map entry, or `subtitles.burn: false` in a reel, to keep them off). `style.mjs lock` / `unlock` switch it for every channel; `--workspace <dir>` writes `<dir>/style.json` so only that channel's reels are affected |
 | `animation.look` | default look (`auto` = pick per topic): `case-file` · `collage` · `chalkboard` · `blueprint` · `comic` · `vhs` · `newsprint` (see `gallery/index.html`) |
-| `audio.music_mood` | free real music by mood: `suspense` · `mystery` · `cinematic` · `epic` · `calm` · `uplifting` · `playful` · `scifi` · `ambient` (empty = synthesized bed) |
+| `audio.music_mood` | free real music by mood: `suspense` · `mystery` · `cinematic` · `epic` · `calm` · `uplifting` · `playful` · `scifi` · `ambient` (empty = synthesized bed). A track used by one of the last 5 reels in the same workspace folder is skipped while another exists (`audio.music_avoid_recent`: how many reels back, 0 = off); a re-render keeps its own track |
 | `content.max_scene_seconds` | stills check warns above this (add beats). 16:9 uses at least 8; `reel.max_scene_seconds` overrides per reel |
 | `images.max_rerolls` | automatic AI image re-rolls when the quality check fails |
 | `audio.bed, ai_music, music_prompt` | background mood / AI music |

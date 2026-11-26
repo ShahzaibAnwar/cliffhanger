@@ -166,6 +166,17 @@ t('stills check: contrast, touching labels, map names, late punch lines', () => 
   if (!/m: "NEMO" appears 3\.5 s in/.test(all)) throw new Error('late punch line not flagged');
   return 'dark-on-dark flagged, outlined art passes, touching chips, unknown map name, late punch line flagged';
 });
+t('caption styles: own class names, a gap between words', () => {
+  const css = fs.readFileSync(path.join(HERE, 'engine', 'engine.css'), 'utf8');
+  // the caption box carries the style name as a class ("subs tape"): a bare .tape{…} rule elsewhere would restyle it
+  const names = ['word', 'karaoke', 'pop', 'box', 'tape', 'line'];
+  for (const m of css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{/g)) for (const sel of m[1].split(',').map(x => x.trim())) {
+    const n = names.find(n => sel === '.' + n);
+    if (n) throw new Error(`a bare ".${n}" rule also styles the "${n}" caption box`);
+  }
+  if (!/\.subs i\{[^}]*display:inline-block[^}]*margin:0 \.1/.test(css)) throw new Error('caption words lost their margin (the outline paints over a plain space)');
+  return 'no clashes; words keep a margin';
+});
 const { pickStyle } = await import('./style.mjs');
 t('auto style picks a look from the topic', () => {
   const cases = [['the dancing plague, a real epidemic', 'newsprint'], ['unsolved signal from space? no: the unsolved wow signal', null], ['fun facts about axolotl animals', 'comic'], ['quantum gravity', 'case-file']];

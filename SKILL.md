@@ -270,6 +270,12 @@ each render shows where the work went. Read
 - **Music**: `audio.bed` = drone · tension · mystery · pulse · calm · none. Pick by mood (horror →
   tension, curiosity → mystery, investigation → pulse, wonder → calm).
 
+**Re-making an existing reel (new brand, new look, changed lines):** copy the project folder, never edit the
+original. Take `reel.json`, `art/` (with `art/gen/` and `art/photos/`), `credits.json`, and `build/vo`,
+`build/vo_raw`, `build/timings.json`: unchanged lines then keep their voice clips, and only changed lines (and, on
+ElevenLabs, the lines right after them) are voiced again. If the old reel had no burned captions, expect
+"subtitle band" warnings in `--stills`: each one says how far up to move that overlay.
+
 ## 7.5 Other languages (one command)
 
 Write `lines.<lang>.json` (per scene: `vo` in the native script, `roman` for Roman subtitles, optional

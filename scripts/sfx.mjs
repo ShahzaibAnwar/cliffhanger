@@ -196,16 +196,18 @@ export async function findSound(query, { proj = null, allowNetwork = true, varia
 
 // ---------- music beds from free tracks (by mood) ----------
 // One track per reel (chosen from the mood's list by the reel's name, so re-renders keep it); cached in sfx-library/music/.
-export async function findMusic(mood, { key = '', allowNetwork = true } = {}) {
+// avoid: file names (basename) used by other recent reels in the same workspace: skipped while another track of this mood exists
+export async function findMusic(mood, { key = '', allowNetwork = true, avoid = [], prefer = '' } = {}) {
   const dir = path.join(LIB_DIR, 'music'), idxFile = path.join(dir, 'index.json');
   let idx = {}; try { idx = JSON.parse(fs.readFileSync(idxFile, 'utf8')); } catch { /* new */ }
   let have = Object.entries(idx).filter(([f, m]) => m.mood === mood && fs.existsSync(path.join(dir, f)));
-  if (have.length < 4 && allowNetwork) {
+  const want = Math.min(8, 4 + have.filter(([f]) => avoid.includes(f)).length);      // keep 4 fresh choices beside the recently used ones
+  if (have.length < want && allowNetwork) {
     try {
       const { searchMusic, download } = await import('./library.mjs');
       const cands = (await searchMusic(mood)).filter(c => !Object.values(idx).some(m => m.id === c.id));
       fs.mkdirSync(dir, { recursive: true });
-      for (const c of cands.slice(0, 4 - have.length)) {
+      for (const c of cands.slice(0, want - have.length)) {
         const raw = path.join(CACHE_DIR, 'dl-music-' + c.id.replace(/[^\w-]/g, '').slice(-12));
         const name = `${mood}-${c.id.replace(/[^\w-]/g, '').slice(-10)}.mp3`;
         try { await download(c.url, raw); } catch (e) { console.warn(`! music download failed (${c.title.slice(0, 40)}): ${e.message}`); continue; }
@@ -220,9 +222,11 @@ export async function findMusic(mood, { key = '', allowNetwork = true } = {}) {
   }
   if (!have.length) return null;
   have.sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  const fresh = have.filter(([f]) => !avoid.includes(f)), skipped = fresh.length && fresh.length < have.length ? have.filter(([f]) => avoid.includes(f)).map(([f]) => f) : [];
+  if (fresh.length) have = fresh;
   const h = [...String(key)].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7);
-  const [f, m] = have[h % have.length];
-  return { file: path.join(dir, f), credit: { title: m.title, creator: m.creator, licence: m.licence, licence_version: m.licence_version, source: m.source, page: m.page } };
+  const [f, m] = have.find(([x]) => x === prefer) || have[h % have.length];
+  return { file: path.join(dir, f), skipped, credit: { title: m.title, creator: m.creator, licence: m.licence, licence_version: m.licence_version, source: m.source, page: m.page } };
 }
 
 // ---------- CLI ----------

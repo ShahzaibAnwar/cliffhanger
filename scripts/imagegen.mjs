@@ -154,9 +154,9 @@ export function resolveGenerated(scenes, proj, cfg = {}, characters = null) {
     if (it.key !== 'bg_image' && !o.svg_file && !o.svg) { const lib = libraryFallback(it.spec.image_prompt); if (lib) o.svg_file = lib; }
     if (!f) { missing.push(`${it.scene}: ${it.spec.image_prompt} → ${it.key === 'bg_image' ? 'dark background' : (o.svg_file ? 'hand-drawn ' + o.svg_file : 'NO FALLBACK (add svg_file)')}`); continue; }
     const rel = path.relative(proj, f).replace(/\\/g, '/');
-    if (it.key === 'bg_image') { it.target.bg_image = rel; continue; }
+    if (it.key === 'bg_image') { it.target.bg_image = rel; it.target.bg_ai = true; continue; }
     const bg = STYLES[k.style].bg;
-    o.image = rel;
+    o.image = rel; o.ai = true;                                               // generated: gets the "ai_label" mark when that is on
     if (o.svg_file) o.fallback_svg_file = o.svg_file;                         // swapped in if the image fails to load
     delete o.svg_file; delete o.svg;
     const onDark = it.useTheme === 'dark';

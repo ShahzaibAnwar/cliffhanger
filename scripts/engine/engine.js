@@ -211,6 +211,8 @@
     wrap.style.left = o.x + 'px'; wrap.style.top = o.y + 'px'; wrap.style.width = o.w + 'px';
     if (o.z) wrap.style.zIndex = o.z;
     if (o.feather && o.image) wrap.classList.add('feather');
+    const aiL = o.ai_label != null ? o.ai_label : D.ai_label;                 // "ai_label": true | "text" (reel, or one object; false hides it)
+    if (o.ai && o.image && aiL && S._shaker && !S._aiMark) S._aiMark = h('div', 'ai-label', S._shaker, esc(aiL === true ? 'AI illustration' : aiL));   // one mark per scene, same spot every time
     if (o.adapt && o.image) wrap.classList.add('adapt-' + o.adapt);     // shared image shown on the opposite theme
     if (o.fallback_svg) wrap._fallback = o.fallback_svg;
     // collage look (paper cut-out): grayscale + halftone dots + paper sticker edge, on a torn paint block
@@ -959,6 +961,7 @@
     // scene-level sound cues and ambience
     (s.sfx || []).forEach(c => cue(c, T(c.at, 0), 0.5));
     if (s.ambience) cue(Object.assign({ loop: true, dur: s.dur, vol: 0.22 }, typeof s.ambience === 'string' ? { type: s.ambience } : s.ambience), s.start, 0.22);
+    if (s.bg_ai && s.bg_image && (s.ai_label != null ? s.ai_label : D.ai_label)) { const al = s.ai_label != null ? s.ai_label : D.ai_label; if (!s._aiMark) s._aiMark = h('div', 'ai-label', shaker, esc(al === true ? 'AI illustration' : al)); }
     if (s.theme === 'photo' && s.bg_image) {
       const im = h('img', 'photo', bg); im.src = s.bg_image;
       C(im, s.bg_motion || 'kenburns', { amt: 0.09 });
@@ -1162,8 +1165,9 @@
     const hit = (r, z) => Math.max(0, Math.min(r.right, z.x1) - Math.max(r.left, z.x0)) * Math.max(0, Math.min(r.bottom, z.y1) - Math.max(r.top, z.y0));
     for (const s of scenes) {
       window.__seek(Math.max(s.start, s.end - 0.06));
+      const tight = el => { if (!el.children.length && el.textContent.trim()) { const rg = document.createRange(); rg.selectNodeContents(el); const rr = rg.getBoundingClientRect(); if (rr.width) return rr; } return el.getBoundingClientRect(); };
       s._el.querySelectorAll('.hl,.ov,.term,.labfile,.stat .num,.notepad,.bars,.end .follow,.end .next,.obj .clean > *').forEach(el => {
-        const r = el.getBoundingClientRect(); if (!r.width || getComputedStyle(el).opacity === '0') return;
+        const r = tight(el); if (!r.width || getComputedStyle(el).opacity === '0') return;
         const isArt = el.closest('.obj'); const area = r.width * r.height;
         if (!isArt && (r.left < -2 || r.right > W + 2 || r.top < -2 || r.bottom > H + 2)) out.push({ scene: s.id, zone: 'off canvas (cut off)', what: (el.innerText || el.className).replace(/\s+/g, ' ').trim().slice(0, 40) });
         for (const z of Z) { const a = hit(r, z); if (a > (isArt ? area * 0.2 : area * (z.x0 > 900 ? 0.08 : 0.03))) out.push({ scene: s.id, zone: z.n, what: (isArt ? 'illustration' : (el.innerText || el.className).replace(/\s+/g, ' ').trim().slice(0, 40)) }); }
@@ -1193,7 +1197,17 @@
       }
       if (subsEl) {                                           // overlays fighting with subtitles
         const sy = s._subY || SUBY, band = { x0: 60, x1: W - 60, y0: sy - 4, y1: sy + (SUB.size || 60) * 2.4 };
-        s._el.querySelectorAll('.ov,.term,.labfile').forEach(el => { const r = el.getBoundingClientRect(); if (r.width && hit(r, band) > 0) out.push({ scene: s.id, zone: 'subtitle band', what: (el.innerText || el.className).replace(/\s+/g, ' ').trim().slice(0, 40) }); });
+        const boxes = [...s._el.querySelectorAll('.hl,.ov,.term,.labfile,.stat .num')].filter(e => getComputedStyle(e).opacity !== '0').map(e => ({ e, r: e.getBoundingClientRect() })).filter(o => o.r.width);
+        s._el.querySelectorAll('.ov,.term,.labfile').forEach(el => {
+          const r = el.getBoundingClientRect(); if (!r.width || hit(r, band) <= 0) return;
+          let tip = '';                                       // nearest free spot above the captions (clear of headline and other labels)
+          for (let d = Math.ceil((r.bottom - band.y0 + 16) / 10) * 10; d <= 1100; d += 10) {
+            const m = { left: r.left, right: r.right, top: r.top - d, bottom: r.bottom - d };
+            if (m.top < (WIDE ? 40 : 130)) break;
+            if (!boxes.some(o => o.e !== el && !el.contains(o.e) && !o.e.contains(el) && hit(m, { x0: o.r.left - 8, y0: o.r.top - 8, x1: o.r.right + 8, y1: o.r.bottom + 8 }) > 0)) { tip = `: move it up ${d} px (y − ${d})`; break; }
+          }
+          out.push({ scene: s.id, zone: 'subtitle band' + tip, what: (el.innerText || el.className).replace(/\s+/g, ' ').trim().slice(0, 40) });
+        });
       }
     }
     return out;

@@ -293,7 +293,7 @@ const TIMELINE = { total: TOTAL, look: reel.look || ANIM.look || 'case-file', ca
     headline: [].concat(x.headline || []).join(' ').slice(0, 60) || undefined })) };
 fs.writeFileSync(path.join(build, 'timeline.json'), JSON.stringify(TIMELINE, null, 1));
 const data = {
-  size: { w: W, h: H }, layout: reel.layout || null, geo: GEO ? { countries: GEO.countries } : null, mascot: reel.mascot || null, mouth: MOUTH,
+  size: { w: W, h: H }, layout: reel.layout || null, geo: GEO ? { countries: GEO.countries } : null, mascot: reel.mascot || null, ai_label: reel.ai_label ?? SETTINGS.images?.ai_label ?? false, mouth: MOUTH,
   brand: Object.assign({ name: 'YOUR BRAND', accent: '#C8302A' }, reel.brand || {}),
   scenes, total: TOTAL,
   transition: ANIM.transition || 'auto', camera: ANIM.camera || 'push', film_fx: ANIM.film_fx !== false,
@@ -651,7 +651,16 @@ if (flag('no-audio') || !voScenes.length) {
   let bedLabel = null;
   if (!audioCfg.music && audioCfg.music_mood && audioCfg.music_mood !== 'none') {     // free real music by mood (CC0 / CC BY)
     const { findMusic } = await import('./sfx.mjs');
-    const r = await findMusic(audioCfg.music_mood, { key: slug, allowNetwork: !flag('offline') });
+    const recentN = audioCfg.music_avoid_recent ?? 5, avoid = [];           // tracks used by the last N reels rendered in this workspace
+    if (recentN > 0) try {
+      const ws = path.dirname(proj);
+      const sib = fs.readdirSync(ws, { withFileTypes: true }).filter(d => d.isDirectory() && path.join(ws, d.name) !== proj)
+        .map(d => path.join(ws, d.name, 'credits.json')).filter(f => fs.existsSync(f)).map(f => ({ f, m: fs.statSync(f).mtimeMs })).sort((a, b) => b.m - a.m).slice(0, recentN);
+      for (const x of sib) for (const c of JSON.parse(fs.readFileSync(x.f, 'utf8'))) if (c.kind === 'music') avoid.push({ file: String(c.file).replace(/^music: /, ''), reel: path.basename(path.dirname(x.f)) });
+    } catch { /* no siblings */ }
+    const r = await findMusic(audioCfg.music_mood, { key: slug, allowNetwork: !flag('offline'), avoid: avoid.map(a => a.file),
+      prefer: (() => { try { return String(JSON.parse(fs.readFileSync(path.join(proj, 'credits.json'), 'utf8')).find(c => c.kind === 'music')?.file || '').replace(/^music: /, ''); } catch { return ''; } })() });   // a re-render keeps its track
+    if (r?.skipped?.length) console.log(`music: skipped ${r.skipped.map(f => `${f} (used in ${avoid.find(a => a.file === f)?.reel})`).join(', ')}`);
     if (r) {
       audioCfg.music = r.file; audioCfg.music_volume = audioCfg.music_volume ?? 0.18;
       const { addCredit } = await import('./library.mjs'); if (r.credit) addCredit(proj, 'music', 'music: ' + path.basename(r.file), r.credit);

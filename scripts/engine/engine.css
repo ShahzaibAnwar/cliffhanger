@@ -180,12 +180,12 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 /* ---------- burned-in subtitles ---------- */
 .subs{position:absolute;left:60px;right:60px;z-index:70;text-align:center;font:400 60px/1.12 var(--head);text-transform:uppercase;pointer-events:none}
 .subs .sl{display:inline-block;transform-origin:50% 60%}
-.subs i{font-style:normal;color:#fff;-webkit-text-stroke:10px #111;paint-order:stroke fill;text-shadow:0 6px 18px rgba(0,0,0,.45);opacity:.55}
+.subs i{display:inline-block;margin:0 .12em;font-style:normal;color:#fff;-webkit-text-stroke:10px #111;paint-order:stroke fill;text-shadow:0 6px 18px rgba(0,0,0,.45);opacity:.55}
 .subs i.on{opacity:1}
 .subs.word i.now{color:var(--hl)}
 .subs.line i{opacity:1}
 .subs.tape .sl{background:var(--tape);padding:10px 22px 6px;box-shadow:0 10px 24px rgba(0,0,0,.3);transform-origin:50% 50%}
-.subs.tape i{color:var(--ink);-webkit-text-stroke:0;text-shadow:none;opacity:.35}
+.subs.tape i{color:var(--ink);-webkit-text-stroke:0;text-shadow:none;opacity:.35;margin:0 .04em}
 .subs.tape i.on{opacity:1}.subs.tape i.now{color:var(--accent)}
 
 /* ---------- newspaper clipping ---------- */
@@ -250,7 +250,7 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .finish-print .clean img,.finish-print .clean video{border:14px solid #F5F2EA;border-bottom-width:38px;box-shadow:0 14px 26px rgba(30,25,15,.35);background:#F5F2EA}
 .finish-print.tone-bw .clean img,.finish-print.tone-bw .clean video{filter:grayscale(1) contrast(1.12)}
 .finish-print .inner{transform-style:preserve-3d}
-.tape{position:absolute;top:-16px;width:120px;height:34px;background:rgba(236,228,196,.82);box-shadow:0 2px 3px rgba(0,0,0,.12);z-index:3}
+.tape:not(.subs){position:absolute;top:-16px;width:120px;height:34px;background:rgba(236,228,196,.82);box-shadow:0 2px 3px rgba(0,0,0,.12);z-index:3}
 .tape.t1{left:6%;transform:rotate(-8deg)}
 .tape.t2{right:6%;transform:rotate(7deg)}
 /* ---- torn paper photo ---- */
@@ -324,7 +324,7 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .subs.pop i.on{opacity:1}
 .subs.pop i.key.on{color:var(--hl)}
 /* box: the current word sits in a highlight box (the "short-form app" look) */
-.subs.box i{opacity:1;padding:2px 10px 0;border-radius:12px}
+.subs.box i{opacity:1;padding:2px 10px 0;border-radius:12px;margin:0 .02em}
 .subs.box i.now{background:var(--accent);-webkit-text-stroke:0;text-shadow:none}
 
 /* ---- map ---- */
@@ -382,3 +382,9 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .scene.look-blueprint .map .land path{fill:rgba(190,230,255,.16);stroke:rgba(214,240,255,.9);stroke-width:1.6}
 .scene.look-chalkboard .map .land path{fill:rgba(255,255,255,.12);stroke:rgba(242,240,230,.8);stroke-width:1.6}
 .scene.look-vhs .map .land path,.scene.look-comic.theme-dark .map .land path{fill:rgba(255,255,255,.12);stroke:rgba(255,255,255,.55)}
+
+/* AI label ("ai_label": true): one small mark per scene that shows a generated picture, top-left under the header
+   line (level with the brand mark), clear of art, overlays, captions and the platform's top bar */
+.ai-label{position:absolute;left:72px;top:140px;z-index:26;font:600 18px var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--ink);opacity:.72;border:1.5px solid currentColor;padding:4px 9px 3px;white-space:nowrap;pointer-events:none}
+.theme-dark .ai-label{color:var(--dark-ink)}
+.theme-photo .ai-label{color:#fff;opacity:.9;background:rgba(0,0,0,.45);border-color:rgba(255,255,255,.7)}
