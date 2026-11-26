@@ -124,7 +124,11 @@ export async function aiSfx(c, { allowNetwork = true } = {}) {
 }
 
 // ---------- CLI ----------
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// true when this file was run directly (also through a symlink/junction, e.g. ~/.claude/skills/cliffhanger)
+function isMainModule(url) {
+  try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(url)); } catch { return false; }
+}
+if (process.argv[1] && isMainModule(import.meta.url)) {
   const [cmd, ...rest] = process.argv.slice(2);
   const opt = (n, d) => { const i = rest.indexOf('--' + n); return i >= 0 ? rest[i + 1] : d; };
   if (cmd === 'list' || !cmd) {

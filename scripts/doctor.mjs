@@ -105,4 +105,8 @@ async function main() {
   process.exit(bad ? 1 : 0);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+// true when this file was run directly (also through a symlink/junction, e.g. ~/.claude/skills/cliffhanger)
+function isMainModule(url) {
+  try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(url)); } catch { return false; }
+}
+if (process.argv[1] && isMainModule(import.meta.url)) main();

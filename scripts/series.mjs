@@ -54,7 +54,11 @@ export function syncSeries(ws) {
   return out;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// true when this file was run directly (also through a symlink/junction, e.g. ~/.claude/skills/cliffhanger)
+function isMainModule(url) {
+  try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(url)); } catch { return false; }
+}
+if (process.argv[1] && isMainModule(import.meta.url)) {
   const [cmd = 'show', wsArg] = process.argv.slice(2);
   const ws = path.resolve(wsArg || loadSettings().output?.projects_dir || '.');
   const data = syncSeries(ws);

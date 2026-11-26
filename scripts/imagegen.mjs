@@ -434,7 +434,11 @@ export async function generate(spec, theme, cfg, proj, { provider } = {}) {
 }
 
 // ---------- CLI ----------
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// true when this file was run directly (also through a symlink/junction, e.g. ~/.claude/skills/cliffhanger)
+function isMainModule(url) {
+  try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(url)); } catch { return false; }
+}
+if (process.argv[1] && isMainModule(import.meta.url)) {
   const a = process.argv.slice(2), opt = (n, d) => { const i = a.indexOf('--' + n); return i >= 0 ? a[i + 1] : d; };
   const cfg = loadSettings().images || {};
   if (a.includes('--check')) {

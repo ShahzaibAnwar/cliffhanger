@@ -46,6 +46,19 @@ t('art library SVGs are well-formed', () => {
   return svgs.length + ' drawings';
 });
 
+t('scripts run through a linked install (~/.claude/skills is usually a link)', () => {
+  const link = path.join(os.tmpdir(), `cliff-link-${process.pid}`);
+  try { fs.unlinkSync(link); } catch { /* none left over */ }       // unlink only: never delete through a link
+  fs.symlinkSync(ROOT, link, process.platform === 'win32' ? 'junction' : 'dir');
+  try {
+    const out = sh(process.execPath, [path.join(link, 'scripts', 'imagegen.mjs'), '--styles']);
+    if (!/engraving/.test(out)) throw new Error('imagegen.mjs printed nothing when run through a link');
+    const sf = sh(process.execPath, [path.join(link, 'scripts', 'sfx.mjs')]);
+    if (!/whoosh/.test(sf)) throw new Error('sfx.mjs printed nothing when run through a link');
+    return 'imagegen, sfx respond';
+  } finally { try { fs.unlinkSync(link); } catch { /* gone */ } }
+});
+
 const { makeCharacterResolver, resolveGenerated } = await import('./imagegen.mjs');
 t('character references (offline)', () => {
   const proj = fs.mkdtempSync(path.join(os.tmpdir(), 'cliff-test-'));
