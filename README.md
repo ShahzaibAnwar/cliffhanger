@@ -69,6 +69,23 @@ can use real CC0 recordings (Freesound via Openverse), and you can drop your own
 No download possible? The skill prints search links and file names for an `art/inbox/` folder; it also writes
 ready-to-paste prompt packs for the Gemini app and Veo, then imports what you save.
 
+**Styles you can see before you choose:** `gallery.mjs` renders every look (case file, paper collage, chalkboard,
+blueprint, comic, VHS, newsprint), caption style (word, karaoke, pop-in keywords, highlight box, tape, plain) and
+picture finish into one self-contained page; Claude shows it and asks which you want.
+
+![every look, caption style and finish](examples/styles-overview.jpg)
+
+**Maps, charts, a talking mascot, real music:** world maps with highlighted countries and animated routes (bundled
+public-domain outlines), line and bar charts from your CSV numbers, any character image as a paper puppet whose jaw
+moves with the voice, and free CC0 / CC BY music by mood.
+
+**Learns from your numbers:** import each video's retention (YouTube Studio export, or numbers read from your
+insights screenshots); `analytics.mjs` shows which scenes lost viewers and writes `learnings.md` (which hooks, looks,
+lengths and scene types work for *your* audience) for Claude to use when planning the next ones.
+
+**Batch production:** `batch.mjs` produces every planned episode overnight (keeps the computer awake, resumes after a
+stop) and ends with a review page of covers, scores and captions.
+
 **Engagement check:** every stills pass scores the video against researched retention rules (hook timing,
 a new visual every 2.5–4 s, length, narration speed, keyword headlines, the ending) with a fix for each miss.
 See [`references/engagement.md`](references/engagement.md) for the rules and their sources.
@@ -172,6 +189,9 @@ scripts/
   voiceover.py              TTS and word timings
   tighten.py                pacing pass: shorter pauses, faster delivery, timings remapped
   photos.mjs                free-licence photo finder: search, download, cut-out or print, credits
+  gallery.mjs               style gallery: every look, caption style and finish as images/clips + one page
+  analytics.mjs             retention import, scene-by-scene drops, learnings across videos
+  batch.mjs                 overnight production of many episodes + review page
   inbox.mjs                 hand-off folder: prompt packs for Gemini/Veo, imports your own files
   library.mjs               shared search, licence filter, download and credits (images + sounds)
   render.mjs                HTML engine → frames → ffmpeg, with audio mix, SRT, cover and contact sheet
@@ -189,6 +209,7 @@ scripts/
   check-secrets.mjs         secret guard used by the pre-commit hook
   engine/                   the deterministic animation engine (CSS + JS + art kit)
 assets/art/                 shared illustration library ("@lib/heart.svg")
+assets/geo/                 world outlines for maps (Natural Earth, public domain)
 examples/
   hypnic-jerk/              full example: reel.json, AI art, facts, captions, 720p preview
   component-gallery/        every component on one page

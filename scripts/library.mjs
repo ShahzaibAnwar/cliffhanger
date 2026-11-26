@@ -110,6 +110,28 @@ export async function searchSounds(q, { licence = 'cc0', n = 8, maxSeconds = 60 
     .slice(0, n);
 }
 
+// ---------- music (Jamendo, ccMixter, Wikimedia via Openverse) ----------
+export const MOODS = {
+  suspense: ['suspense', 'tension'], mystery: ['mystery', 'dark ambient'], cinematic: ['cinematic', 'filmscore'], epic: ['epic'],
+  calm: ['piano', 'calm'], uplifting: ['uplifting', 'inspiring'], playful: ['playful', 'quirky'], scifi: ['electronic', 'space ambient'], ambient: ['ambient'],
+};
+const VOCAL = /\b(feat|ft\.|vocal|vocals|song|lyrics|sing|singer|rap|remix|karaoke|choir)\b/i;
+export async function searchMusic(mood, { licence = 'safe', minS = 60, maxS = 480 } = {}) {
+  const lic = (LICENCES[licence] || LICENCES.safe).filter(l => l !== 'pdm');
+  const qs = MOODS[mood] || [mood], out = [], seen = new Set();
+  for (const q of qs) {
+    let j; try { j = await getJson(`https://api.openverse.org/v1/audio/?q=${encodeURIComponent(q)}&license=${lic.join(',')}&source=jamendo,ccmixter,wikimedia_audio&page_size=20&mature=false`); } catch { continue; }
+    for (const r of j.results || []) {
+      const d = (r.duration || 0) / 1000;
+      if (!r.url || seen.has(r.id) || d < minS || d > maxS || VOCAL.test(r.title || '')) continue;
+      seen.add(r.id);
+      out.push({ id: 'ov-' + r.id, source: r.source, title: r.title || mood, creator: r.creator || '', licence: r.license, licence_version: r.license_version || '', url: r.url, page: r.foreign_landing_url || r.url, dur: d,
+        genres: (r.genres || []).join(',') });
+    }
+  }
+  return out.sort((a, b) => (/filmscore|ambient|classical|soundtrack|electronic/i.test(b.genres) - /filmscore|ambient|classical|soundtrack|electronic/i.test(a.genres)) || (a.id < b.id ? -1 : 1));
+}
+
 // ---------- credits ----------
 export function creditLine(c) {
   const lic = LICENCE_NAME[c.licence] || c.licence.toUpperCase();

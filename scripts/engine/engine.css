@@ -256,3 +256,106 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .finish-torn .inner{filter:drop-shadow(0 10px 12px rgba(30,25,15,.35))}
 .finish-torn .clean{background:#F5F2EA;padding:10px}
 .obj video{display:block;width:100%;height:auto}
+
+/* ================= LOOKS: skins over the paper / dark scene themes ================= */
+/* chalkboard: slate, chalk lettering */
+.scene.look-chalkboard{--ink:#F2F0E6;--muted:#B9C4B4;--dark-ink:#F2F0E6;--dark-muted:#9AA394;--accent:#F7DE6B;--head:'Cabin Sketch','Anton',sans-serif;color:#F2F0E6}
+.scene.look-chalkboard .bg{background:radial-gradient(ellipse 80% 60% at 50% 40%,rgba(255,255,255,.07),transparent 70%),
+  repeating-linear-gradient(115deg,rgba(255,255,255,.018) 0 2px,transparent 2px 9px),#2E4237}
+.scene.look-chalkboard.theme-dark .bg{background:radial-gradient(ellipse 80% 60% at 50% 40%,rgba(255,255,255,.05),transparent 70%),repeating-linear-gradient(115deg,rgba(255,255,255,.015) 0 2px,transparent 2px 9px),#1E2421}
+.scene.look-chalkboard .bg::after{box-shadow:inset 0 0 0 26px #6B4A2B,inset 0 0 0 30px #4A321C,inset 0 0 260px rgba(0,0,0,.45)}
+.scene.look-chalkboard .hl{text-shadow:0 0 1px rgba(255,255,255,.6);letter-spacing:.02em}
+.scene.look-chalkboard .holes,.scene.look-chalkboard .sprocket{display:none}
+.scene.look-chalkboard .grain{mix-blend-mode:screen;opacity:.12}
+.scene.look-chalkboard .meta{border-bottom-color:rgba(255,255,255,.25)}
+/* blueprint: drafting grid, white lines */
+.scene.look-blueprint{--ink:#EAF3FF;--muted:#9EC1E8;--dark-ink:#EAF3FF;--dark-muted:#86A9D2;--accent:#FFD54A;--head:'Anton',sans-serif;color:#EAF3FF}
+.scene.look-blueprint .bg{background:repeating-linear-gradient(0deg,rgba(255,255,255,.16) 0 2px,transparent 2px 120px),repeating-linear-gradient(90deg,rgba(255,255,255,.16) 0 2px,transparent 2px 120px),
+  repeating-linear-gradient(0deg,rgba(255,255,255,.07) 0 1px,transparent 1px 24px),repeating-linear-gradient(90deg,rgba(255,255,255,.07) 0 1px,transparent 1px 24px),#1F5596}
+.scene.look-blueprint.theme-dark .bg{background-color:#123461}
+.scene.look-blueprint .bg::after{box-shadow:inset 0 0 220px rgba(0,10,40,.45)}
+.scene.look-blueprint .hl{font-family:var(--head);letter-spacing:.05em}
+.scene.look-blueprint .meta{font-family:var(--mono);border-bottom:2px dashed rgba(255,255,255,.35)}
+.scene.look-blueprint .holes,.scene.look-blueprint .sprocket{display:none}
+.scene.look-blueprint .grain{mix-blend-mode:screen;opacity:.06}
+/* comic: halftone dots, caption panels */
+.scene.look-comic{--ink:#111;--muted:#444;--accent:#E0262B;--head:'Bangers','Anton',sans-serif}
+.scene.look-comic .bg{background:radial-gradient(circle,rgba(224,38,43,.22) 0 2.2px,transparent 2.6px) 0 0/16px 16px,#FFE9A8}
+.scene.look-comic.theme-dark .bg{background:radial-gradient(circle,rgba(255,255,255,.12) 0 2.2px,transparent 2.6px) 0 0/16px 16px,#1B1F3A}
+.scene.look-comic.theme-dark{--ink:#fff;--dark-ink:#fff}
+.scene.look-comic .bg::after{box-shadow:inset 0 0 0 14px #111}
+.scene.look-comic .hl{background:#FFF7DA;border:6px solid #111;padding:22px 30px 12px;box-shadow:12px 12px 0 #111;transform:rotate(-1.2deg);color:#111;letter-spacing:.03em;right:120px}
+.scene.look-comic .hl .l2{color:var(--accent);-webkit-text-stroke:2px #111}
+.scene.look-comic .holes,.scene.look-comic .sprocket{display:none}
+.scene.look-comic .grain{opacity:.12}
+.scene.look-comic .obj .clean img,.scene.look-comic .obj .clean svg{filter:drop-shadow(5px 0 0 #111) drop-shadow(-5px 0 0 #111) drop-shadow(0 5px 0 #111) drop-shadow(0 -5px 0 #111)}
+/* vhs: scanlines, colour bleed, tape OSD */
+.scene.look-vhs{--ink:#F4F1E8;--dark-ink:#F4F1E8;--muted:#C9C3B6;--dark-muted:#C9C3B6;--accent:#FF4FA3;--head:'Anton',sans-serif;color:#F4F1E8}
+.scene.look-vhs .bg{background:radial-gradient(ellipse 90% 70% at 50% 45%,#2B2440,#0D0B14 75%)}
+.scene.look-vhs .bg::after{box-shadow:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.28) 0 2px,transparent 2px 5px);mix-blend-mode:multiply}
+.scene.look-vhs .hl{text-shadow:4px 0 0 rgba(255,0,80,.65),-4px 0 0 rgba(0,220,255,.65)}
+.scene.look-vhs .meta{font:500 28px var(--mono);letter-spacing:.12em;color:#F4F1E8;border:0;text-shadow:0 0 8px rgba(255,255,255,.55)}
+.scene.look-vhs .meta>*:first-child::before{content:'\25B6  PLAY   '}
+.scene.look-vhs .holes,.scene.look-vhs .sprocket{display:none}
+.scene.look-vhs .grain{mix-blend-mode:screen;opacity:.18}
+.scene.look-vhs .obj .clean img,.scene.look-vhs .obj .clean svg{filter:drop-shadow(3px 0 0 rgba(255,0,80,.45)) drop-shadow(-3px 0 0 rgba(0,220,255,.45))}
+/* newsprint: newspaper page, serif headlines */
+.scene.look-newsprint{--ink:#151515;--muted:#555;--accent:#B3261E;--head:'Playfair Display',Georgia,serif}
+.scene.look-newsprint .bg{background:linear-gradient(90deg,transparent 0 33%,rgba(0,0,0,.18) 33.1%,transparent 33.3%,transparent 66.6%,rgba(0,0,0,.18) 66.7%,transparent 66.9%),
+  radial-gradient(ellipse 80% 60% at 50% 40%,rgba(255,255,255,.35),transparent 70%),#EFE8D6}
+.scene.look-newsprint.theme-dark .bg{background:#2A2722}
+.scene.look-newsprint.theme-dark{--ink:#EFE8D6;--dark-ink:#EFE8D6}
+.scene.look-newsprint .hl{font-weight:900;text-transform:none;letter-spacing:-.01em;line-height:1.05;border-top:6px double currentColor;border-bottom:2px solid currentColor;padding:14px 0 18px}
+.scene.look-newsprint .hl .l2{font-style:italic}
+.scene.look-newsprint .meta{font-family:'Special Elite',var(--mono);color:#333;border-bottom:3px double rgba(0,0,0,.6)}
+.scene.look-newsprint .holes,.scene.look-newsprint .sprocket{display:none}
+.scene.look-newsprint .grain{opacity:.45}
+
+/* ================= caption styles ================= */
+/* karaoke: every word visible, a colour fill sweeps through each word as it is spoken */
+.subs.karaoke i{opacity:1;color:#fff;background:linear-gradient(90deg,var(--hl) 0 var(--fill,0%),#fff var(--fill,0%));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  -webkit-text-stroke:0;text-shadow:none;filter:drop-shadow(0 0 1.5px #111) drop-shadow(0 0 1.5px #111) drop-shadow(0 0 2px #111) drop-shadow(0 5px 10px rgba(0,0,0,.5))}
+.subs.karaoke i:not(.on){--fill:0%}
+.subs.karaoke i.on:not(.now){--fill:100%}
+/* pop: words pop in one by one; key words are bigger and in the accent colour */
+.subs.pop i{display:inline-block;opacity:0;transform-origin:50% 70%}
+.subs.pop i.on{opacity:1}
+.subs.pop i.key.on{color:var(--hl)}
+/* box: the current word sits in a highlight box (the "short-form app" look) */
+.subs.box i{opacity:1;padding:2px 10px 0;border-radius:12px}
+.subs.box i.now{background:var(--accent);-webkit-text-stroke:0;text-shadow:none}
+
+/* ---- map ---- */
+.mapbox{position:absolute;left:0;top:0}
+.mapbox svg{-webkit-mask-image:radial-gradient(ellipse 62% 58% at 50% 50%,#000 62%,transparent 100%);mask-image:radial-gradient(ellipse 62% 58% at 50% 50%,#000 62%,transparent 100%)}
+.map .land path{fill:rgba(0,0,0,.08);stroke:rgba(0,0,0,.28);stroke-width:1.2}
+.theme-dark .map .land path{fill:rgba(255,255,255,.07);stroke:rgba(255,255,255,.22)}
+.map .land-hi path{fill:var(--accent);stroke:#fff;stroke-width:1.5}
+.map .route{fill:none;stroke:var(--ink);stroke-width:7;stroke-linecap:round;filter:drop-shadow(0 0 3px rgba(255,255,255,.9))}
+.theme-dark .map .route{stroke:var(--dark-ink);filter:drop-shadow(0 0 3px rgba(0,0,0,.9))}
+.map .route.dashed{stroke-dasharray:4 16}
+.map .route-dot{fill:#fff;stroke:var(--accent);stroke-width:5}
+.map .mpin circle{fill:var(--accent);stroke:#fff;stroke-width:4}
+.map .mpin .ring{fill:none;stroke:var(--accent);stroke-width:3;opacity:.45}
+.map .mpin text{font:600 30px var(--mono);fill:var(--ink);paint-order:stroke;stroke:var(--paper);stroke-width:6px;text-transform:uppercase;letter-spacing:.06em}
+.theme-dark .map .mpin text{fill:var(--dark-ink);stroke:var(--dark)}
+/* ---- chart ---- */
+.chartbox{position:absolute;left:0;top:0}
+.chart-title{font:600 30px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 12px 20px}
+.theme-dark .chart-title{color:var(--dark-muted)}
+.chart .axis{stroke:currentColor;stroke-width:3;opacity:.45}
+.chart .xl{font:500 26px var(--mono);fill:currentColor;opacity:.7;text-anchor:middle}
+.chart .line{fill:none;stroke:var(--accent);stroke-width:9;stroke-linecap:round;stroke-linejoin:round}
+.chart .bar{fill:currentColor;opacity:.75}.chart .bar.hi{fill:var(--accent);opacity:1}
+.chart-end circle{fill:var(--accent);stroke:#fff;stroke-width:4}
+.chart .endv{font:400 76px var(--head);fill:var(--accent);text-anchor:end}
+
+/* ---- talking mascot (paper puppet) ---- */
+.mascot{position:absolute;left:0;top:0;z-index:30}
+.pup-in{position:relative;transform-origin:50% 100%}
+.pup-up,.pup-jaw{position:relative}
+.pup-jaw{position:absolute;left:0;top:0;width:100%;transform-origin:50% 0}
+.pup-up img,.pup-jaw img,.pup-up svg,.pup-jaw svg{display:block;width:100%;height:auto}
+.pup-mouth{position:absolute;inset:0;background:#2A0E0E}
+.mascot .pup-in{filter:drop-shadow(0 10px 12px rgba(30,25,15,.3))}
+.mascot.finish-collage .pup-up img,.mascot.finish-collage .pup-jaw img{filter:url(#cf-halftone) drop-shadow(3px 0 0 #F3EFE6) drop-shadow(-3px 0 0 #F3EFE6) drop-shadow(0 3px 0 #F3EFE6) drop-shadow(0 -3px 0 #F3EFE6)}

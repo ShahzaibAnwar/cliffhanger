@@ -178,6 +178,31 @@ let AI_MISSING = [];
 }
 // repeated as the last thing printed, so it can't scroll away unnoticed
 const aiMissingNote = () => { if (AI_MISSING.length) console.warn(`\n!!! ${AI_MISSING.length} picture(s)/clip(s) are missing: these scenes show the hand-drawn fallback.\n!!! Run  node scripts/imagegen.mjs "${proj}"  (AI images),  node scripts/photos.mjs project "${proj}"  (photos),\n!!! or  node scripts/inbox.mjs pack "${proj}"  for a list to make by hand, then render again.`); };
+// talking mascot: how loud the voice is on every frame (0..1), from the voiceover clips
+let MOUTH = null;
+if (reel.mascot && (reel.mascot.image || reel.mascot.svg_file)) {
+  MOUTH = [];
+  for (const s of scenes) {
+    const vo = timings.scenes[s.id]; if (!vo || s._beatOf) continue;
+    const f = path.resolve(proj, vo.file); if (!fs.existsSync(f)) continue;
+    const r = spawnSync('ffmpeg', ['-hide_banner', '-i', f, '-af', 'aresample=8000,asetnsamples=n=267:p=0,astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level', '-f', 'null', '-'], { encoding: 'utf8', maxBuffer: 1 << 26 });
+    const db = [...(r.stderr || '').matchAll(/RMS_level=(-?[\d.]+|-inf)/g)].map(m => m[1] === '-inf' ? -90 : +m[1]);
+    db.forEach((d, i) => { const k = Math.round((s.vo_at + i / 30) * 30); MOUTH[k] = +Math.max(0, Math.min(1, (d + 48) / 30)).toFixed(2); });
+  }
+  for (let i = 0; i < MOUTH.length; i++) if (MOUTH[i] == null) MOUTH[i] = 0;
+}
+// maps need the bundled world outlines; charts can read a CSV ("csv": "data/x.csv", "x_col": "year", "y_col": "deaths")
+let GEO = null;
+for (const s of scenes) for (const v of [s.visual, ...(s.beats || []).map(b => b.visual)].filter(Boolean)) {
+  if (v.type === 'map' && !GEO) GEO = JSON.parse(fs.readFileSync(path.join(HERE, '..', 'assets', 'geo', 'world-110m.json'), 'utf8'));
+  if (v.type === 'chart' && v.csv && !v.data) {
+    const rows = fs.readFileSync(path.resolve(proj, v.csv), 'utf8').trim().split(/\r?\n/).map(l => l.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(c => c.replace(/^"|"$/g, '').trim()));
+    const head = rows.shift(), xi = v.x_col ? head.indexOf(v.x_col) : 0, yi = v.y_col ? head.indexOf(v.y_col) : 1;
+    if (xi < 0 || yi < 0) { console.error(`chart: column "${xi < 0 ? v.x_col : v.y_col}" not in ${v.csv} (columns: ${head.join(', ')})`); process.exit(1); }
+    v.data = rows.filter(r => r[yi] !== '' && !isNaN(+r[yi].replace(/[, ]/g, ''))).map(r => ({ x: r[xi], y: +r[yi].replace(/[, ]/g, '') }));
+    if (v.last) v.data = v.data.slice(-v.last);
+  }
+}
 // an explicit image/clip wins over svg_file; the drawing becomes its fallback (shown if the file is missing or fails)
 (function mediaFirst(o) {
   if (Array.isArray(o)) return o.forEach(mediaFirst);
@@ -189,24 +214,32 @@ const aiMissingNote = () => { if (AI_MISSING.length) console.warn(`\n!!! ${AI_MI
   for (const k of Object.keys(o)) if (k !== 'svg') mediaFirst(o[k]);
 })(scenes);
 resolveAssets(scenes);
+if (reel.mascot) resolveAssets(reel.mascot);
 
 // canvas size: vertical by default; reel.format.width/height switches it (e.g. 1920x1080 for long-form)
 const W = parseInt(reel.format?.width || 1080, 10), H = parseInt(reel.format?.height || 1920, 10), WIDE = W > H;
+// timeline for analytics.mjs: what was on screen when (written to build/, copied to out/ on the final render)
+const TIMELINE = { total: TOTAL, look: reel.look || ANIM.look || 'case-file', captions: SUBS.burn ? (SUBS.style || 'word') : null,
+  hook: (scenes.find(x => x.vo) || {}).vo || '', format: `${W}x${H}`,
+  scenes: scenes.map(x => ({ id: x.id, start: x.start, end: x.end, visual: x.visual?.type || null, beat: !!x._beatOf, theme: x.theme,
+    headline: [].concat(x.headline || []).join(' ').slice(0, 60) || undefined })) };
+fs.writeFileSync(path.join(build, 'timeline.json'), JSON.stringify(TIMELINE, null, 1));
 const data = {
-  size: { w: W, h: H }, layout: reel.layout || null,
+  size: { w: W, h: H }, layout: reel.layout || null, geo: GEO ? { countries: GEO.countries } : null, mascot: reel.mascot || null, mouth: MOUTH,
   brand: Object.assign({ name: 'YOUR BRAND', accent: '#C8302A' }, reel.brand || {}),
   scenes, total: TOTAL,
   transition: ANIM.transition || 'auto', camera: ANIM.camera || 'push', film_fx: ANIM.film_fx !== false,
   art_enter: ANIM.sketch_art ? 'sketch' : (ANIM.art_enter || 'fadeUp'), headline_fx: ANIM.headline_fx || null,
   // collage look (from paper cut-out explainers): cut-out finish, stop-motion on twos, scribble wipes
-  finish: ANIM.finish || (ANIM.look === 'collage' ? 'collage' : null),
-  stop_motion: ANIM.stop_motion != null ? ANIM.stop_motion : (ANIM.look === 'collage' ? 2 : null),
+  look: reel.look || ANIM.look || null,              // case-file (default) · collage · chalkboard · blueprint · comic · vhs · newsprint
+  finish: ANIM.finish || ((reel.look || ANIM.look) === 'collage' ? 'collage' : null),
+  stop_motion: ANIM.stop_motion != null ? ANIM.stop_motion : ((reel.look || ANIM.look) === 'collage' ? 2 : null),
   backing: ANIM.backing || null, backing_color: ANIM.backing_color || null, transition_color: ANIM.transition_color || null,
   subtitles: SUBS.burn ? SUBS : null, subs: SUBS.burn ? subtitleChunks() : [],
 };
 const css = fs.readFileSync(path.join(HERE, 'engine', 'engine.css'), 'utf8');
 const js = fs.readFileSync(path.join(HERE, 'engine', 'engine.js'), 'utf8');
-const fontsUrl = reel.fonts_url || 'https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@600;700&family=JetBrains+Mono:wght@500;600;700&family=Playfair+Display:wght@900&display=block';
+const fontsUrl = reel.fonts_url || 'https://fonts.googleapis.com/css2?family=Anton&family=Caveat:wght@600;700&family=JetBrains+Mono:wght@500;600;700&family=Playfair+Display:ital,wght@0,900;1,700&family=Bangers&family=Cabin+Sketch:wght@700&family=Special+Elite&display=block';
 const pageHtml = d => `<!doctype html><html><head><meta charset="utf-8">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="${fontsUrl}">
 <style>${css}html,body,#stage{width:${W}px;height:${H}px}.ovsvg{width:${W}px;height:${H}px}.cmp-vs{left:${W / 2}px}${reel.css || ''}</style></head><body><div id="stage"></div>
@@ -492,9 +525,18 @@ if (flag('no-audio') || !voScenes.length) {
     if (aiUsed || aiFell || realUsed) console.log(`sfx: ${realUsed} real recordings, ${aiUsed} AI sounds${aiFell ? `, ${aiFell} AI cues fell back${audioCfg.ai_sfx ? '' : ' (AI sound effects are off in settings)'}` : ''}`);
   }
   let bedLabel = null;
+  if (!audioCfg.music && audioCfg.music_mood && audioCfg.music_mood !== 'none') {     // free real music by mood (CC0 / CC BY)
+    const { findMusic } = await import('./sfx.mjs');
+    const r = await findMusic(audioCfg.music_mood, { key: slug, allowNetwork: !flag('offline') });
+    if (r) {
+      audioCfg.music = r.file; audioCfg.music_volume = audioCfg.music_volume ?? 0.18;
+      const { addCredit } = await import('./library.mjs'); if (r.credit) addCredit(proj, 'music', 'music: ' + path.basename(r.file), r.credit);
+      console.log(`music: "${r.credit?.title}" by ${r.credit?.creator || 'unknown'} (${r.credit?.licence})`);
+    } else console.warn(`! no "${audioCfg.music_mood}" music found; using the ${audioCfg.bed || 'drone'} bed`);
+  }
   if (audioCfg.music) {
     const k = add(path.resolve(proj, audioCfg.music));
-    chains.push(`[${k}:a]aformat=sample_rates=48000:channel_layouts=stereo,aloop=loop=-1:size=2e9,atrim=0:${TOTAL},volume=${audioCfg.music_volume},afade=t=out:st=${Math.max(0, TOTAL - 1.5)}:d=1.5[bedraw]`);
+    chains.push(`[${k}:a]aformat=sample_rates=48000:channel_layouts=stereo,aloop=loop=-1:size=2e9,atrim=0:${TOTAL},volume=${audioCfg.music_volume},afade=t=in:d=1.2,afade=t=out:st=${Math.max(0, TOTAL - 1.5)}:d=1.5[bedraw]`);
     bedLabel = '[bedraw]';
   } else if (audioCfg.bed && audioCfg.bed !== 'none') {
     const { bedFile, aiMusic } = await import('./sfx.mjs');
@@ -572,6 +614,10 @@ let creditsPath = null;
 if (credits.length && !preview) {
   creditsPath = path.join(outDir, 'credits.txt');
   fs.writeFileSync(creditsPath, 'Credits (paste into the description; CC BY items require it):\n' + credits.map(c => '- ' + creditLine(c)).join('\n') + '\n');
+}
+if (!preview) {
+  fs.writeFileSync(path.join(outDir, 'timeline.json'), JSON.stringify(TIMELINE, null, 1));
+  fs.writeFileSync(path.join(outDir, 'engagement.json'), JSON.stringify(engagementCheck(), null, 1));   // read by batch.mjs review page
 }
 const chs = preview ? null : chaptersText();
 let chaptersPath = null;

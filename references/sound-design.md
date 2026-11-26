@@ -83,3 +83,11 @@ ducked under the voice.
 - Order for every cue: your file → your folders → real CC0 recording → ElevenLabs AI sound (if on) → preset.
 - Credits for downloaded sounds are added to the project's `credits.json` (CC0 needs none, but it's recorded).
 - `node scripts/sfx.mjs find "glass shatter"` pre-fetches a sound; `node scripts/sfx.mjs library` lists the library.
+
+## Real music by mood
+
+`"audio": { "music_mood": "suspense" }` picks a free track for the mood (suspense, mystery, cinematic, epic, calm,
+uplifting, playful, scifi, ambient) from Jamendo / ccMixter / Wikimedia through Openverse: CC0 or CC BY only, titles
+that suggest vocals skipped. Four tracks per mood are downloaded once into `sfx-library/music/`; each reel gets one
+(chosen by its name, so re-renders keep it), loudness-matched, faded in and ducked under the voice. CC BY needs the
+credit from `out/credits.txt` in the description. `node scripts/sfx.mjs music <mood>` pre-fetches a mood.

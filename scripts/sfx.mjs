@@ -194,6 +194,37 @@ export async function findSound(query, { proj = null, allowNetwork = true, varia
   return { file, credit: meta ? { title: meta.title, creator: meta.creator, licence: meta.licence, licence_version: meta.licence_version, source: meta.source, page: meta.page } : null };
 }
 
+// ---------- music beds from free tracks (by mood) ----------
+// One track per reel (chosen from the mood's list by the reel's name, so re-renders keep it); cached in sfx-library/music/.
+export async function findMusic(mood, { key = '', allowNetwork = true } = {}) {
+  const dir = path.join(LIB_DIR, 'music'), idxFile = path.join(dir, 'index.json');
+  let idx = {}; try { idx = JSON.parse(fs.readFileSync(idxFile, 'utf8')); } catch { /* new */ }
+  let have = Object.entries(idx).filter(([f, m]) => m.mood === mood && fs.existsSync(path.join(dir, f)));
+  if (have.length < 4 && allowNetwork) {
+    try {
+      const { searchMusic, download } = await import('./library.mjs');
+      const cands = (await searchMusic(mood)).filter(c => !Object.values(idx).some(m => m.id === c.id));
+      fs.mkdirSync(dir, { recursive: true });
+      for (const c of cands.slice(0, 4 - have.length)) {
+        const raw = path.join(CACHE_DIR, 'dl-music-' + c.id.replace(/[^\w-]/g, '').slice(-12));
+        const name = `${mood}-${c.id.replace(/[^\w-]/g, '').slice(-10)}.mp3`;
+        try { await download(c.url, raw); } catch (e) { console.warn(`! music download failed (${c.title.slice(0, 40)}): ${e.message}`); continue; }
+        const r = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', raw, '-af', 'loudnorm=I=-20:TP=-2:LRA=11', '-ar', '48000', '-ac', '2', '-c:a', 'libmp3lame', '-q:a', '3', path.join(dir, name)]);
+        fs.rmSync(raw, { force: true });
+        if (r.status !== 0) continue;
+        idx[name] = { mood, ...c }; fs.writeFileSync(idxFile, JSON.stringify(idx, null, 1));
+        console.log(`  + music (${mood}): "${c.title.slice(0, 50)}" by ${c.creator || 'unknown'} (${c.licence}, ${c.source})`);
+      }
+      have = Object.entries(idx).filter(([f, m]) => m.mood === mood && fs.existsSync(path.join(dir, f)));
+    } catch (e) { console.warn(`! music search "${mood}" failed: ${e.message.slice(0, 120)}`); }
+  }
+  if (!have.length) return null;
+  have.sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  const h = [...String(key)].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7);
+  const [f, m] = have[h % have.length];
+  return { file: path.join(dir, f), credit: { title: m.title, creator: m.creator, licence: m.licence, licence_version: m.licence_version, source: m.source, page: m.page } };
+}
+
 // ---------- CLI ----------
 // true when this file was run directly (also through a symlink/junction, e.g. ~/.claude/skills/cliffhanger)
 function isMainModule(url) {
@@ -206,6 +237,10 @@ if (process.argv[1] && isMainModule(import.meta.url)) {
     const q = rest.filter(x => !x.startsWith('--') && x !== opt('takes') && x !== opt('licence')).join(' ');
     const r = await findSound(q, { takes: +opt('takes', 3), licence: opt('licence', 'cc0') });
     console.log(r ? `ready: use { "find": "${q}" } in a sfx cue  (${path.relative(SKILL_DIR, r.file)})` : 'nothing found; try simpler words, or drop your own file into sfx-library/');
+  } else if (cmd === 'music') {   // node sfx.mjs music suspense  → downloads a few tracks for that mood
+    const { MOODS } = await import('./library.mjs');
+    if (!rest[0]) { console.log('moods: ' + Object.keys(MOODS).join(', ')); }
+    else { const r = await findMusic(rest[0], { key: rest[1] || '' }); console.log(r ? `ready: "audio": { "music_mood": "${rest[0]}" }  (${path.relative(SKILL_DIR, r.file)})` : 'no track found; try another mood'); }
   } else if (cmd === 'library') {
     const files = listAudio(LIB_DIR); console.log(`${files.length} sounds in ${LIB_DIR}`);
     for (const f of files) console.log('  ' + path.relative(LIB_DIR, f));

@@ -51,7 +51,9 @@ settings, `voiceover.py` retries automatically with a simpler request.
 | `audio.ai_sfx, sfx_volume` | AI sound effects on/off, effects level |
 | `animation.transition, camera, film_fx, sketch_art, headline_fx` | motion defaults |
 | `output.projects_dir` | where new reel project folders go; also where `series.json` lives |
-| `subtitles.burn, style, lang, y, size, max_words` | burned-in subtitles |
+| `subtitles.burn, style, lang, y, size, max_words` | burned-in subtitles; style `word` · `karaoke` · `pop` · `box` · `tape` · `line` |
+| `animation.look` | default look: `case-file` · `collage` · `chalkboard` · `blueprint` · `comic` · `vhs` · `newsprint` (see `gallery/index.html`) |
+| `audio.music_mood` | free real music by mood: `suspense` · `mystery` · `cinematic` · `epic` · `calm` · `uplifting` · `playful` · `scifi` · `ambient` (empty = synthesized bed) |
 | `content.max_scene_seconds` | stills check warns above this (add beats). 16:9 uses at least 8; `reel.max_scene_seconds` overrides per reel |
 | `images.max_rerolls` | automatic AI image re-rolls when the quality check fails |
 | `audio.bed, ai_music, music_prompt` | background mood / AI music |

@@ -21,3 +21,4 @@ Thumbs.db
 **/out/*.mp4
 !examples/hypnic-jerk/out/hypnic-jerk-preview.mp4
 examples/*.wav
+gallery/

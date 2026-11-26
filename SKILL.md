@@ -54,7 +54,27 @@ every final render). It lists the parts made per language, the voice per languag
 **what the next episode must pay off**. A new part must: open with a callback to the previous
 cliffhanger, keep the brand and per-language voices, reuse recurring art, and set `series.part`/`next`.
 
+## 0.7 Pick the style: show, don't tell (new video or series, or "change the style")
+
+The user chooses the look by seeing it. If `"$SKILL_DIR/gallery/overview.jpg"` doesn't exist (or the skill was
+updated), build it once: `node "$SKILL_DIR/scripts/gallery.mjs"` (~4 min, offline; `--page` rebuilds the page only).
+1. Read `gallery/overview.jpg` (it appears in the chat: looks on paper and dark scenes, caption styles, picture
+   finishes), and give the link to `gallery/index.html` (one self-contained page with every option, a short
+   description, best uses, the exact setting, and caption clips that play).
+2. In writing, recommend 2–3 looks that suit the topic (the gallery's "best for": chalkboard for teaching,
+   blueprint for tech, VHS for mysteries, newsprint for history, comic for light topics, collage for real photos,
+   case file as the default), plus a caption style and a music mood.
+3. Ask with AskUserQuestion: look, captions, music mood (recommended option first). Save the choice in reel.json
+   (`look`, `subtitles.style`, `audio.music_mood`); offer to make it the series default (settings `animation.look`,
+   `subtitles`, `audio.music_mood`).
+4. When the user asks to change a style later, show the gallery again, apply, and re-run `--stills` so they see it
+   on their own video before the final render.
+
 ## 1. Ideas (when the user has no topic, or asks for ideas)
+
+**Read `learnings.md` first** if the workspace has one (`node "$SKILL_DIR/scripts/analytics.mjs" report` builds it):
+it says which hooks, looks, lengths and scene types hold *this* audience. Lean ideas and scripts toward what works
+there, and say so when you do.
 
 Read `references/story-engine.md` → "Idea engine". Produce an **idea slate** of 8–10 ideas in a table:
 title · hook line (first 2 s, spoken) · the twist · the Part-2 cliffhanger · score /25
@@ -261,6 +281,39 @@ the split layout puts headlines left and art right automatically (see reel-json.
 - **Render time:** GPU + parallel tabs render 5,000+ frames in a few minutes. Keep the computer awake and
   plugged in during long renders; the progress line shows fps and an ETA and warns if the frame rate collapses
   (sleep or overheating). The cover becomes `out/thumbnail.jpg`.
+
+## 7.57 More visuals: maps, charts, a talking mascot, real music
+
+- **Map** (`visual.type: "map"`): world outlines are bundled (Natural Earth, public domain, offline).
+  `highlight: ["PAK", "CHN"]` (ISO codes or names) fills countries, `route: [[lon, lat], ...]` draws a path with a
+  travelling dot, `points: [{lon, lat, label}]` drops pins; the view fits automatically (`bounds` to force it).
+- **Chart** (`visual.type: "chart"`): a line (or `kind: "bar"`) that draws itself, ending on the final value. Use
+  the user's numbers: `"csv": "data/x.csv", "x_col": "year", "y_col": "users"` (or inline `data`), `title`, `unit`.
+  Only real, sourced numbers (from facts.md).
+- **Talking mascot** (`reel.mascot`): any character image becomes a paper puppet whose jaw moves with the voice.
+  Run `grid.mjs` on the image, then `"mascot": { "image": "art/me.png", "mouth": [fx, fy], "chin": fy2 }`
+  (mouth = centre of the mouth, chin = bottom of the chin, as 0–1 fractions). `mouth_style: "gap"` cuts the jaw
+  out (for drawings with a closed mouth line); the default stretches the lower face (best for photos). `scenes`
+  ("all" or a list), `x`, `y`, `w`. A recurring mascot is a strong series identity.
+- **Real music** (`audio.music_mood`): suspense · mystery · cinematic · epic · calm · uplifting · playful · scifi ·
+  ambient. A free track (CC0 / CC BY, mostly Jamendo) is downloaded once, ducked under the voice, and credited in
+  `out/credits.txt` (CC BY credits must go in the description/captions).
+
+## 7.58 Learn from the numbers (after posting)
+
+When the user shares results, import them: `analytics.mjs retention <project> <export.csv>` (YouTube Studio's
+retention export), or read the numbers off their insights screenshots (Read the image) and enter them:
+`analytics.mjs point <project> 3=78 10=55 30=41` and `analytics.mjs add <project> --views … --avg … --shares …`.
+`analytics.mjs show <project>` says which scenes lost viewers (the opening always loses the most: compare it with
+their average); `analytics.mjs report` writes `learnings.md` for the whole workspace. Summarise what to do more or
+less of, and use it for the next ideas. Don't over-read fewer than ~5 videos.
+
+## 7.59 Batch production (several episodes, e.g. overnight)
+
+Plan the episodes first (ideas → research → scripts → reel.json + captions.md for each, approved by the user), then
+`node "$SKILL_DIR/scripts/batch.mjs" run <workspace>`: voiceover → pacing → AI images → photos → final render for
+every episode, keeping the computer awake, resuming where it stopped. `batch.mjs status` shows progress; the run ends
+with `<workspace>/review.html` (cover, length, engagement score, what to improve, captions, links) for approval.
 
 ## 7.6 Hook A/B variants (optional)
 

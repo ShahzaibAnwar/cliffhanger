@@ -112,6 +112,23 @@ t('video clips play frame-exact', () => {
 });
 process.on('exit', () => { try { fs.rmSync(tmpProj, { recursive: true, force: true }); } catch { /* temp */ } });
 
+const { parseRetention } = await import('./analytics.mjs');
+t('retention import (CSV with % positions or seconds)', () => {
+  const a = parseRetention('Video position (%),Absolute audience retention (%)\n0,100\n50,60\n100,35', 60);
+  const b = parseRetention('time,retention\n0:00,1\n0:30,0.55\n1:00,0.3', 60);
+  if (a[1].t !== 30 || a[1].r !== 60 || b[1].t !== 30 || b[1].r !== 55) throw new Error(JSON.stringify({ a, b }));
+  return 'YouTube export + generic CSV';
+});
+t('looks, map and chart render', () => {
+  const proj = path.join(tmpProj, 'vis'); fs.mkdirSync(path.join(proj, 'data'), { recursive: true });
+  fs.writeFileSync(path.join(proj, 'data', 'u.csv'), 'year,n\n2020,1\n2021,3\n2022,6\n');
+  fs.writeFileSync(path.join(proj, 'reel.json'), JSON.stringify({ title: 'vis', look: 'comic', scenes: [
+    { id: 'm', duration: 2, headline: ['MAP'], visual: { type: 'map', highlight: ['PAK'], route: [[67, 24.9], [116.4, 39.9]], points: [{ lon: 67, lat: 24.9, label: 'Karachi' }] } },
+    { id: 'c', theme: 'dark', look: 'blueprint', duration: 2, headline: ['CHART'], visual: { type: 'chart', csv: 'data/u.csv', x_col: 'year', y_col: 'n', unit: 'M' } }] }));
+  const out = sh(process.execPath, [path.join(HERE, 'render.mjs'), proj, '--at', '1.8,3.8']);
+  if (/\[page error\]/.test(out)) throw new Error('page errors');
+  return 'comic + blueprint, map + CSV chart';
+});
 t('component gallery renders (stills)', () => {
   const out = sh(process.execPath, [path.join(HERE, 'render.mjs'), path.join(ROOT, 'examples', 'component-gallery'), '--stills']);
   if (/\[page error\]/.test(out)) throw new Error('page errors:\n' + out.split('\n').filter(l => l.includes('[page error]')).join('\n'));

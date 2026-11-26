@@ -154,6 +154,7 @@
       case 'blink': el.style.opacity = t < a.t0 ? 0 : (Math.floor((t - a.t0) * 2.6) % 2 ? 0 : 1); break;
       case 'shake': if (t >= a.t0 && t <= a.t0 + a.dur) { const k = P.amp * (1 - p); s._shk.x += Math.sin(t * 95) * k; s._shk.y += Math.cos(t * 77) * k; } break;
       case 'flash': el.style.opacity = (t >= a.t0 && p < 1) ? (1 - p) * (P.max || 0.8) : 0; break;
+      case 'growy': el.style.transform = `scaleY(${t < a.t0 ? 0 : E.out(p)})`; break;
     }
   }
   function applyC(c, t, s) {
@@ -430,6 +431,93 @@
         if (r.mystery) sfx('thud', t0 + 0.2, 0.35);
       });
     },
+    // world / region map: highlighted countries, a route that draws itself with a travelling dot, labelled pins
+    map(v, sc) {
+      const G = D.geo || { countries: [] }, mw = v.w || (WIDE ? 1000 : 960), mh = v.h || (WIDE ? 640 : 760);
+      const box = h('div', 'mapbox', sc); box.style.left = (v.x != null ? v.x : ART_X) + 'px'; box.style.top = (v.y != null ? v.y : ART_Y) + 'px';
+      box.style.width = mw + 'px'; box.style.height = mh + 'px';
+      enter(box, v, 'fade', 0.05, 0.5, 'translate(-50%,-50%)', 0);
+      const want = new Set([].concat(v.highlight || []).map(x => String(x).toLowerCase()));
+      const isHi = c => want.has(String(c.iso).toLowerCase()) || want.has(String(c.n).toLowerCase());
+      const pts = [...(v.route || []), ...(v.points || []).map(p => [p.lon, p.lat])];
+      // fit: given bounds, else highlighted countries + points, else the world
+      let b = v.bounds;                              // [west, south, east, north]
+      if (!b) {
+        const xs = [], ys = [];
+        G.countries.filter(isHi).forEach(c => c.r.forEach(r => r.forEach(([x, y]) => { xs.push(x); ys.push(y); })));
+        pts.forEach(([x, y]) => { xs.push(x); ys.push(y); });
+        b = xs.length ? [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] : [-170, -58, 180, 80];
+        const padX = Math.max(8, (b[2] - b[0]) * 0.25), padY = Math.max(6, (b[3] - b[1]) * 0.25); b = [b[0] - padX, b[1] - padY, b[2] + padX, b[3] + padY];
+      }
+      const my = lat => Math.log(Math.tan(Math.PI / 4 + Math.max(-80, Math.min(80, lat)) * Math.PI / 360));          // Mercator
+      const [x0, x1, y0, y1] = [b[0], b[2], my(b[3]), my(b[1])];
+      const k = Math.min(mw / (x1 - x0), mh / ((y0 - y1) * 180 / Math.PI));
+      const ox = (mw - (x1 - x0) * k) / 2, oy = (mh - (y0 - y1) * 180 / Math.PI * k) / 2;
+      const P = ([lon, lat]) => [ox + (lon - x0) * k, oy + (y0 - my(lat)) * 180 / Math.PI * k];
+      const svg = sv('svg', { class: 'map', viewBox: `0 0 ${mw} ${mh}`, width: mw, height: mh }, box);
+      const land = sv('g', { class: 'land' }, svg), hiG = sv('g', { class: 'land-hi' }, svg);
+      G.countries.forEach(c => {
+        const d = c.r.map(r => 'M' + r.map(P).map(([x, y]) => x.toFixed(1) + ',' + y.toFixed(1)).join('L') + 'Z').join('');
+        if (!isHi(c)) { sv('path', { d }, land); return; }
+        const p = sv('path', { d }, hiG); p.style.fillOpacity = 0;
+        A(p, 'fillo', T(v.highlight_at != null ? v.highlight_at : v.at, 0.4), 0.6, { base: 1 });
+      });
+      if (v.route && v.route.length > 1) {
+        const q = v.route.map(P);
+        let d = `M${q[0][0].toFixed(1)},${q[0][1].toFixed(1)}`;
+        for (let i = 1; i < q.length; i++) {                       // gentle arcs between stops
+          const [ax, ay] = q[i - 1], [bx, by] = q[i], mx = (ax + bx) / 2, mY = (ay + by) / 2, dx = bx - ax, dy = by - ay, bend = v.curve === false ? 0 : 0.18;
+          d += ` Q${(mx - dy * bend).toFixed(1)},${(mY + dx * bend).toFixed(1)} ${bx.toFixed(1)},${by.toFixed(1)}`;
+        }
+        const path = sv('path', { d, class: 'route' + (v.dashed ? ' dashed' : '') }, svg), dot = sv('circle', { r: 11, class: 'route-dot' }, svg);
+        const t0 = T(v.route_at != null ? v.route_at : v.at, 0.6), dur = v.route_dur || 2.2;
+        S._layout.push(() => {
+          const len = path.getTotalLength(); path.style.strokeDasharray = v.dashed ? '' : len; if (!v.dashed) path.style.strokeDashoffset = len;
+          if (!v.dashed) A(path, 'draw', t0, dur, { len });
+          S._pencils.push({ el: dot, path, len, t0, dur, map: true });
+        });
+        sfx('whoosh_low', t0, 0.25);
+      }
+      (v.points || []).forEach((p, i) => {
+        const [x, y] = P([p.lon, p.lat]), g = sv('g', { class: 'mpin', transform: `translate(${x.toFixed(1)},${y.toFixed(1)})` }, svg);
+        sv('circle', { r: 13 }, g); sv('circle', { r: 26, class: 'ring' }, g);
+        if (p.label) { const tx = sv('text', { x: 22, y: -18 }, g); tx.textContent = p.label; }
+        const t = p.at != null ? T(p.at) : T(v.at, 0.6) + i * 0.4;
+        g.style.opacity = 0; A(g, 'opacity', t, 0.25, { a: 0, b: 1 }); sfx('pop', t, 0.25);
+      });
+    },
+    // line or bar chart from numbers (inline "data" or a CSV the renderer has read into it)
+    chart(v, sc) {
+      const data = v.data || [], cw = v.w || (WIDE ? 980 : 900), ch = v.h || (WIDE ? 560 : 640);
+      const box = h('div', 'chartbox', sc); box.style.left = (v.x != null ? v.x : ART_X) + 'px'; box.style.top = (v.y != null ? v.y : ART_Y) + 'px';
+      enter(box, v, 'fadeUp', 0.05, 0.45, 'translate(-50%,-50%)', 0);
+      if (v.title) h('div', 'chart-title', box, esc(v.title));
+      if (!data.length) return;
+      const vals = data.map(d => +d.y), lo = v.zero === false ? Math.min(...vals) : Math.min(0, ...vals), hi = Math.max(...vals), pad = { l: 60, r: 60, t: 110, b: 70 };
+      const X = i => pad.l + (data.length === 1 ? 0.5 : i / (data.length - 1)) * (cw - pad.l - pad.r), Y = y => ch - pad.b - (y - lo) / Math.max(1e-9, hi - lo) * (ch - pad.t - pad.b);
+      const svg = sv('svg', { class: 'chart', viewBox: `0 0 ${cw} ${ch}`, width: cw, height: ch }, box);
+      sv('line', { x1: pad.l, y1: ch - pad.b, x2: cw - pad.r, y2: ch - pad.b, class: 'axis' }, svg);
+      const t0 = T(v.at, 0.3), dur = v.draw_dur || 1.8, every = Math.max(1, Math.ceil(data.length / 7));
+      data.forEach((d, i) => { if (i % every && i !== data.length - 1) return; const tx = sv('text', { x: X(i), y: ch - pad.b + 44, class: 'xl' }, svg); tx.textContent = d.x; });
+      if ((v.kind || 'line') === 'bar') {
+        const bw = (cw - pad.l - pad.r) / data.length * 0.7;
+        data.forEach((d, i) => {
+          const x = pad.l + (i + 0.15) * (cw - pad.l - pad.r) / data.length, r = sv('rect', { x, y: Y(+d.y), width: bw, height: Y(lo) - Y(+d.y), class: 'bar' + (v.highlight_last && i === data.length - 1 ? ' hi' : '') }, svg);
+          r.style.transformOrigin = `${x}px ${Y(lo)}px`; r.style.transform = 'scaleY(0)';
+          A(r, 'growy', t0 + i / data.length * dur, 0.4, {});
+        });
+      } else {
+        const d = data.map((pt, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(+pt.y).toFixed(1)}`).join('');
+        const path = sv('path', { d, class: 'line' }, svg);
+        S._layout.push(() => { const len = path.getTotalLength(); path.style.strokeDasharray = len; path.style.strokeDashoffset = len; A(path, 'draw', t0, dur, { len }); });
+      }
+      const last = data[data.length - 1], lx = (v.kind || 'line') === 'bar' ? pad.l + (data.length - 0.5) * (cw - pad.l - pad.r) / data.length : X(data.length - 1);
+      const end = sv('g', { class: 'chart-end' }, svg);
+      if ((v.kind || 'line') !== 'bar') sv('circle', { cx: lx, cy: Y(+last.y), r: 12 }, end);
+      const lab = sv('text', { x: Math.min(lx, cw - pad.r), y: Y(+last.y) - 26, class: 'endv' }, end);
+      lab.textContent = (v.prefix || '') + (v.format === 'raw' ? last.y : new Intl.NumberFormat(D.number_locale || 'en-US').format(+last.y)) + (v.unit || '');
+      end.style.opacity = 0; A(end, 'opacity', t0 + dur - 0.1, 0.3, { a: 0, b: 1 }); sfx('pop', t0 + dur, 0.3);
+    },
     notepad(v, sc) { notepad(v, sc); },
     terminal(v, sc) { terminal(v, sc, v); },
     labfile(v, sc) { labfile(v, sc); },
@@ -554,6 +642,8 @@
     S._pencils.push({ el: pencil, segs });
   }
   function applyPencil(pc, t) {
+    if (arguments[0].map) { const p = arguments[0], q = clamp((arguments[1] - p.t0) / p.dur, 0, 1), pt = p.path.getPointAtLength(E.io(q) * p.len);
+      p.el.setAttribute('cx', pt.x); p.el.setAttribute('cy', pt.y); p.el.style.opacity = arguments[1] < p.t0 ? 0 : 1; return; }
     const g = pc.segs; if (!g.length) return;
     const first = g[0], last = g[g.length - 1], end = last.t0 + last.dur;
     let x, y, o = 1;
@@ -757,7 +847,8 @@
 
   scenes.forEach((s, i) => {
     S = s; s._anims = []; s._conts = []; s._layout = []; s._pencils = []; s._shk = { x: 0, y: 0 }; s._boil = []; s._videos = [];
-    const sc = h('div', 'scene theme-' + s.theme, stage);
+    const look = s.look || D.look;
+    const sc = h('div', 'scene theme-' + s.theme + (look && look !== 'case-file' ? ' look-' + look : ''), stage);
     s._el = sc;
     const shaker = h('div', 'shaker', sc); s._shaker = shaker;
     const bg = h('div', 'bg', shaker); s._bg = bg;
@@ -781,6 +872,32 @@
       if (TSFX[s._tr]) sfx(TSFX[s._tr], s.start - (s._tr === 'whip' ? 0.08 : 0), 0.4);
       else sfx('swish', s.start, 0.16);
       if (s.theme === 'dark' && prev.theme !== 'dark') sfx('braam', s.start, 0.22);
+    }
+    // talking mascot (paper puppet): the image is split at the mouth line; the lower jaw drops with the voice
+    const M = D.mascot;
+    if (M && s.mascot !== false && (M.scenes === 'all' || M.scenes == null || [].concat(M.scenes).includes(s.id) || s.mascot === true)) {
+      const mw = M.w || (WIDE ? 300 : 330), mx = M.x != null ? M.x : (WIDE ? 220 : 200), my = M.y != null ? M.y : (WIDE ? H - 230 : 1430);
+      const [fx, fy] = M.mouth || [0.5, 0.62];
+      const pup = h('div', 'mascot', sc); pup.style.left = mx + 'px'; pup.style.top = my + 'px'; pup.style.width = mw + 'px';
+      const content = M.svg || (M.image ? `<img src="${M.image}" alt="">` : '');
+      const inner = h('div', 'pup-in', pup);
+      const hole = h('div', 'pup-mouth', inner);           // dark mouth interior, seen only through the gap when the jaw drops
+      const up = h('div', 'pup-up', inner, content), jaw = h('div', 'pup-jaw', inner, content);
+      // jaw = the band from the mouth line to the chin, face-wide; the body keeps still (a hole is cut where the jaw was)
+      const chin = M.chin != null ? M.chin : Math.min(1, fy + 0.07), jw = (M.jaw_w != null ? M.jaw_w : 0.22) / 2;
+      S._layout.push(() => {
+        const W2 = inner.offsetWidth, H2 = inner.offsetHeight; if (!W2 || !H2) return;
+        const x0 = Math.max(0, fx - jw) * W2, x1 = Math.min(1, fx + jw) * W2, y0 = fy * H2, y1 = chin * H2, xc = (x0 + x1) / 2, ym = y0 + (y1 - y0) * 0.35;
+        const U = `M${x0.toFixed(1)} ${y0.toFixed(1)} H${x1.toFixed(1)} V${ym.toFixed(1)} Q${xc.toFixed(1)} ${(y1 + (y1 - ym) * 0.6).toFixed(1)} ${x0.toFixed(1)} ${ym.toFixed(1)} Z`;   // rounded chin
+        if (s._mascot.gap) up.style.clipPath = `path(evenodd, 'M0 0 H${W2} V${H2} H0 Z ${U}')`;   // "gap": cut-out jaw with a dark mouth
+        else hole.style.display = 'none';                                                           // "stretch": no seam, the lower face stretches
+        jaw.style.clipPath = `path('${U}')`; hole.style.clipPath = `path('${U}')`;
+        jaw.style.transformOrigin = `${xc.toFixed(1)}px ${y0.toFixed(1)}px`;
+        s._mascot.band = y1 - y0;
+      });
+      if (M.finish === 'collage' || (D.finish === 'collage' && M.finish !== 'none')) pup.classList.add('finish-collage');
+      enter(pup, { at: M.at != null ? M.at : 0.1, enter: M.enter || 'spring', dur: 0.5 }, 'spring', 0.1, 0.5, 'translate(-50%,-50%)', M.rot || 0);
+      s._mascot = { inner, jaw, hole, gap: M.mouth_style === 'gap', open: M.jaw || (M.mouth_style === 'gap' ? 0.42 : 0.35), ph: (i * 1.7) % 6, band: 30 };
     }
     // film life on dark scenes: dust specks, a scratch, light flicker
     s._specks = [];
@@ -819,7 +936,8 @@
   // ---------- ready: fonts, images, layout pass ----------
   window.__ready = (async () => {
     try {
-      await Promise.all(['400 100px Anton', '500 30px "JetBrains Mono"', '600 30px "JetBrains Mono"', '700 60px Caveat', '600 40px Caveat']
+      await Promise.all(['400 100px Anton', '500 30px "JetBrains Mono"', '600 30px "JetBrains Mono"', '700 60px Caveat', '600 40px Caveat',
+        '400 100px Bangers', '700 100px "Cabin Sketch"', '400 40px "Special Elite"', '900 100px "Playfair Display"', 'italic 700 100px "Playfair Display"']
         .map(f => document.fonts.load(f).catch(() => null)));
       await document.fonts.ready;
     } catch (e) { /* fall back to system fonts */ }
@@ -846,7 +964,7 @@
       const cands = [base, base - 150, base - 300, base + 120, 1180];
       for (const s of scenes) {
         window.__seek(Math.max(s.start, s.end - 0.06));
-        const rects = [...s._el.querySelectorAll('.ov,.term,.labfile,.np-row,.stat .num,.stat .lab,.bar-row,.end > *')]
+        const rects = [...s._el.querySelectorAll('.ov,.term,.labfile,.np-row,.stat .num,.stat .lab,.bar-row,.end > *,.mascot')]
           .map(e => e.getBoundingClientRect()).filter(r => r.width && r.height);
         s._subY = cands.find(y => !rects.some(r => r.bottom > y - 6 && r.top < y + hgt)) ?? base;
       }
@@ -883,6 +1001,11 @@
       s._boil.forEach((el, k) => { el.style.translate = `${((rnd(st * 31 + k * 7) - 0.5) * 3).toFixed(2)}px ${((rnd(st * 17 + k * 11) - 0.5) * 3).toFixed(2)}px`; el.style.rotate = `${((rnd(st * 13 + k * 5) - 0.5) * 0.6).toFixed(2)}deg`; });
     }
     s._shaker.style.transform = `translate(${s._shk.x}px,${s._shk.y}px) ${camera(s, ts)}`;
+    if (s._mascot) {                    // jaw follows the voice (smoothed over 2 frames); idle breathing + sway
+      const m = s._mascot, f = Math.round(ts * 30), env = D.mouth || [], a = Math.max(env[f] || 0, (env[f - 1] || 0) * 0.7);
+      m.jaw.style.transform = m.gap ? `translateY(${(a * m.open * m.band).toFixed(1)}px)` : `scaleY(${(1 + a * m.open).toFixed(3)})`;
+      m.inner.style.transform = `translateY(${(Math.sin(ts * 2.1 + m.ph) * 4 - a * 6).toFixed(1)}px) rotate(${(Math.sin(ts * 1.3 + m.ph) * 1.6).toFixed(2)}deg) scale(${(1 + a * 0.025).toFixed(3)})`;
+    }
     const f = Math.floor(t * 24);                       // living grain: re-seed texture every frame
     s._grain.style.backgroundPosition = `${Math.floor(rnd(f) * 260)}px ${Math.floor(rnd(f + 7) * 260)}px`;
     if (s._specks.length) {
@@ -942,17 +1065,26 @@
     subsEl.style.top = (SUB.y || 1500) + 'px';
     if (SUB.size) subsEl.style.fontSize = SUB.size + 'px';
   }
+  const SUBSTYLE = SUB ? (SUB.style || 'word') : null;
+  const sc0 = c => scenes.find(x => c.t0 + 0.06 >= x.start && c.t0 + 0.06 < x.end) || scenes[0];
+  // key words: in the scene's headline, or long content words (shown bigger / in the accent colour by "pop")
+  const isKey = (w, s) => { const n = norm(w); if (n.length < 3) return false; const hl = [].concat(s.headline || []).join(' ').split(/\s+/).map(norm); return hl.includes(n) || n.length >= 7; };
   function drawSubs(t) {
     if (!subsEl) return;
     const c = D.subs.find(x => t >= x.t0 && t < x.t1 + 0.12) || null;
     if (c !== subCur) {
       subCur = c;
       if (c) { const sc = scenes.find(x => c.t0 + 0.06 >= x.start && c.t0 + 0.06 < x.end) || scenes[0]; subsEl.style.top = (sc._subY || SUB.y || 1500) + 'px'; }
-      subsEl.innerHTML = c ? '<span class="sl">' + c.words.map(w => '<i>' + esc(w.w) + '</i>').join(' ') + '</span>' : '';
+      subsEl.innerHTML = c ? '<span class="sl">' + c.words.map(w => `<i${isKey(w.w, sc0(c)) ? ' data-k="1"' : ''}>` + esc(w.w) + '</i>').join(' ') + '</span>' : '';
     }
     if (!c) return;
     const ws = subsEl.querySelectorAll('i');
-    c.words.forEach((w, i) => { ws[i].className = t >= w.s ? (t < w.e + 0.05 ? 'on now' : 'on') : ''; });
+    c.words.forEach((w, i) => {
+      const el = ws[i], on = t >= w.s, now = on && t < w.e + 0.05;
+      el.className = (on ? (now ? 'on now' : 'on') : '') + (el.dataset.k ? ' key' : '');
+      if (SUBSTYLE === 'karaoke') el.style.setProperty('--fill', (clamp((t - w.s) / Math.max(0.08, w.e - w.s), 0, 1) * 100).toFixed(1) + '%');
+      if (SUBSTYLE === 'pop') { const q = clamp((t - w.s) / 0.16, 0, 1); el.style.transform = on ? `scale(${(el.dataset.k ? 1.18 : 1) * (0.6 + 0.4 * E.back(q))})` : 'scale(.6)'; }
+    });
     const p = clamp((t - c.t0) / 0.14, 0, 1);
     subsEl.firstChild.style.transform = `scale(${0.92 + 0.08 * E.back(p)})`; subsEl.firstChild.style.opacity = p;
   }

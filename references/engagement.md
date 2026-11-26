@@ -86,3 +86,7 @@ NF Netflix Timed Text Style Guide — https://partnerhelp.netflixstudios.com/hc/
 GU Guo, Kim & Rubin (2014), MOOC video engagement — https://up.csail.mit.edu/other-pubs/las2014-pguo-engagement.pdf ·
 RO Speech rate and comprehension — https://www.sciencedirect.com/science/article/pii/S0271530925000709 ·
 ZG Ghibellini & Meier (2025), Zeigarnik/Ovsiankina meta-analysis — https://www.nature.com/articles/s41599-025-05000-w
+
+## Your own numbers beat general rules
+After 5–10 videos, `analytics.mjs report` shows what holds *your* audience (hook types, looks, lengths, scene types).
+When it disagrees with the general rules above, follow your own data, and keep testing (hook variants, `variants.mjs`).
