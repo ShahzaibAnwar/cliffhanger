@@ -97,7 +97,8 @@ anything else warns at render time with the closest name, or use `{ "find": "<wo
 
 For "why / how" explainers pick `suspense` or `mystery` (auto style does when the topic is a question); `--stills`
 prints the track the reel will get with its genre tags, so a mismatch shows before the render. `"music_avoid":
-["rock", "guitar"]` skips genres or title words, and a file name skips one track.
+["rock", "guitar"]` skips genres or title words (inside compound tags too: `psychedelicrock`), and a file name skips one
+track. Suspense, mystery and the other quiet moods skip rock-, punk- and guitar-tagged tracks on their own.
 Music starts where the track's music starts: a silent intro is skipped (`"music_trim_silence": false` keeps it), and
 `"music_start": 12.5` starts that many seconds in (e.g. to land a drop on the twist).
 `"audio": { "music_mood": "suspense" }` picks a free track for the mood (suspense, mystery, cinematic, epic, calm,

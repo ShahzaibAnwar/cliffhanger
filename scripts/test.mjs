@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { pythonCmd } from './doctor.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -438,6 +438,56 @@ t('find sounds that fail are reported (skipped, or their fallback); credits list
   if (cr.some(c => c.kind === 'music' || c.kind === 'sound')) throw new Error('stale music/sound credits kept: ' + JSON.stringify(cr));
   if (!cr.some(c => c.kind === 'photo')) throw new Error('a photo credit was removed');
   return 'skipped + fallback reported with the reason; old music and sound credits dropped, photo kept';
+});
+t('quiet music moods skip rock-tagged tracks; loud tags warn inside compound tags', () => {
+  const lib = path.join(tmpProj, 'lib'), md = path.join(lib, 'music'); fs.mkdirSync(md, { recursive: true });
+  const tracks = { 'suspense-a.mp3': 'ambient,filmscore,rock', 'suspense-b.mp3': 'psychedelicrock', 'suspense-c.mp3': 'ambient,downtempo' };
+  const idx = {}; for (const [f, g] of Object.entries(tracks)) { sh('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=f=200:d=1', path.join(md, f)]); idx[f] = { mood: 'suspense', id: 'x-' + f, title: 'T ' + f, creator: 'c', licence: 'cc0', source: 'test', page: 'https://example.org', genres: g }; }
+  fs.writeFileSync(path.join(md, 'index.json'), JSON.stringify(idx));
+  const env = { ...process.env, CLIFF_SFX_LIBRARY: lib };
+  const pick = (opts) => spawnSync(process.execPath, ['--input-type=module', '-e', `const m = await import(${JSON.stringify(pathToFileURL(path.join(HERE, 'sfx.mjs')).href)}); const out = []; for (const key of 'abcdefghij') { const r = await m.findMusic('suspense', { key, allowNetwork: false, ...${JSON.stringify(opts)} }); out.push(r && r.genres); } console.log(JSON.stringify(out));`], { encoding: 'utf8', env });
+  const on = JSON.parse(pick({}).stdout || '[]'), off = JSON.parse(pick({ defaultAvoid: false }).stdout || '[]');
+  if (!on.length || on.some(g => /rock/.test(g))) throw new Error('suspense picked a rock-tagged track: ' + JSON.stringify(on));
+  if (!off.some(g => /rock/.test(g))) throw new Error('music_avoid_default false should allow them again: ' + JSON.stringify(off));
+  // the warning: a compound tag ("psychedelicrock") still warns, even with an unrelated music_avoid entry
+  const proj = path.join(tmpProj, 'loud'); fs.mkdirSync(proj, { recursive: true });
+  for (const key of ['k1', 'k2', 'k3', 'k4', 'k5', 'k6']) {
+    fs.writeFileSync(path.join(proj, 'reel.json'), JSON.stringify({ title: key, audio: { music_mood: 'suspense', music_avoid_default: false, music_avoid: ['suspense-a.mp3', 'suspense-c.mp3'] }, scenes: [{ id: 'a', duration: 1, headline: ['A'] }] }));
+    const r = spawnSync(process.execPath, [path.join(HERE, 'render.mjs'), proj, '--stills', '--offline'], { encoding: 'utf8', cwd: ROOT, env, maxBuffer: 64 << 20 });
+    const all = (r.stdout || '') + (r.stderr || '');
+    const shown = (all.match(/music \(this reel\): .* · (suspense-\w\.mp3)/) || [])[1];
+    const kept = JSON.parse(fs.readFileSync(path.join(proj, 'credits.json'), 'utf8')).find(c => c.kind === 'music')?.file;
+    if (!shown || kept !== 'music: ' + shown) throw new Error(`--stills showed ${shown} but kept ${kept} for the render`);
+    fs.rmSync(path.join(proj, 'credits.json'));      // each key picks afresh
+    if (/music \(this reel\): "T suspense-b\.mp3"/.test(all)) {
+      if (!/looks like rock \(tags: psychedelicrock/.test(all)) throw new Error('psychedelicrock did not warn:\n' + all.slice(-400));
+      return 'rock-tagged skipped by default (10 keys), allowed with music_avoid_default false, "psychedelicrock" warns';
+    }
+  }
+  throw new Error('the psychedelicrock track was never picked');
+});
+t('Urdu question ending counts, effects on a line\'s last word warned, localize names a split line', () => {
+  const proj = path.join(tmpProj, 'kfc'); fs.mkdirSync(path.join(proj, 'build'), { recursive: true });
+  const reel = { title: 'kfc', scenes: [
+    { id: 'pad', vo: 'They asked for chicken that was fried', headline: ['THE', 'ORDER'], visual: { type: 'notepad', lines: [{ text: 'grilled chicken', strike_at: 'word:fried', replace: 'fried', replace_at: 'word:fried' }] } },
+    { id: 'end', vo: 'سچ یا ڈرامہ؟ کمنٹ میں بتائیں۔', headline: ['SACH?'] }] };
+  fs.writeFileSync(path.join(proj, 'reel.json'), JSON.stringify(reel));
+  const tm = {}; for (const x of reel.scenes) { const w = x.vo.split(/\s+/); tm[x.id] = { file: 'build/none.mp3', duration: w.length * 0.35 + 0.2, words: w.map((q, i) => ({ w: q, s: i * 0.35, e: i * 0.35 + 0.3 })) }; }
+  fs.writeFileSync(path.join(proj, 'build', 'timings.json'), JSON.stringify({ scenes: tm }));
+  const r = spawnSync(process.execPath, [path.join(HERE, 'render.mjs'), proj, '--stills'], { encoding: 'utf8', cwd: ROOT, maxBuffer: 64 << 20 });
+  const all = (r.stdout || '') + (r.stderr || '');
+  if (r.status !== 0) throw new Error('render failed: ' + all.slice(-300));
+  if (/ending closes everything/.test(all)) throw new Error('an Urdu question (؟) at the end was not counted');
+  if (!/pad: notepad line 1 strike_at "word:fried" fires 0\.\d+ s before the cut/.test(all)) throw new Error('strike on the last word not warned:\n' + all.slice(-500));
+  // localize: the source split a line into two scenes; the lines file still has both sentences in the first
+  const src = path.join(tmpProj, 'split-src'); fs.mkdirSync(src, { recursive: true });
+  fs.writeFileSync(path.join(src, 'reel.json'), JSON.stringify({ title: 'split', scenes: [{ id: 'hook', vo: 'He asked a robot for chicken.' }, { id: 'count', vo: 'About fifteen times.' }] }));
+  const lp = path.join(tmpProj, 'lines.split.json');
+  fs.writeFileSync(lp, JSON.stringify({ hook: { vo: 'اس نے روبوٹ سے چکن مانگا۔ تقریباً پندرہ بار۔' } }));
+  const l = spawnSync(process.execPath, [path.join(HERE, 'localize.mjs'), src, '--lang', 'ur', '--lines', lp, '--out', path.join(tmpProj, 'split-ur')], { encoding: 'utf8', cwd: ROOT });
+  const lo = (l.stdout || '') + (l.stderr || '');
+  if (l.status === 0 || !/- count: "About fifteen times\."/.test(lo) || !/"hook" in the lines file has 2 sentences where the source has 1/.test(lo)) throw new Error('missing split line not explained:\n' + lo.slice(-500));
+  return '؟ ending passes, last-word strike warned, split line named with a hint';
 });
 const { pickStyle } = await import('./style.mjs');
 t('auto style picks a look from the topic', () => {

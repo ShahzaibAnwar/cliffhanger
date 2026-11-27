@@ -138,6 +138,10 @@ node scripts/art-preview.mjs <project>/art/gen
 - **Don't** put text in images, ask for a whole scene in one image, or show real people's faces.
   One object per image, composed in the reel with overlays.
 
+**Screenshots, receipts, tweets, chat logs** (viral-news reels): the `newsprint` look with each screenshot as
+`"image"` + `"finish": "print"` reads as taped news clippings (paper border, tape, and a flutter by default); give
+them `slam` / `drop` entrances. Blur names and faces of private people before using a screenshot.
+
 Supplied images work the same way: `"image": "art/my-photo.png"` with `"blend": "multiply"` (white
 background) or `"screen"` (black background).
 

@@ -127,7 +127,7 @@ export async function aiSfx(c, { allowNetwork = true } = {}) {
 // Resolution for a cue: { file } (your own) → <project>/sfx/ and sfx-library/ (matched by filename words)
 // → a CC0 recording downloaded once into sfx-library/ (reused by every project) → AI sound → synthesized preset.
 // Drop your own packs (wav/mp3/ogg/flac) into sfx-library/ (any subfolder): file names are the search words.
-export const LIB_DIR = path.join(SKILL_DIR, 'sfx-library');
+export const LIB_DIR = process.env.CLIFF_SFX_LIBRARY ? path.resolve(process.env.CLIFF_SFX_LIBRARY) : path.join(SKILL_DIR, 'sfx-library');   // env: tests use a small library
 const AUDIO = /\.(wav|mp3|ogg|flac|m4a|aiff?)$/i;
 // what each built-in effect sounds like in real life (used when audio.real_sfx is on)
 // natural length of each effect when a real recording stands in for it (seconds)
@@ -206,11 +206,17 @@ export async function findSound(query, { proj = null, allowNetwork = true, varia
 // ---------- music beds from free tracks (by mood) ----------
 // One track per reel (chosen from the mood's list by the reel's name, so re-renders keep it); cached in sfx-library/music/.
 // avoid: file names (basename) used by other recent reels in the same workspace: skipped while another track of this mood exists
-export async function findMusic(mood, { key = '', allowNetwork = true, avoid = [], prefer = '', avoidTags = [] } = {}) {
+// suspense, mystery and other quiet beds skip rock-tagged tracks unless music_avoid_default is false (tags are often
+// vague: "metal" is left out because ambient stems get tagged "deathmetal")
+export const QUIET_MOODS = ['suspense', 'mystery', 'calm', 'ambient', 'scifi', 'cinematic'];
+export const LOUD_TAGS = ['rock', 'punk', 'grunge', 'guitar'];
+export async function findMusic(mood, { key = '', allowNetwork = true, avoid = [], prefer = '', avoidTags = [], defaultAvoid = true } = {}) {
   const dir = path.join(LIB_DIR, 'music'), idxFile = path.join(dir, 'index.json');
   let idx = {}; try { idx = JSON.parse(fs.readFileSync(idxFile, 'utf8')); } catch { /* new */ }
   const tags = avoidTags.map(t => String(t).toLowerCase()).filter(Boolean);       // "music_avoid": ["rock", "guitar"]
-  const ok = (m, f = '') => !tags.some(t => `${m.genres || ''} ${m.title || ''} ${f}`.toLowerCase().includes(t));   // genre, title word or file name
+  const loud = defaultAvoid && QUIET_MOODS.includes(mood) ? LOUD_TAGS : [];
+  const ok = (m, f = '') => !tags.some(t => `${m.genres || ''} ${m.title || ''} ${f}`.toLowerCase().includes(t))   // genre, title word or file name
+    && !loud.some(t => String(m.genres || '').toLowerCase().includes(t));
   let have = Object.entries(idx).filter(([f, m]) => m.mood === mood && ok(m, f) && fs.existsSync(path.join(dir, f)));
   const want = Math.min(8, 4 + have.filter(([f]) => avoid.includes(f)).length);      // keep 4 fresh choices beside the recently used ones
   if (have.length < want && allowNetwork) {

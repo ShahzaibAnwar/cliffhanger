@@ -63,12 +63,13 @@ function autoPos(sceneId, vo, word) {                 // relative position of an
   return i >= 0 ? i / Math.max(1, toks.length) : 0.4;
 }
 let explicit = 0, auto = 0, overridden = 0;
-const missing = [], warnings = [], noAerab = [], earlyPunch = [];
+const missing = [], warnings = [], noAerab = [], earlyPunch = [], srcById = {};
 let addedBeats = 0;
 const TTS = opt('tts') ? read(path.resolve(opt('tts'))) : {};
 const norm2 = w => String(w).toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '');   // the engine's word match
 for (const s of reel.scenes) {
   const L = lines[s.id];
+  srcById[s.id] = s.vo;
   if (!L) { if (s.vo) missing.push(s.id); continue; }
   const srcVo = s.vo; const cmap = Object.fromEntries(Object.entries(L.cues || {}).map(([k, v]) => [k.toLowerCase(), v]));
   const remap = o => {
@@ -137,7 +138,18 @@ for (const s of reel.scenes) {
     else if (h.length > 1) warnings.push(`${s.id}: cue "${k}" → "${v}" uses "${first}", which matches ${h.map(i => `"${toks[i]}" (word ${i + 1})`).join(' and ')}; the first one wins${better && better !== first ? `: map it to "${better}"` : ': map it to a word that appears once'}`);
   }
 }
-if (missing.length) { console.error('Missing lines for scenes: ' + missing.join(', ')); process.exit(1); }
+if (missing.length) {                 // name them, and spot a translation that still holds a line the source split off
+  const sent = t => String(t || '').split(/[.!?؟۔।]+/).map(x => x.trim()).filter(Boolean).length;
+  console.error(`Missing lines for ${missing.length} scene(s) in ${path.basename(linesPath)}:`);
+  for (const id of missing) {
+    const i = reel.scenes.findIndex(x => x.id === id), src = reel.scenes[i], prev = reel.scenes[i - 1], Lp = prev && lines[prev.id];
+    let hint = '';
+    if (Lp && sent(Lp.vo) > sent(srcById[prev.id])) hint = `
+     "${prev.id}" in the lines file has ${sent(Lp.vo)} sentences where the source has ${sent(srcById[prev.id])}: the source split that line, so move the sentence that matches "${String(src.vo).slice(0, 30)}" into "${id}"`;
+    console.error(`   - ${id}: "${String(src.vo).slice(0, 60)}"${hint}`);
+  }
+  process.exit(1);
+}
 
 reel.slug = `${reel.slug || path.basename(src)}-${lang}`;
 if (!changed.includes('title')) reel.title = `${reel.title} (${LANG[lang] || lang})`;

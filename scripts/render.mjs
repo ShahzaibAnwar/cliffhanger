@@ -488,7 +488,7 @@ function engagementCheck() {
   add(!copied.length, 'Headlines are keywords, not the transcript', copied.length ? `${copied.length} scene(s) repeat the narration word for word` : 'short keyword headlines', `shorten: ${copied.slice(0, 3).map(x => x.id).join(', ')}`);
   // 8. ending opens a new question (Part 2) or loops back
   const last = [...main].reverse().find(x => x.vo) || {};
-  const opens = /\?\s*$/.test(String(last.vo || '').trim()) || !!reel.series?.next || /part\s*2|next|tomorrow|follow/i.test(String(last.vo || ''));
+  const opens = /[?\u061F\uFF1F]/.test(String(last.vo || '')) || !!reel.series?.next || /part\s*2|next|tomorrow|follow|فالو|फॉलो|اگلی قسط|अगला भाग/i.test(String(last.vo || ''));
   if (!WIDE) add(opens, 'Ending opens the next question', opens ? 'ends on a question / Part 2 tease' : 'ending closes everything', 'end on the new, related question Part 2 will answer (last 5 s)');
   // 9. 16:9: end card long enough for YouTube end screens (5–20 s)
   if (WIDE) { const endDur = (main[main.length - 1] || {}).dur || 0; add(endDur >= 8, 'End card covers the end screen', `last scene ${endDur.toFixed(1)} s`, 'give the end card "min": 18 so YouTube end-screen elements fit'); }
@@ -558,16 +558,17 @@ async function chooseMusic(cfg, allowNetwork) {
       .map(d => path.join(ws, d.name, 'credits.json')).filter(f => fs.existsSync(f)).map(f => ({ f, m: fs.statSync(f).mtimeMs })).sort((a, b) => b.m - a.m).slice(0, recentN);
     for (const x of sib) for (const c of JSON.parse(fs.readFileSync(x.f, 'utf8'))) if (c.kind === 'music') avoid.push({ file: String(c.file).replace(/^music: /, ''), reel: path.basename(path.dirname(x.f)) });
   } catch { /* no siblings */ }
-  const r = await findMusic(cfg.music_mood, { key: slug, allowNetwork, avoidTags: musicAvoidTags(cfg), avoid: avoid.map(a => a.file),
+  const r = await findMusic(cfg.music_mood, { key: slug, allowNetwork, avoidTags: musicAvoidTags(cfg), defaultAvoid: cfg.music_avoid_default !== false, avoid: avoid.map(a => a.file),
     prefer: (() => { try { return String(JSON.parse(fs.readFileSync(path.join(proj, 'credits.json'), 'utf8')).find(c => c.kind === 'music')?.file || '').replace(/^music: /, ''); } catch { return ''; } })() });   // a re-render keeps its track
   return { r, avoid };
 }
-const LOUD_GENRES = /\b(rock|metal|punk|grunge|guitar|hard ?core)\b/i;
+const LOUD_GENRES = /rock|metal|punk|grunge|guitar|hard ?core/i;      // inside compound tags too ("psychedelicrock")
 function musicLine(r, cfg) {           // title, creator, genres; a warning when a loud genre lands under an explainer
-  const g = r.genres ? ` · ${r.genres.replace(/,/g, ', ')}` : '';
-  const loud = LOUD_GENRES.test(`${r.genres || ''} ${r.credit?.title || ''}`) && !musicAvoidTags(cfg).length;
+  const g = r.genres ? ` · ${r.genres.replace(/,/g, ', ')}` : ' · no genre tags: listen to it';
+  const hit = (`${r.genres || ''} ${r.credit?.title || ''}`.match(LOUD_GENRES) || [''])[0].toLowerCase();
+  const loud = !!hit && !musicAvoidTags(cfg).some(t => hit.includes(String(t).toLowerCase()));
   return { text: `"${r.credit?.title}" by ${r.credit?.creator || 'unknown'} (${r.credit?.licence}${g}) · ${path.basename(r.file)} ("music_avoid": ["${path.basename(r.file)}"] skips it)`,
-    warn: loud ? `! music "${r.credit?.title}" is tagged ${(`${r.genres || ''} ${r.credit?.title || ''}`.match(LOUD_GENRES) || [''])[0]}: for a suspense or curiosity reel set "music_avoid": ["rock", "guitar"] (or another music_mood)` : null };
+    warn: loud ? `! music "${r.credit?.title}" looks like ${hit} (tags: ${r.genres || 'none'}; tags are often vague, so listen if unsure): for a suspense or curiosity reel set "music_avoid": ["rock", "guitar"] (or another music_mood)` : null };
 }
 
 // ---------- QA modes ----------
@@ -611,7 +612,15 @@ if (flag('stills') || opt('at')) {
   }
   if (!opt('at') && !reel.audio?.music && reel.audio?.music_mood && reel.audio.music_mood !== 'none') {
     const cfg = Object.assign({ music_volume: 0.18 }, reel.audio);
-    try { const { r } = await chooseMusic(cfg, false); if (r) { const ml = musicLine(r, cfg); console.log('music (this reel): ' + ml.text); if (ml.warn) console.warn(ml.warn); } } catch { /* offline: picked at render */ }
+    // the same choice the render makes (it may download the mood's tracks), kept in credits.json, which the render reuses
+    try {
+      const { r } = await chooseMusic(cfg, !flag('offline'));
+      if (r) {
+        const { addCredit, pruneCredits } = await import('./library.mjs'), name = 'music: ' + path.basename(r.file);
+        pruneCredits(proj, 'music', [name]); if (r.credit) addCredit(proj, 'music', name, r.credit);
+        const ml = musicLine(r, cfg); console.log('music (this reel): ' + ml.text); if (ml.warn) console.warn(ml.warn);
+      }
+    } catch { /* offline: picked at render */ }
   }
   if (!frame0 && (reel.first_frame ?? SETTINGS.video?.first_frame) !== 'cover')
     console.warn('! frame 0 is the empty page (headline and art are still entering): WhatsApp, X and LinkedIn previews show it. "first_frame": "cover" in reel.json (or settings video.first_frame) puts the cover there');
@@ -632,6 +641,23 @@ if (flag('stills') || opt('at')) {
     }
     if (t != null && t > (WIDE ? 5.5 : 3)) latePunch.push(`${s.id}: "${L[ai]}" appears ${t.toFixed(1)} s in, line 1 waits alone until then (fine for a deliberate reveal; otherwise set "punch_at", e.g. 0.6)`);
   }
+  // effects cued in the last ~0.9 s of a scene (a strike or a replacement needs about a second to be read) (a strike on the line's last word) are cut off before anyone sees them
+  const atEnd = [];
+  for (const x of scenes) {
+    if (scenes.some(y => y._beatOf === x.id)) continue;         // its words run on into the beats
+    const v = x.visual || {}, bits = [];
+    (x.overlays || []).forEach(o => {     // overlays you read; carried ones stay on screen into the next scene
+      if (o.carry || ['path', 'flash', 'arrow', 'circle', 'scribble'].includes(o.type)) return;
+      for (const k of ['at', 'reveal_at', 'fill_at']) if (typeof o[k] === 'string') bits.push([`${o.type}${o.text ? ' "' + String(o.text).slice(0, 18) + '"' : ''} ${k}`, o[k], 0.6]);
+    });
+    for (const k of ['highlight_at', 'winner_at']) if (typeof v[k] === 'string') bits.push([`${v.type} ${k}`, v[k], 0.6]);
+    (v.lines || []).forEach((ln, i) => { if (ln && typeof ln === 'object') for (const k of ['strike_at', 'replace_at', 'mark_at', 'circle_at']) if (typeof ln[k] === 'string') bits.push([`${v.type} line ${i + 1} ${k}`, ln[k], 0.9]); });
+    for (const [what, spec, need] of bits) {
+      const t = atTime(x, spec), left = x.end - t;
+      if (left >= 0 && left < need) atEnd.push(`${x.id}: ${what} "${spec}" fires ${left.toFixed(2)} s before the cut, so it's barely seen: cue an earlier word, or add "pad": 0.8 to the scene`);
+    }
+  }
+  if (atEnd.length) { console.warn(`! ${atEnd.length} effect(s) at the very end of a scene:`); for (const w of atEnd) console.warn('   - ' + w); }
   if (latePunch.length) { console.warn(`! ${latePunch.length} headline punch line(s) land late:`); for (const w of latePunch) console.warn('   - ' + w); }
   if (long.length) {
     console.warn(`! ${long.length} scene(s) longer than ${maxScene}s on one visual (add "beats" for a new visual mid-line; the voice doesn't change):`);
