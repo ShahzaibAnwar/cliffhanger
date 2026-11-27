@@ -113,6 +113,13 @@
     const p = a.dur > 0 ? clamp((t - a.t0) / a.dur, 0, 1) : (t >= a.t0 ? 1 : 0);
     switch (a.type) {
       case 'show': el.style.opacity = t < a.t0 ? 0 : p; break;          // opacity only: keeps the element's own CSS transform
+      case 'window': el.style.opacity = t >= a.t0 && t < a.t0 + a.dur ? 1 : 0; break;   // on screen only inside [t0, t0 + dur)
+      case 'strip': {                                                     // slide to each stop's x at its time (eased)
+        const st = P.stops || []; if (!st.length) break;
+        let k = -1; for (let i = 0; i < st.length; i++) if (t >= st[i].t) k = i;
+        const x = k <= 0 ? st[0].x : st[k - 1].x + (st[k].x - st[k - 1].x) * E.io(clamp((t - st[k].t) / (P.dur || 0.35), 0, 1));
+        el.style.transform = `translateX(${x.toFixed(1)}px)`; break;
+      }
       case 'in': {
         if (t < a.t0) { el.style.opacity = 0; if (P.style === 'wipe') el.style.clipPath = 'inset(-30% 100% -30% -5%)'; return; }
         const e = E.out(p); let o = 1, tr = '';
@@ -297,6 +304,15 @@
     });
     const sketch = o.enter === 'sketch' && !!o.svg;
     enter(wrap, o, sketch ? 'fade' : o.enter, o.at, sketch ? 0.12 : o.dur, 'translate(-50%,-50%)', o.rot);
+    // a sound for the movement (audio.entrance_sfx): whooshes for slides, a thud when it lands, a pop for springy ones.
+    // A whoosh right on the cut is left to the cut's own swish.
+    const ES = { slideL: ['whoosh', 0.22, 0], slideR: ['whoosh', 0.22, 0], slideUp: ['whoosh', 0.22, 0], zoom: ['whoosh_low', 0.25, 0],
+      drop: ['thud', 0.32, 0.55], slam: ['thud', 0.34, 0.85], stick: ['thud', 0.2, 0.6], spring: ['pop', 0.24, 0.1], swing: ['pop', 0.2, 0.1], pop: ['pop', 0.24, 0.1] };
+    const es = !sketch && !o.sfx && D.entrance_sfx && ES[o.enter];
+    if (es) {
+      const ta = T(o.at, 0.05), dur = o.dur != null ? o.dur : 0.6;
+      if (!(/whoosh/.test(es[0]) && ta - S.start < 0.15 && S.start > 0.05 && S.cut_sfx !== false)) sfx(es[0], ta + dur * es[2], es[1]);
+    }
     if (sketch) {        // whiteboard effect: every outline draws itself, then colour and hatching fade in
       const ts = T(o.at, 0.05), total = o.sketch_dur || 1.4;
       sfx('scribble', ts, 0.2, total * 0.75);
@@ -355,9 +371,36 @@
   }
 
   // ---------- headline ----------
+  function slideHeadline(s, sc, lines) {
+    const accentLine = s.accent_line != null ? s.accent_line : 1, ws = s.words || [];
+    const box = h('div', 'hl-slide', sc); box.style.top = (s.headline_y != null ? s.headline_y : Math.round(H * (WIDE ? 0.42 : 0.38))) + 'px';
+    const strip = h('div', 'hs-strip', box); strip.style.fontSize = (s.headline_size || (WIDE ? 190 : 230)) + 'px';
+    const items = []; let cursor = 0, j = 0;
+    lines.forEach((ln, i) => String(ln).split(/\s+/).filter(Boolean).forEach((w, wi) => {
+      const sp = h('span', 'w' + (i === accentLine ? ' l2' : ''), strip, esc(w));
+      let t = null;
+      if (s.headline_static) t = s.start - 1;
+      else if (i === accentLine && s.punch_at != null) t = T(s.punch_at) + wi * 0.3;
+      else {
+        const n = norm(w);
+        for (let k = cursor; k < ws.length && n; k++) {
+          const wn = norm(ws[k].w);
+          if (wn && (wn === n || (wn.startsWith(n) && n.length >= 3) || (n.startsWith(wn) && wn.length >= 3))) { t = s.start + Math.max(0, ws[k].s - 0.06); cursor = k + 1; break; }
+        }
+      }
+      if (t == null) t = s.start + 0.05 + j * 0.4;
+      if (items.length) t = Math.max(t, items[items.length - 1].t + 0.14);      // one word after another
+      A(sp, 'in', t, 0.28, { style: 'pop', pre: '', rot: 0 });
+      items.push({ sp, t }); j++;
+    }));
+    const a = A(strip, 'strip', s.start, 0, { stops: [], dur: 0.32 });
+    S._layout.push(() => { a.p.stops = items.map(({ sp, t }) => ({ t, x: W / 2 - (sp.offsetLeft + sp.offsetWidth / 2) })); });
+    items.slice(1).forEach(({ t }) => sfx('whoosh', t, 0.12));
+  }
   function headline(s, sc) {
     const lines = Array.isArray(s.headline) ? s.headline : (s.headline ? [s.headline] : []);
     if (!lines.length) return;
+    if (s.headline_style === 'slide') return slideHeadline(s, sc, lines);
     const hl = h('div', 'hl ' + (s.headline_style || (s.theme === 'photo' ? 'label' : '')), sc);
     if (s.headline_y != null) hl.style.top = s.headline_y + 'px';
     const maxChars = Math.max(...lines.map(l => String(l).length));
@@ -439,6 +482,53 @@
       const th = T(v.highlight_at, '45%');
       marks.forEach((m, i) => { const w = parseFloat(m.style.width); m.style.width = '0'; A(m, 'width', th + i * 0.12, 0.4, { to: w }); });
       sfx('paper', T(v.at, 0.1), 0.35);
+    },
+    // match-cut montage: many papers ran it. Pages cut fast (each a little longer than the last) while the key word stays
+    // on the same spot inside a red box. pages: ["headline", …] or [{ headline, masthead, date, issue }, …]
+    matchcut(v, sc) {
+      const pages = (v.pages || []).map(p => (typeof p === 'string' ? { headline: p } : p)).filter(p => p && p.headline);
+      if (!pages.length) return;
+      const key = String(v.word || '').trim(), kn = norm(key), n = pages.length;
+      const ax = v.x || W / 2, ay = v.y || Math.round(H * (WIDE ? 0.56 : 0.55));
+      const t0 = T(v.at, 0.1), d0 = v.first != null ? v.first : 0.15, d1 = v.last != null ? v.last : 0.45;
+      let durs = pages.map((_, i) => (n > 1 ? d0 + (d1 - d0) * i / (n - 1) : d1));
+      const room = Math.max(0.3, S.end - t0 - 0.8), sum = durs.slice(0, -1).reduce((x, y) => x + y, 0);   // the last page stays
+      if (sum > room) durs = durs.map(d => d * room / sum);
+      const MAST = ['The Daily Record', 'Evening Herald', 'The Morning Post', 'City Gazette', 'The Courier', 'Weekly Chronicle', 'The Observer', 'Daily Bulletin'];
+      const els = []; let t = t0;
+      pages.forEach((p, i) => {
+        const c = h('div', 'news mc-page', sc); if (v.w) c.style.width = v.w + 'px';
+        h('div', 'news-mast', c, esc(p.masthead || MAST[i % MAST.length]));
+        h('div', 'news-meta', c, `<span>${esc(p.date || '')}</span><span>${esc(p.issue || '')}</span>`);
+        const head = h('div', 'news-head', c); let found = false;
+        head.innerHTML = String(p.headline).split(/(\s+)/).map(w => {
+          const wn = norm(w);
+          if (!found && kn && wn && (wn === kn || (wn.startsWith(kn) && kn.length >= 3))) { found = true; return `<span class="mc-key">${esc(w)}</span>`; }
+          return esc(w);
+        }).join('');
+        if (!found && key) head.innerHTML += ` <span class="mc-key">${esc(key)}</span>`;
+        const body = h('div', 'news-body', c);
+        for (let col = 0; col < 3; col++) { const C2 = h('div', 'news-col', body); for (let j = 0; j < 6; j++) h('i', '', C2).style.width = (62 + rnd(i * 31 + col * 7 + j) * 36) + '%'; }
+        A(c, 'window', t, i === n - 1 ? 1e4 : durs[i]);
+        if (i) sfx('shutter', t, 0.2);
+        els.push({ c, rot: v.rot != null ? v.rot : (rnd(i * 5.3 + 1) - 0.5) * 5 });
+        t += durs[i];
+      });
+      sfx('paper', t0, 0.35);
+      const box = h('div', 'mc-box', sc); A(box, 'show', t0, 0.01);
+      if (v.box_until != null) A(box, 'out', T(v.box_until), 0.2);
+      S._layout.push(() => {                 // move each page so its key word's centre lands on (ax, ay); rotate around it
+        let bw = 0, bh = 0;
+        for (const { c, rot } of els) {
+          const k = c.querySelector('.mc-key'); if (!k) continue;
+          let x = 0, y = 0; for (let e = k; e && e !== c; e = e.offsetParent) { x += e.offsetLeft; y += e.offsetTop; }
+          const kx = x + k.offsetWidth / 2, ky = y + k.offsetHeight / 2;
+          c.style.left = (ax - kx) + 'px'; c.style.top = (ay - ky) + 'px';
+          c.style.transformOrigin = `${kx}px ${ky}px`; c.style.transform = `rotate(${rot.toFixed(2)}deg)`;
+          bw = Math.max(bw, k.offsetWidth); bh = Math.max(bh, k.offsetHeight);
+        }
+        Object.assign(box.style, { left: (ax - bw / 2 - 16) + 'px', top: (ay - bh / 2 - 8) + 'px', width: (bw + 32) + 'px', height: (bh + 16) + 'px' });
+      });
     },
     // side-by-side comparison: two objects, labels, values, "VS"
     compare(v, sc) {
@@ -1253,7 +1343,7 @@
       const near = L => (Math.max(L, bgL) + 0.05) / (Math.min(L, bgL) + 0.05) < 1.6;
       s._el.querySelectorAll('.obj .clean svg').forEach(svgEl => {
         let tot = 0, closeA = 0, n = 0, sn = 0, sc = 0;
-        [...svgEl.querySelectorAll('path,circle,ellipse,rect,polygon,polyline,line')].slice(0, 300).forEach(el => {
+        [...svgEl.querySelectorAll('path,circle,ellipse,rect,polygon,polyline,line')].slice(0, 4000).forEach(el => {
           if (el.closest(NOPAINT)) return;
           const cs = getComputedStyle(el), L = paintLum(cs.fill), Ls = lumOf(cs.stroke);
           if (Ls != null && parseFloat(cs.strokeWidth) > 0) { sn++; if (near(Ls)) sc++; }

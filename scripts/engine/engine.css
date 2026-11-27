@@ -199,6 +199,17 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .news-body{display:grid;grid-template-columns:1fr 1fr 1fr;gap:22px}
 .news-col i{display:block;height:13px;margin:0 0 12px;background:#9b958a}
 .news-col i.hot{background:var(--accent)}
+/* match-cut montage: pages placed by script around the key word */
+.news.mc-page{width:1040px;left:0;top:0;padding:36px 44px 40px}
+.mc-page .news-mast{font-size:78px}
+.mc-page .news-head{font-size:92px;line-height:1.04}
+.mc-key{position:relative;z-index:1}
+.mc-box{position:absolute;border:8px solid var(--accent);border-radius:4px;z-index:25;box-shadow:0 6px 18px rgba(0,0,0,.25);pointer-events:none}
+/* sliding headline: giant words, the strip slides so the newest word is centred */
+.hl-slide{position:absolute;left:0;right:0;height:0;z-index:20;font-family:var(--head);text-transform:uppercase;line-height:1;letter-spacing:.004em}
+.hs-strip{position:absolute;left:0;top:-.5em;white-space:nowrap}
+.hs-strip .w{display:inline-block;margin-right:.24em}
+.hs-strip .l2{color:var(--accent)}
 /* ---------- comparison ---------- */
 .cmp-lab{position:absolute;left:0;top:0;text-align:center;width:420px}
 .cmp-lab b{display:block;font:400 64px/1 var(--head);text-transform:uppercase}

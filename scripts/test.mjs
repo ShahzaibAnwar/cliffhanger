@@ -364,6 +364,81 @@ t('localize: late punch words get punch_at, new beats from the lines file, beats
   if (!b.long?.beats?.[0]?.at) throw new Error('beats block has no "at" for the long scene: ' + JSON.stringify(b));
   return `punch_at 0.6 on a verb-final line, beat added, block → ${b.long.beats[0].at}`;
 });
+t('match-cut montage, sliding headline, first-frame cover, music skips a silent intro', () => {
+  const proj = path.join(tmpProj, 'ideas'); fs.mkdirSync(path.join(proj, 'build'), { recursive: true }); fs.mkdirSync(path.join(proj, 'audio'), { recursive: true });
+  const reel = { title: 'ideas', audio: { music: 'audio/track.wav', bed: 'none' }, scenes: [
+    { id: 'hook', lead: 1, vo: 'A whole town could not stop dancing.', headline: ['WHOLE TOWN', 'DANCING'], headline_style: 'slide' },
+    { id: 'papers', vo: 'Every paper called it the dancing plague.', headline: ['EVERY', 'PAPER'],
+      visual: { type: 'matchcut', word: 'plague', pages: ['Dancing plague grips Strasbourg', 'Strange plague spreads', 'Doctors baffled by plague', 'Plague of dancers reaches 400'] } }] };
+  fs.writeFileSync(path.join(proj, 'reel.json'), JSON.stringify(reel));
+  // voice: a tone per scene; music: 2.5 s of silence, then a tone
+  sh('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=f=220:d=2.6:sample_rate=48000', path.join(proj, 'audio', 'v.wav')]);
+  sh('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo:d=2.5', '-f', 'lavfi', '-i', 'sine=f=660:d=6:sample_rate=48000', '-filter_complex', '[1]aformat=channel_layouts=stereo[t];[0][t]concat=n=2:v=0:a=1', path.join(proj, 'audio', 'track.wav')]);
+  const tm = {}; for (const x of reel.scenes) { const w = x.vo.split(/\s+/); tm[x.id] = { file: 'audio/v.wav', duration: 2.6, words: w.map((q, i) => ({ w: q, s: i * 0.33, e: i * 0.33 + 0.3 })) }; }
+  fs.writeFileSync(path.join(proj, 'build', 'timings.json'), JSON.stringify({ scenes: tm }));
+  const run = a => { const r = spawnSync(process.execPath, [path.join(HERE, 'render.mjs'), proj, ...a], { encoding: 'utf8', cwd: ROOT, maxBuffer: 64 << 20 }); const all = (r.stdout || '') + (r.stderr || ''); if (r.status !== 0 || /\[page error\]/.test(all)) throw new Error('render ' + a.join(' ') + ' failed: ' + all.slice(-400)); return all; };
+  if (!/frame 0 is the empty page/.test(run(['--stills']))) throw new Error('empty first frame not mentioned');
+  // the sliding strip moves between two words; the montage cuts between pages
+  run(['--at', '1.4,2.1,3.75,4.05']);
+  const st = f => fs.readFileSync(path.join(proj, 'build', 'stills', f));
+  if (st('at-1.4s.png').equals(st('at-2.1s.png'))) throw new Error('sliding headline did not move');
+  if (st('at-3.75s.png').equals(st('at-4.05s.png'))) throw new Error('match-cut pages did not change');
+  // full render with "first_frame": "cover": frame 0 is the cover; the music is audible before the voice starts (lead 1 s)
+  reel.first_frame = 'cover'; fs.writeFileSync(path.join(proj, 'reel.json'), JSON.stringify(reel));
+  run([]);
+  const mp4 = path.join(proj, 'out', fs.readdirSync(path.join(proj, 'out')).find(f => f.endsWith('.mp4')));
+  const g = (a, f) => spawnSync('ffmpeg', ['-v', 'error', '-i', a, ...f, '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], { maxBuffer: 1 << 24 }).stdout;
+  const f0 = g(mp4, ['-vf', 'select=eq(n\\,0),scale=54:96', '-frames:v', '1']), cv = g(path.join(proj, 'out', 'cover.png'), ['-vf', 'scale=54:96']);
+  let d = 0; for (let i = 0; i < f0.length; i++) d += Math.abs(f0[i] - cv[i]); d /= f0.length;
+  if (!(d < 6)) throw new Error('frame 0 is not the cover (mean difference ' + d.toFixed(1) + ')');
+  const vol = spawnSync('ffmpeg', ['-hide_banner', '-i', mp4, '-af', 'atrim=0.4:0.9,volumedetect', '-f', 'null', '-'], { encoding: 'utf8' }).stderr.match(/mean_volume: (-?[\d.]+) dB/);
+  if (!vol || +vol[1] < -60) throw new Error('music still silent before the voice (' + (vol && vol[1]) + ' dB): its silent intro was not skipped');
+  return `first-frame note, strip slides, pages cut, frame 0 = cover (Δ ${d.toFixed(1)}), music at ${vol[1]} dB before the voice`;
+});
+t('busy drawings read whole, still reels warned, entrance sounds, music genres shown', () => {
+  const proj = path.join(tmpProj, 'motion'); fs.mkdirSync(path.join(proj, 'art'), { recursive: true });
+  // 340 pale bumps drawn before the dark outline: the contrast check must reach the outline (it stopped at 300 shapes)
+  let bumps = ''; for (let i = 0; i < 340; i++) bumps += `<circle cx="${60 + (i % 34) * 15}" cy="${80 + Math.floor(i / 34) * 14}" r="5" fill="#EFE6D6"/>`;
+  fs.writeFileSync(path.join(proj, 'art', 'bumpy.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 260"><rect x="40" y="60" width="520" height="160" rx="60" fill="#EDE3D2"/>${bumps}<rect x="40" y="60" width="520" height="160" rx="60" fill="none" stroke="#2b2420" stroke-width="6"/></svg>`);
+  const sc = [{ id: 'bumpy', duration: 2.5, headline: ['BUMPY'], visual: { type: 'art', svg_file: 'art/bumpy.svg', w: 800 } }];
+  for (let i = 0; i < 4; i++) sc.push({ id: 'still' + i, duration: 2.5, headline: ['STILL ' + i], visual: { type: 'art', svg_file: '@lib/brain.svg', motion: 'none', enter: 'fadeUp' } });
+  sc.push({ id: 'slide', duration: 2.5, headline: ['SLIDE'], visual: { type: 'art', svg_file: '@lib/arm.svg', enter: 'slideL', at: 0.5 } });
+  sc.push({ id: 'drop', duration: 2.5, headline: ['DROP'], visual: { type: 'art', svg_file: '@lib/glass.svg', enter: 'drop', at: 0.3 } });
+  sc.push({ id: 'own', duration: 2.5, headline: ['OWN'], visual: { type: 'art', svg_file: '@lib/eye.svg', enter: 'spring', sfx: { find: 'cat hiss', fallback: 'pop' } } });
+  fs.writeFileSync(path.join(proj, 'reel.json'), JSON.stringify({ title: 'motion', audio: { music_mood: 'suspense' }, scenes: sc }));
+  const r = spawnSync(process.execPath, [path.join(HERE, 'render.mjs'), proj, '--stills'], { encoding: 'utf8', cwd: ROOT, maxBuffer: 64 << 20 });
+  const all = (r.stdout || '') + (r.stderr || '');
+  if (r.status !== 0) throw new Error('render failed: ' + all.slice(-300));
+  if (/bumpy: "illustration" → low contrast/.test(all)) throw new Error('a pale drawing with a dark outline flagged as low contrast');
+  if (!/4\/8 drawings are still/.test(all)) throw new Error('still drawings not warned:\n' + all.slice(-600));
+  if (!/the same entrance \("fadeUp"\) in \d+ scenes in a row/.test(all)) throw new Error('repeated entrance not warned');
+  const ev = JSON.parse(fs.readFileSync(path.join(proj, 'build', 'sfx.json'), 'utf8'));
+  const near = (type, t) => ev.some(e => e.type === type && Math.abs(e.t - t) < 0.5);
+  const s5 = 2.5 * 5, s6 = 2.5 * 6, s7 = 2.5 * 7;   // fixed 2.5 s scenes
+  if (!near('whoosh', s5 + 0.5)) throw new Error('slideL made no whoosh: ' + JSON.stringify(ev.filter(e => e.t > s5 - 0.2 && e.t < s6)));
+  if (!near('thud', s6 + 0.3 + 0.33)) throw new Error('drop made no thud as it landed');
+  if (ev.some(e => e.type === 'pop' && Math.abs(e.t - (s7 + 0.11)) < 0.2) || !ev.some(e => e.find === 'cat hiss')) throw new Error('an object with its own sfx should use it instead');
+  if (fs.existsSync(path.join(ROOT, 'sfx-library', 'music', 'index.json')) && !/music \(this reel\): ".+" by .+ · .+\.mp3/.test(all)) throw new Error('the chosen music track is not shown');
+  return 'outline past 300 shapes counts, 4/8 still + repeated entrance warned, whoosh/thud/own find cue';
+});
+t('find sounds that fail are reported (skipped, or their fallback); credits list only what this render mixes', () => {
+  const proj = path.join(tmpProj, 'credits'); fs.mkdirSync(path.join(proj, 'build'), { recursive: true }); fs.mkdirSync(path.join(proj, 'audio'), { recursive: true });
+  sh('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=f=220:d=2:sample_rate=48000', path.join(proj, 'audio', 'v.wav')]);
+  sh('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=f=330:d=4:sample_rate=48000', path.join(proj, 'audio', 'bed.wav')]);
+  fs.writeFileSync(path.join(proj, 'reel.json'), JSON.stringify({ title: 'credits', audio: { music: 'audio/bed.wav' }, scenes: [
+    { id: 'a', vo: 'One two three.', headline: ['ONE'], sfx: [{ find: 'zzqx unicorn burp', at: 0.3 }, { find: 'qqzx glass dragon', fallback: 'pop', at: 0.8 }] }] }));
+  fs.writeFileSync(path.join(proj, 'build', 'timings.json'), JSON.stringify({ scenes: { a: { file: 'audio/v.wav', duration: 2, words: ['One', 'two', 'three.'].map((w, i) => ({ w, s: i * 0.5, e: i * 0.5 + 0.4 })) } } }));
+  fs.writeFileSync(path.join(proj, 'credits.json'), JSON.stringify([{ kind: 'music', file: 'music: playful-old.mp3', title: 'Old track' }, { kind: 'sound', file: 'sfx/old-hiss.mp3', title: 'old hiss' }, { kind: 'photo', file: 'art/p.jpg', title: 'kept photo', licence: 'cc0', source: 'test', page: 'https://example.org' }]));
+  const r = spawnSync(process.execPath, [path.join(HERE, 'render.mjs'), proj, '--offline'], { encoding: 'utf8', cwd: ROOT, maxBuffer: 64 << 20 });
+  const all = (r.stdout || '') + (r.stderr || '');
+  if (r.status !== 0) throw new Error('render failed: ' + all.slice(-400));
+  if (!/"zzqx unicorn burp" at 0\.3 s → skipped: not in the library and offline/.test(all)) throw new Error('missing find sound not reported as skipped:\n' + all.slice(-500));
+  if (!/"qqzx glass dragon" at 0\.8 s → pop \(its fallback\)/.test(all)) throw new Error('find fallback not reported');
+  const cr = JSON.parse(fs.readFileSync(path.join(proj, 'credits.json'), 'utf8'));
+  if (cr.some(c => c.kind === 'music' || c.kind === 'sound')) throw new Error('stale music/sound credits kept: ' + JSON.stringify(cr));
+  if (!cr.some(c => c.kind === 'photo')) throw new Error('a photo credit was removed');
+  return 'skipped + fallback reported with the reason; old music and sound credits dropped, photo kept';
+});
 const { pickStyle } = await import('./style.mjs');
 t('auto style picks a look from the topic', () => {
   const cases = [['the dancing plague, a real epidemic', 'newsprint'], ['unsolved signal from space? no: the unsolved wow signal', null], ['fun facts about axolotl animals', 'comic'], ['quantum gravity', 'case-file']];

@@ -37,8 +37,10 @@ export function pickStyle(text, { wide = false, map = styleMap() } = {}) {
   const fallback = map.find(m => m.default) || map[0];
   const tie = best.score > 0 && second && second.score === best.score;
   const m = best.score > 0 && !tie ? best.m : fallback;
+  const curious = /^\s*(why|how|what if)\b|\bwhy (do|does|did|is|are|can)\b/.test(t);   // a question to solve: suspense, not a jingle
   return {
-    look: m.look, captions: (m.captions || {})[wide ? 'wide' : 'vertical'] || 'word', burn: (m.captions || {}).burn !== false, music_mood: m.music_mood || '',
+    look: m.look, captions: (m.captions || {})[wide ? 'wide' : 'vertical'] || 'word', burn: (m.captions || {}).burn !== false,
+    music_mood: curious && m.music_mood === 'playful' ? 'mystery' : m.music_mood || '',
     matched: best.score > 0 && !tie ? best.hits : [], tie: tie ? [best.m.look, second.m.look] : null, fallback: !(best.score > 0) || tie,
     why: best.score === 0 ? `no keyword matched → default "${m.look}"` : tie ? `tie between "${best.m.look}" and "${second.m.look}" (${best.hits.join(', ')} / ${second.hits.join(', ')}) → ask the user` : `matched ${best.hits.map(k => `"${k}"`).join(', ')} → "${m.look}"`,
   };

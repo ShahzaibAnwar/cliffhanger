@@ -167,28 +167,37 @@ function processClip(src, out, max = 6) {
 }
 // Returns { file, credit } or null. variant picks among several takes (so repeated cues don't sound identical).
 export async function findSound(query, { proj = null, allowNetwork = true, variant = 0, licence = 'cc0', takes = 3 } = {}) {
+  findSound.lastWhy = '';                           // why nothing came back (read by render.mjs)
   const dirs = [proj && path.join(proj, 'sfx'), LIB_DIR].filter(Boolean);
   let have = matches(query, dirs);
   if (have.length < takes && allowNetwork) {
     try {
       const { searchSounds, download } = await import('./library.mjs');
       const idx = readIndex();
-      const cands = (await searchSounds(query, { licence, n: 8, maxSeconds: 40 })).filter(c => !Object.values(idx).some(x => x.id === c.id));
-      for (const c of cands.slice(0, takes - have.length)) {
+      const all = await searchSounds(query, { licence, n: 8, maxSeconds: 40 });
+      const cands = all.filter(c => !Object.values(idx).some(x => x.id === c.id));
+      if (!all.length) findSound.lastWhy = 'no match on Freesound/Openverse';
+      let got = 0, failed = 0;
+      for (const c of cands) {                    // the next result when one fails (403s happen), until there are enough takes
+        if (have.length + got >= takes) break;
         const slug = query.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30);
         const raw = path.join(CACHE_DIR, 'dl-' + c.id.replace(/[^\w-]/g, '') + path.extname(new URL(c.url).pathname || '.mp3'));
         const out = path.join(LIB_DIR, `${slug}-${c.id.replace(/[^\w-]/g, '').slice(-10)}.mp3`);
         fs.mkdirSync(LIB_DIR, { recursive: true });
-        try { await download(c.url, raw); } catch (e) { console.warn(`! sound download failed (${c.title.slice(0, 40)}): ${e.message}`); continue; }
-        if (!processClip(raw, out)) { console.warn(`! could not process sound ${c.title.slice(0, 40)}`); continue; }
+        let ok = false;
+        for (let a = 0; a < 2 && !ok; a++) { try { await download(c.url, raw); ok = true; } catch (e) { if (a) { failed++; findSound.lastWhy = `download failed (${e.message.slice(0, 40)})`; } else await new Promise(r => setTimeout(r, 800)); } }
+        if (!ok) continue;
+        if (!processClip(raw, out)) { failed++; findSound.lastWhy = 'could not process the download'; continue; }
+        got++;
         fs.rmSync(raw, { force: true });
         idx[path.basename(out)] = { query, id: c.id, title: c.title, creator: c.creator, licence: c.licence, licence_version: c.licence_version, source: c.source, page: c.page };
         fs.mkdirSync(LIB_DIR, { recursive: true }); fs.writeFileSync(path.join(LIB_DIR, 'index.json'), JSON.stringify(idx, null, 1));
         console.log(`  + sound "${query}": ${c.title.slice(0, 50)} (${c.licence}, ${c.source})`);
       }
       have = matches(query, dirs);
-    } catch (e) { console.warn(`! sound search "${query}" failed: ${e.message.slice(0, 120)}`); }
-  }
+      if (failed && !have.length) findSound.lastWhy = `${failed} download(s) failed (${findSound.lastWhy || ''})`;
+    } catch (e) { findSound.lastWhy = `search failed: ${e.message.slice(0, 80)}`; }
+  } else if (!have.length && !allowNetwork) findSound.lastWhy = 'not in the library and offline';
   if (!have.length) return null;
   const file = have[Math.abs(variant) % have.length], meta = readIndex()[path.basename(file)];
   return { file, credit: meta ? { title: meta.title, creator: meta.creator, licence: meta.licence, licence_version: meta.licence_version, source: meta.source, page: meta.page } : null };
@@ -197,15 +206,17 @@ export async function findSound(query, { proj = null, allowNetwork = true, varia
 // ---------- music beds from free tracks (by mood) ----------
 // One track per reel (chosen from the mood's list by the reel's name, so re-renders keep it); cached in sfx-library/music/.
 // avoid: file names (basename) used by other recent reels in the same workspace: skipped while another track of this mood exists
-export async function findMusic(mood, { key = '', allowNetwork = true, avoid = [], prefer = '' } = {}) {
+export async function findMusic(mood, { key = '', allowNetwork = true, avoid = [], prefer = '', avoidTags = [] } = {}) {
   const dir = path.join(LIB_DIR, 'music'), idxFile = path.join(dir, 'index.json');
   let idx = {}; try { idx = JSON.parse(fs.readFileSync(idxFile, 'utf8')); } catch { /* new */ }
-  let have = Object.entries(idx).filter(([f, m]) => m.mood === mood && fs.existsSync(path.join(dir, f)));
+  const tags = avoidTags.map(t => String(t).toLowerCase()).filter(Boolean);       // "music_avoid": ["rock", "guitar"]
+  const ok = (m, f = '') => !tags.some(t => `${m.genres || ''} ${m.title || ''} ${f}`.toLowerCase().includes(t));   // genre, title word or file name
+  let have = Object.entries(idx).filter(([f, m]) => m.mood === mood && ok(m, f) && fs.existsSync(path.join(dir, f)));
   const want = Math.min(8, 4 + have.filter(([f]) => avoid.includes(f)).length);      // keep 4 fresh choices beside the recently used ones
   if (have.length < want && allowNetwork) {
     try {
       const { searchMusic, download } = await import('./library.mjs');
-      const cands = (await searchMusic(mood)).filter(c => !Object.values(idx).some(m => m.id === c.id));
+      const cands = (await searchMusic(mood)).filter(c => ok(c) && !Object.values(idx).some(m => m.id === c.id));
       fs.mkdirSync(dir, { recursive: true });
       for (const c of cands.slice(0, want - have.length)) {
         const raw = path.join(CACHE_DIR, 'dl-music-' + c.id.replace(/[^\w-]/g, '').slice(-12));
@@ -217,7 +228,7 @@ export async function findMusic(mood, { key = '', allowNetwork = true, avoid = [
         idx[name] = { mood, ...c }; fs.writeFileSync(idxFile, JSON.stringify(idx, null, 1));
         console.log(`  + music (${mood}): "${c.title.slice(0, 50)}" by ${c.creator || 'unknown'} (${c.licence}, ${c.source})`);
       }
-      have = Object.entries(idx).filter(([f, m]) => m.mood === mood && fs.existsSync(path.join(dir, f)));
+      have = Object.entries(idx).filter(([f, m]) => m.mood === mood && ok(m, f) && fs.existsSync(path.join(dir, f)));
     } catch (e) { console.warn(`! music search "${mood}" failed: ${e.message.slice(0, 120)}`); }
   }
   if (!have.length) return null;
@@ -226,7 +237,7 @@ export async function findMusic(mood, { key = '', allowNetwork = true, avoid = [
   if (fresh.length) have = fresh;
   const h = [...String(key)].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7);
   const [f, m] = have.find(([x]) => x === prefer) || have[h % have.length];
-  return { file: path.join(dir, f), skipped, credit: { title: m.title, creator: m.creator, licence: m.licence, licence_version: m.licence_version, source: m.source, page: m.page } };
+  return { file: path.join(dir, f), skipped, genres: m.genres || '', credit: { title: m.title, creator: m.creator, licence: m.licence, licence_version: m.licence_version, source: m.source, page: m.page } };
 }
 
 // ---------- CLI ----------

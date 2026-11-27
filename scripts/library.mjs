@@ -151,7 +151,7 @@ export async function searchMusic(mood, { licence = 'safe', minS = 60, maxS = 48
 
 // ---------- credits ----------
 export function creditLine(c) {
-  const lic = LICENCE_NAME[c.licence] || c.licence.toUpperCase();
+  const lic = LICENCE_NAME[c.licence] || String(c.licence || 'unknown licence').toUpperCase();
   const ver = c.licence_version && !lic.includes(String(c.licence_version)) ? ' ' + c.licence_version : '';   // "CC0 1.0 (public domain)" already has it
   return `"${c.title}"${c.creator ? ' by ' + c.creator : ''} · ${lic}${ver} · ${c.source} · ${c.page}`;
 }
@@ -162,6 +162,13 @@ export function addCredit(proj, kind, file, c) {
   all = all.filter(x => x.file !== file);
   all.push({ kind, file, title: strip(c.title), creator: strip(c.creator), licence: c.licence, licence_version: c.licence_version, source: c.source, page: c.page });
   fs.writeFileSync(p, JSON.stringify(all, null, 1));
+}
+// keep only the credits of one kind that this render uses (a changed music_mood or removed sound leaves no stale line)
+export function pruneCredits(proj, kind, keep = []) {
+  const p = path.join(proj, 'credits.json');
+  let all = []; try { all = JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return; }
+  const next = all.filter(x => x.kind !== kind || keep.includes(x.file));
+  if (next.length !== all.length) fs.writeFileSync(p, JSON.stringify(next, null, 1));
 }
 export function readCredits(proj) { try { return JSON.parse(fs.readFileSync(path.join(proj, 'credits.json'), 'utf8')); } catch { return []; } }
 

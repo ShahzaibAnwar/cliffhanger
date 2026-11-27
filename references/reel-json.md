@@ -54,7 +54,7 @@ reports anything that still runs off the edge.
 | `hold` | `true`: an intentional still (play-along test, "stare at the dot"). No camera move or art drift; between consecutive hold scenes a hard cut with no cut sound, and an unchanged visual stays put instead of entering again. Not counted by "no visual held over 5 s" (scenes with a `countdown` aren't either) |
 | `punch_at` | when the red line appears. Default: when its first word is spoken (`--stills` warns when that's over 3 s in, 5.5 s on 16:9) |
 | `headline_at` | force line-1 time (default: each word appears as it is spoken) |
-| `headline_style` | `""` · `label` (white tape label, default on photo) · `center` |
+| `headline_style` | `""` · `label` (white tape label, default on photo) · `center` · `slide` (giant words one at a time as they're spoken; the line slides so the newest word sits in the middle: a kinetic hook for scene 1; `headline_y`, `headline_size`) |
 | `headline_size`, `headline_y` | override auto-fit size / top position |
 | `bg_image`, `bg_motion` | photo theme background (`kenburns` / `kenout` / `drift`) |
 | `visual` | the main component (below) |
@@ -69,6 +69,9 @@ reports anything that still runs off the edge.
 
 Top-level extras: `"animation": {...}` overrides the animation settings for the whole reel;
 `"cover": {"scene": "twist", "at": 1.5}` picks the thumbnail frame saved as `out/cover.png`.
+`"first_frame": "cover"` (or settings `video.first_frame`) makes frame 0 of the video the cover: WhatsApp, X and
+LinkedIn previews show the first frame, which is otherwise the empty page (`--stills` says so). One frame, so it isn't
+noticed in playback.
 
 ## Time specs (`at`, `punch_at`, `reveal_at`, `strike_at`, `until` …)
 
@@ -82,7 +85,12 @@ Add `"until": <time>` to any visual/overlay to fade it out.
 `enter`: `fadeUp` (default) · `fade` · `fadeDown` · `pop` · `spring` · `swing` · `slam` · `zoom` ·
 `blur` · `wipe` · `wipeDown` · `slideL` · `slideR` · `slideUp` (slides get motion blur) · `drop` ·
 `sketch` (SVG art only: outlines draw themselves on, then colour/hatching fade in; `sketch_dur`) · `none`.
-Any object/overlay can carry `"sfx": "impact"` or `"sfx": {"prompt": "...", "fallback": "pop"}`.
+Any object/overlay can carry `"sfx": "impact"`, `"sfx": {"prompt": "...", "fallback": "pop"}` or a real recording
+`"sfx": {"find": "cat hiss"}` (same cues as a scene's `sfx` list; it plays when the object enters).
+Art entrances make their own sound unless the object has an `sfx` (`audio.entrance_sfx: false` turns it off):
+`slideL`/`slideR`/`slideUp` whoosh, `zoom` a low whoosh, `drop`/`slam`/`stick` a thud as they land, `spring`/`swing`/`pop`
+a pop. A whoosh right on a cut is left to the cut's own swish. `--stills` warns when most drawings are still
+(`"motion": "none"`) or one entrance repeats in 4+ scenes in a row.
 
 ## Visual components (`visual.type`)
 
@@ -180,6 +188,12 @@ keeps the current one on screen.
 
 **newspaper**: `masthead`, `date`, `issue`, `headline`, `lines` (per column), `highlight` (line indexes
 turned red), `highlight_at`, `x`, `y`, `w`, `rot`.
+
+**matchcut**: "every paper ran it". Newspaper pages cut fast while one word stays locked on the same spot in a red box.
+`word` (the key word, found in each headline; added at the end where missing), `pages` (headlines as strings, or
+`{headline, masthead, date, issue}`; 5–8 reads best), `first` (0.15 s) and `last` (0.45 s): each page stays a little
+longer than the one before, and the last stays to the end of the scene. `x`, `y` (where the word sits), `w`, `rot`,
+`at`, `box_until` (hide the box). Use it for the beat where the story spread: the viewer reads the word, not the pages.
 
 **compare**: `left` / `right` = `{svg_file|image|image_prompt, label, value, w, at}`, `vs`, `winner`, `cards` (true: each side on a light card, a "this vs that" split)
 (`left`/`right` gets a red underline at `winner_at`), `y`.

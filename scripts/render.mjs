@@ -341,6 +341,7 @@ const data = {
   scenes, total: TOTAL,
   transition: ANIM.transition || 'auto', camera: ANIM.camera || 'push', film_fx: ANIM.film_fx !== false,
   art_enter: ANIM.sketch_art ? 'sketch' : (ANIM.art_enter || 'fadeUp'), headline_fx: ANIM.headline_fx || null,
+  entrance_sfx: (reel.audio?.entrance_sfx ?? SETTINGS.audio?.entrance_sfx ?? true) !== false && reel.audio?.sfx !== false,
   // collage look (from paper cut-out explainers): cut-out finish, stop-motion on twos, scribble wipes
   look: reel.look || (ANIM.look !== 'auto' ? ANIM.look : null) || null,              // case-file (default) · collage · chalkboard · blueprint · comic · vhs · newsprint
   finish: ANIM.finish || ((reel.look || ANIM.look) === 'collage' ? 'collage' : null),
@@ -394,6 +395,9 @@ await page.evaluate(() => window.__ready);
 const fontsOk = await page.evaluate(() => document.fonts.check('400 100px Anton'));
 if (!fontsOk) console.warn('! Anton font not loaded (offline?). Falling back to system fonts.');
 const events = await page.evaluate(() => window.__events);
+try {      // every sound cue and its time, so what will play can be checked before a render
+  fs.writeFileSync(path.join(build, 'sfx.json'), JSON.stringify(events.map(e => ({ t: +(+e.t).toFixed(2), type: e.type, vol: e.vol, ...(e.find ? { find: e.find } : {}), ...(e.prompt ? { prompt: e.prompt } : {}) })), null, 1));
+} catch { /* not needed to render */ }
 const fellBack = await page.evaluate(() => window.__fallbacks || 0);
 if (fellBack) console.warn(`! ${fellBack} image(s) failed to load in the browser; their hand-drawn fallback was used.`);
 const cdp = await page.context().newCDPSession(page);
@@ -515,6 +519,7 @@ const ff = (a, quiet = true) => {
 };
 
 // ---------- designed cover: big headline + hero visual + series tag (out/cover.png, out/cover-grid.jpg) ----------
+let coverMade = false;
 async function makeCover() {
   const cv = reel.cover || {};
   const cs = scenes.find(x => x.id === cv.scene) || scenes.find(x => x.visual && x.visual.type !== 'endcard') || scenes[0];
@@ -542,6 +547,29 @@ async function makeCover() {
 }
 if (flag('cover')) { const c = await makeCover(); await browser.close(); FINISHED = true; console.log(JSON.stringify({ cover: c, grid: path.join(outDir, WIDE ? 'thumbnail.jpg' : 'cover-grid.jpg') }, null, 1)); process.exit(0); }
 
+// the mood's track for this reel: skips tracks the last few reels in this workspace used, and genres in music_avoid
+const musicAvoidTags = cfg => [].concat(cfg.music_avoid ?? SETTINGS.audio?.music_avoid ?? []).map(String).filter(Boolean);
+async function chooseMusic(cfg, allowNetwork) {
+  const { findMusic } = await import('./sfx.mjs');
+  const recentN = cfg.music_avoid_recent ?? 5, avoid = [];           // tracks used by the last N reels rendered in this workspace
+  if (recentN > 0) try {
+    const ws = path.dirname(proj);
+    const sib = fs.readdirSync(ws, { withFileTypes: true }).filter(d => d.isDirectory() && path.join(ws, d.name) !== proj)
+      .map(d => path.join(ws, d.name, 'credits.json')).filter(f => fs.existsSync(f)).map(f => ({ f, m: fs.statSync(f).mtimeMs })).sort((a, b) => b.m - a.m).slice(0, recentN);
+    for (const x of sib) for (const c of JSON.parse(fs.readFileSync(x.f, 'utf8'))) if (c.kind === 'music') avoid.push({ file: String(c.file).replace(/^music: /, ''), reel: path.basename(path.dirname(x.f)) });
+  } catch { /* no siblings */ }
+  const r = await findMusic(cfg.music_mood, { key: slug, allowNetwork, avoidTags: musicAvoidTags(cfg), avoid: avoid.map(a => a.file),
+    prefer: (() => { try { return String(JSON.parse(fs.readFileSync(path.join(proj, 'credits.json'), 'utf8')).find(c => c.kind === 'music')?.file || '').replace(/^music: /, ''); } catch { return ''; } })() });   // a re-render keeps its track
+  return { r, avoid };
+}
+const LOUD_GENRES = /\b(rock|metal|punk|grunge|guitar|hard ?core)\b/i;
+function musicLine(r, cfg) {           // title, creator, genres; a warning when a loud genre lands under an explainer
+  const g = r.genres ? ` · ${r.genres.replace(/,/g, ', ')}` : '';
+  const loud = LOUD_GENRES.test(`${r.genres || ''} ${r.credit?.title || ''}`) && !musicAvoidTags(cfg).length;
+  return { text: `"${r.credit?.title}" by ${r.credit?.creator || 'unknown'} (${r.credit?.licence}${g}) · ${path.basename(r.file)} ("music_avoid": ["${path.basename(r.file)}"] skips it)`,
+    warn: loud ? `! music "${r.credit?.title}" is tagged ${(`${r.genres || ''} ${r.credit?.title || ''}`.match(LOUD_GENRES) || [''])[0]}: for a suspense or curiosity reel set "music_avoid": ["rock", "guitar"] (or another music_mood)` : null };
+}
+
 // ---------- QA modes ----------
 if (flag('stills') || opt('at')) {
   const dir = path.join(build, 'stills'); fs.mkdirSync(dir, { recursive: true });
@@ -558,6 +586,9 @@ if (flag('stills') || opt('at')) {
         return { tt, name: `${String(i + 1).padStart(2, '0')}`, id: s.id };
       });
   for (const sh of shots) fs.writeFileSync(path.join(dir, sh.name + '.png'), await grab(sh.tt, 'png'));
+  const frame0 = opt('at') ? 1 : await page.evaluate(() => { window.__seek(0);    // what a preview built from the first frame shows
+    return [...document.querySelectorAll('.hl .w, .hs-strip .w, .obj, .ov, .news, .term, .labfile, .stat, .map, .chart')]
+      .filter(e => e.offsetWidth && +getComputedStyle(e).opacity > 0.5).length; });
   const safe = opt('at') ? [] : await page.evaluate(() => window.__safeCheck());
   const artWarn = [];
   if (!opt('at')) for (const [name, raw] of ART_FILES) {
@@ -566,6 +597,24 @@ if (flag('stills') || opt('at')) {
   }
   await browser.close();
   if (artWarn.length) { console.warn(`! ${artWarn.length} drawing warning(s):`); for (const w of artWarn) console.warn('   - ' + w); }
+  // motion: still drawings everywhere, or the same entrance over and over, make a static reel that passes every other check
+  {
+    const art = [...scenes].sort((a, b) => a.start - b.start).filter(x => x.visual?.type === 'art' && x.visual.svg && !x.visual.image && !x.visual.video && x.hold !== true);   // drawings: photos and clips may hold still
+    const still = art.filter(x => x.visual.motion === 'none').length;
+    const ent = art.map(x => x.visual.enter || data.art_enter || 'fadeUp');
+    let run = 1, worst = 1, which = ent[0];
+    for (let k = 1; k < ent.length; k++) { run = ent[k] === ent[k - 1] ? run + 1 : 1; if (run > worst) { worst = run; which = ent[k]; } }
+    const msgs = [];
+    if (art.length >= 4 && still / art.length >= 0.5) msgs.push(`${still}/${art.length} drawings are still ("motion": "none"): give most of them float, drift, pulse, shiver or kenburns`);
+    if (worst >= 4 && which !== 'sketch') msgs.push(`the same entrance ("${which}") in ${worst} scenes in a row: vary "enter" (slideL / slideR, spring, drop, zoom, sketch)`);
+    if (msgs.length) { console.warn('! motion:'); for (const m of msgs) console.warn('   - ' + m); }
+  }
+  if (!opt('at') && !reel.audio?.music && reel.audio?.music_mood && reel.audio.music_mood !== 'none') {
+    const cfg = Object.assign({ music_volume: 0.18 }, reel.audio);
+    try { const { r } = await chooseMusic(cfg, false); if (r) { const ml = musicLine(r, cfg); console.log('music (this reel): ' + ml.text); if (ml.warn) console.warn(ml.warn); } } catch { /* offline: picked at render */ }
+  }
+  if (!frame0 && (reel.first_frame ?? SETTINGS.video?.first_frame) !== 'cover')
+    console.warn('! frame 0 is the empty page (headline and art are still entering): WhatsApp, X and LinkedIn previews show it. "first_frame": "cover" in reel.json (or settings video.first_frame) puts the cover there');
   const maxScene = reel.max_scene_seconds || (WIDE ? Math.max(8, SETTINGS.content?.max_scene_seconds || 0) : SETTINGS.content?.max_scene_seconds || 5);
   const long = scenes.filter(x => !x._beatOf && x.visual?.type !== 'endcard' && x.hold !== true && !(x.overlays || []).some(o => o.type === 'countdown') && longestStretch(x) > maxScene && !scenes.some(y => y._beatOf === x.id));
   if (safe.length) { console.warn(`! ${safe.length} layout warning(s): platform UI zones (covered by buttons/captions on Instagram/TikTok), cut-off, overlapping or low-contrast elements:`); for (const w of safe) console.warn(`   - ${w.scene}: "${w.what}" → ${w.zone}`); }
@@ -640,6 +689,15 @@ const loadTimer = setInterval(() => {
   if (hasSmi) { const r = spawnSync('nvidia-smi', ['--query-gpu=utilization.gpu,utilization.encoder,temperature.gpu', '--format=csv,noheader,nounits'], { encoding: 'utf8' });
     const [g, e, tp] = (r.stdout || '').trim().split('\n')[0].split(',').map(Number); if (isFinite(g)) { LOAD.gpu.push(g); LOAD.enc.push(e); LOAD.temp.push(tp); } }
 }, 3000);
+const FIRST = reel.first_frame ?? SETTINGS.video?.first_frame;
+let coverFrame = null;
+if (FIRST === 'cover' && !preview) {
+  try {
+    const c = await makeCover(); coverMade = true;
+    const r = spawnSync('ffmpeg', ['-v', 'error', '-i', c, '-vf', `scale=${Math.round(W * scale)}:${Math.round(H * scale)}`, '-f', 'image2pipe', '-c:v', 'mjpeg', '-q:v', '2', '-'], { maxBuffer: 64 << 20 });
+    if (r.status === 0 && r.stdout?.length) coverFrame = r.stdout;
+  } catch (e) { console.warn('! first frame: cover failed (' + e.message + '), keeping the rendered frame'); }
+}
 const workers = await openWorkers(Math.min(WORKERS, Math.max(1, Math.ceil(nFrames / 30))));
 console.log(`capture: ${workers.length} parallel tab(s)`);
 // workers grab frames in any order; the writer feeds ffmpeg strictly in order, with a bounded buffer
@@ -667,14 +725,14 @@ await Promise.all(workers.map(async w => {
     while (next - written > LIMIT) await new Promise(r => setTimeout(r, 4));
     const f0 = next; next += RUN;
     if (f0 >= nFrames) return;
-    for (let f = f0; f < Math.min(f0 + RUN, nFrames); f++) { ready.set(f, await grabOn(w.pg, w.cdp, f / fps)); poke(); }
+    for (let f = f0; f < Math.min(f0 + RUN, nFrames); f++) { ready.set(f, f === 0 && coverFrame ? coverFrame : await grabOn(w.pg, w.cdp, f / fps)); poke(); }
   }
 }));
 await writer;
 for (const w of workers.slice(1)) await w.pg.close();
 for (const b of extraBrowsers) await b.close();
 enc.stdin.end(); await once(enc, 'close');
-if (!preview) { try { await makeCover(); } catch (e) { console.warn('! cover failed: ' + e.message); } }
+if (!preview && !coverMade) { try { await makeCover(); } catch (e) { console.warn('! cover failed: ' + e.message); } }
 await browser.close();
 clearInterval(loadTimer);
 const secs = (Date.now() - t0) / 1000;
@@ -694,9 +752,9 @@ if (flag('no-audio') || !voScenes.length) {
   const sfxDir = path.join(build, 'sfx'); fs.mkdirSync(sfxDir, { recursive: true });
   const { PRESETS, presetFile, aiSfx, findSound, REAL, REAL_DUR } = await import('./sfx.mjs');
   for (const e of events) if (!PRESETS[e.type] && SFX_ALIAS[e.type]) e.type = SFX_ALIAS[e.type];   // "tick" → clock, …
-  const { addCredit } = await import('./library.mjs');
+  const { addCredit, pruneCredits } = await import('./library.mjs');
   const realOn = audioCfg.real_sfx !== false, netOk = !flag('offline');
-  let realUsed = 0;
+  let realUsed = 0; const usedSounds = [], findMissed = [];
   const inputs = []; const chains = []; const voLabels = []; const fxLabels = []; let nIn = 0;
   const add = (f, loop) => { if (loop) inputs.push('-stream_loop', '-1'); inputs.push('-i', f); return nIn++; };
   const ms = x => Math.max(0, Math.round(x * 1000));
@@ -712,11 +770,19 @@ if (flag('no-audio') || !voScenes.length) {
       const lib = async q => {                                       // local packs + free CC0 recordings (cached for every project)
         const r = await findSound(q, { proj, allowNetwork: netOk, variant: ei });
         if (!r) return null;
-        if (r.credit) addCredit(proj, 'sound', path.relative(proj, r.file).replace(/\\/g, '/'), r.credit);
-        realUsed++; return r.file;
+        const rel = path.relative(proj, r.file).replace(/\\/g, '/');
+        if (r.credit) addCredit(proj, 'sound', rel, r.credit);
+        usedSounds.push(rel); realUsed++; return r.file;
       };
       if (e.file) { const p = path.resolve(proj, e.file); if (fs.existsSync(p)) file = p; else console.warn('! sound file missing: ' + e.file); }
-      if (!file && e.find) { file = await lib(e.find); if (file) natural = 2.5; }
+      if (!file && e.find) {
+        file = await lib(e.find); if (file) natural = 2.5;
+        else {                     // say so; an unrelated stand-in (a hiss turning into a buzz) is worse than nothing
+          const fb = e.fallback && e.fallback !== 'none' && PRESETS[e.fallback] ? e.fallback : null;
+          findMissed.push(`"${e.find}" at ${e.t.toFixed(1)} s → ${fb ? fb + ' (its fallback)' : 'skipped'}: ${findSound.lastWhy || 'not found'}`);
+          if (!fb) continue;
+        }
+      }
       if (!file && e.prompt) {
         const r = await aiSfx(e, { allowNetwork: aiOk });            // cached sounds are reused even when ai_sfx is off
         if (r === 'DENIED') { aiOk = false; } else if (r) { file = r; aiUsed++; } else aiFell++;
@@ -730,30 +796,29 @@ if (flag('no-audio') || !voScenes.length) {
       const fadeIn = e.loop ? 'afade=t=in:d=0.3,' : '';
       chains.push(`[${k}:a]aformat=sample_rates=48000:channel_layouts=stereo,${trim}${fadeIn}volume=${(e.vol * (audioCfg.sfx_volume ?? 1)).toFixed(3)},adelay=${ms(e.t)}:all=1[x${k}]`); fxLabels.push(`[x${k}]`);
     }
+    if (findMissed.length) { console.warn(`! ${findMissed.length} "find" sound(s) not found (try again, or other words: node scripts/sfx.mjs find "…"):`); for (const m of findMissed) console.warn('   - ' + m); }
+    pruneCredits(proj, 'sound', usedSounds);
     if (aiUsed || aiFell || realUsed) console.log(`sfx: ${realUsed} real recordings, ${aiUsed} AI sounds${aiFell ? `, ${aiFell} AI cues fell back${audioCfg.ai_sfx ? '' : ' (AI sound effects are off in settings)'}` : ''}`);
   }
   let bedLabel = null;
   if (!audioCfg.music && audioCfg.music_mood && audioCfg.music_mood !== 'none') {     // free real music by mood (CC0 / CC BY)
-    const { findMusic } = await import('./sfx.mjs');
-    const recentN = audioCfg.music_avoid_recent ?? 5, avoid = [];           // tracks used by the last N reels rendered in this workspace
-    if (recentN > 0) try {
-      const ws = path.dirname(proj);
-      const sib = fs.readdirSync(ws, { withFileTypes: true }).filter(d => d.isDirectory() && path.join(ws, d.name) !== proj)
-        .map(d => path.join(ws, d.name, 'credits.json')).filter(f => fs.existsSync(f)).map(f => ({ f, m: fs.statSync(f).mtimeMs })).sort((a, b) => b.m - a.m).slice(0, recentN);
-      for (const x of sib) for (const c of JSON.parse(fs.readFileSync(x.f, 'utf8'))) if (c.kind === 'music') avoid.push({ file: String(c.file).replace(/^music: /, ''), reel: path.basename(path.dirname(x.f)) });
-    } catch { /* no siblings */ }
-    const r = await findMusic(audioCfg.music_mood, { key: slug, allowNetwork: !flag('offline'), avoid: avoid.map(a => a.file),
-      prefer: (() => { try { return String(JSON.parse(fs.readFileSync(path.join(proj, 'credits.json'), 'utf8')).find(c => c.kind === 'music')?.file || '').replace(/^music: /, ''); } catch { return ''; } })() });   // a re-render keeps its track
+    const { r, avoid } = await chooseMusic(audioCfg, !flag('offline'));
     if (r?.skipped?.length) console.log(`music: skipped ${r.skipped.map(f => `${f} (used in ${avoid.find(a => a.file === f)?.reel})`).join(', ')}`);
     if (r) {
       audioCfg.music = r.file; audioCfg.music_volume = audioCfg.music_volume ?? 0.18;
-      const { addCredit } = await import('./library.mjs'); if (r.credit) addCredit(proj, 'music', 'music: ' + path.basename(r.file), r.credit);
-      console.log(`music: "${r.credit?.title}" by ${r.credit?.creator || 'unknown'} (${r.credit?.licence})`);
+      const { addCredit, pruneCredits } = await import('./library.mjs'); pruneCredits(proj, 'music', ['music: ' + path.basename(r.file)]);
+      if (r.credit) addCredit(proj, 'music', 'music: ' + path.basename(r.file), r.credit);
+      const ml = musicLine(r, audioCfg); console.log('music: ' + ml.text); if (ml.warn) console.warn(ml.warn);
     } else console.warn(`! no "${audioCfg.music_mood}" music found; using the ${audioCfg.bed || 'drone'} bed`);
   }
+  { const { pruneCredits } = await import('./library.mjs');      // a bed or your own file: no stale track in the credits
+    pruneCredits(proj, 'music', audioCfg.music ? ['music: ' + path.basename(audioCfg.music)] : []); }
   if (audioCfg.music) {
     const k = add(path.resolve(proj, audioCfg.music));
-    chains.push(`[${k}:a]aformat=sample_rates=48000:channel_layouts=stereo,aloop=loop=-1:size=2e9,atrim=0:${TOTAL},volume=${audioCfg.music_volume},afade=t=in:d=1.2,afade=t=out:st=${Math.max(0, TOTAL - 1.5)}:d=1.5[bedraw]`);
+    // start where the music starts: "music_start" seconds into the track, else after its silent intro (if any)
+    const mStart = parseFloat(audioCfg.music_start) || 0;
+    const lead = mStart > 0 ? `atrim=start=${mStart},asetpts=PTS-STARTPTS,` : audioCfg.music_trim_silence === false ? '' : 'silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.05,';
+    chains.push(`[${k}:a]aformat=sample_rates=48000:channel_layouts=stereo,${lead}aloop=loop=-1:size=2e9,atrim=0:${TOTAL},volume=${audioCfg.music_volume},afade=t=in:d=1.2,afade=t=out:st=${Math.max(0, TOTAL - 1.5)}:d=1.5[bedraw]`);
     bedLabel = '[bedraw]';
   } else if (audioCfg.bed && audioCfg.bed !== 'none') {
     const { bedFile, aiMusic } = await import('./sfx.mjs');

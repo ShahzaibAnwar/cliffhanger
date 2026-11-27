@@ -82,6 +82,10 @@ anything else warns at render time with the closest name, or use `{ "find": "<wo
   trims the silence, evens the loudness and stores them in `sfx-library/` for every later project. Takes
   rotate so repeated cues don't sound identical. Offline, or with `--offline`, the synthesized presets play.
 - Any cue can ask for a specific sound: `{ "find": "thunder rumble", "at": "word:storm", "vol": 0.5, "dur": 2 }`.
+  When nothing can be found or downloaded (the next search result is tried, and a failed download once more), the render
+  lists each such cue with the reason and skips it, or plays its `"fallback"` preset if it has one: a cat hiss turning
+  into an unrelated buzz is worse than silence. `node scripts/sfx.mjs find "cat hiss"` fetches it ahead of time.
+  `credits.json` / `out/credits.txt` list only the sounds and music this render mixed in.
 - Your own file: `{ "file": "sfx/door.wav" }` (path inside the project). A project's `sfx/` folder and
   `sfx-library/` are searched by file name first, so drop in sound packs (Sonniss GDC bundles,
   purchased libraries) and name files by what they are.
@@ -91,6 +95,11 @@ anything else warns at render time with the closest name, or use `{ "find": "<wo
 
 ## Real music by mood
 
+For "why / how" explainers pick `suspense` or `mystery` (auto style does when the topic is a question); `--stills`
+prints the track the reel will get with its genre tags, so a mismatch shows before the render. `"music_avoid":
+["rock", "guitar"]` skips genres or title words, and a file name skips one track.
+Music starts where the track's music starts: a silent intro is skipped (`"music_trim_silence": false` keeps it), and
+`"music_start": 12.5` starts that many seconds in (e.g. to land a drop on the twist).
 `"audio": { "music_mood": "suspense" }` picks a free track for the mood (suspense, mystery, cinematic, epic, calm,
 uplifting, playful, scifi, ambient) from Jamendo / ccMixter / Wikimedia through Openverse: CC0 or CC BY only, titles
 that suggest vocals skipped. Four tracks per mood are downloaded once into `sfx-library/music/`; each reel gets one
