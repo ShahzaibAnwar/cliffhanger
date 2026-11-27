@@ -46,7 +46,7 @@ const write = (dir, reel, timings) => {
   fs.writeFileSync(path.join(dir, 'reel.json'), JSON.stringify(reel, null, 1));
   if (timings) { fs.mkdirSync(path.join(dir, 'build'), { recursive: true }); fs.writeFileSync(path.join(dir, 'build', 'timings.json'), JSON.stringify(timings)); }
 };
-const stills = (dir, at) => { const r = sh([dir, '--at', at.join(',')]); if (/\[page error\]/.test(r.stdout || '')) console.warn('! page error in ' + path.basename(dir)); return at.map((_, i) => path.join(dir, 'build', 'stills', String(i + 1).padStart(2, '0') + '.png')); };
+const stills = (dir, at) => { const r = sh([dir, '--at', at.join(',')]); if (/\[page error\]/.test(r.stdout || '')) console.warn('! page error in ' + path.basename(dir)); return at.map(t => path.join(dir, 'build', 'stills', `at-${+Number(t).toFixed(2)}s.png`)); };
 const thumb = (src, dst, w = 540) => { fs.mkdirSync(path.dirname(dst), { recursive: true }); ffm(['-i', src, '-vf', `scale=${w}:-1`, '-q:v', '3', dst]); return dst; };
 // fake word timings so captions can be shown without a voiceover
 const fakeWords = (text, t0 = 0.25, wps = 2.6) => text.split(/\s+/).map((w, i) => ({ w, s: +(t0 + i / wps).toFixed(3), e: +(t0 + (i + 0.85) / wps).toFixed(3) }));

@@ -124,7 +124,7 @@ t('video clips play frame-exact', () => {
   fs.writeFileSync(path.join(proj, 'reel.json'), JSON.stringify({ title: 'clip', scenes: [{ id: 'c', duration: 3, headline: ['CLIP'], visual: { type: 'art', video: 'art/c.mp4', finish: 'print', motion: 'none' } }] }));
   const out = sh(process.execPath, [path.join(HERE, 'render.mjs'), proj, '--at', '0.5,2.0']);
   if (/\[page error\]/.test(out)) throw new Error('page errors');
-  const [f1, f2] = ['01.png', '02.png'].map(f => fs.readFileSync(path.join(proj, 'build', 'stills', f)));
+  const [f1, f2] = ['at-0.5s.png', 'at-2s.png'].map(f => fs.readFileSync(path.join(proj, 'build', 'stills', f)));
   if (f1.equals(f2)) throw new Error('the clip did not move between 0.5 s and 2.0 s');
   return 'moves between frames';
 });
@@ -263,6 +263,106 @@ t('localize: channel block, text overrides, cue warnings, destination voice', ()
   if (o.voice.elevenlabs.voice_id !== 'dest-voice-ur') throw new Error('voice not taken from the destination series.json');
   if (!/cue "cry" → "دو" uses "دو", which matches/.test(all)) throw new Error('repeated cue word not warned');
   return 'brand/series/title, overlays (merge + drop), beats, end card, destination voice, cue warning';
+});
+t('drawing checks: flat clip-art, text in art, cut-off ink; artkit, view crop, --at names', () => {
+  const proj = path.join(tmpProj, 'artchk'); fs.mkdirSync(path.join(proj, 'art'), { recursive: true });
+  const run = a => { const r = spawnSync(a[0], a.slice(1), { encoding: 'utf8', cwd: ROOT, maxBuffer: 64 << 20 }); if (r.status !== 0) throw new Error(a.join(' ') + ' failed: ' + (r.stderr || r.stdout).slice(-400)); return (r.stdout || '') + (r.stderr || ''); };
+  // v1-style clip-art: flat fills, a label inside, a label that runs off the right edge
+  fs.writeFileSync(path.join(proj, 'art', 'flat.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><ellipse cx="200" cy="170" rx="150" ry="90" fill="#C4C9D2" stroke="#2b2420" stroke-width="5"/><circle cx="90" cy="120" r="40" fill="#E9A3B8"/><circle cx="80" cy="160" r="8" fill="#111"/><text x="300" y="60" font-size="40" fill="#2b2420">NEW HAIR</text></svg>');
+  run(['python', path.join(HERE, 'artkit.py'), '--demo', path.join(proj, 'art', 'kit.svg')]);
+  const out = run([process.execPath, path.join(HERE, 'art-preview.mjs'), path.join(proj, 'art'), '--out', path.join(proj, 'sheet.png')]);
+  if (!/flat\.svg: flat clip-art/.test(out)) throw new Error('flat clip-art not flagged');
+  if (!/flat\.svg: text inside the drawing \("NEW HAIR"\)/.test(out)) throw new Error('text in art not flagged');
+  if (!/flat\.svg: the drawing runs past its viewBox \(right \d+/.test(out)) throw new Error('cut-off label not flagged:\n' + out);
+  if (/kit\.svg:/.test(out)) throw new Error('the artkit demo drawing got warnings:\n' + out);
+  // library drawings stay clean
+  const lib = run([process.execPath, path.join(HERE, 'art-preview.mjs'), path.join(ROOT, 'assets', 'art'), '--out', path.join(proj, 'lib.png')]);
+  if (/drawing warning/.test(lib)) throw new Error('library drawings have warnings:\n' + lib);
+  // --stills repeats the checks; --at frames are named by time and keep the stills set
+  fs.writeFileSync(path.join(proj, 'reel.json'), JSON.stringify({ scenes: [
+    { id: 'a', duration: 2, headline: ['FLAT'], visual: { type: 'art', svg_file: 'art/flat.svg', w: 700 } },
+    { id: 'b', duration: 2, headline: ['CLOSE', 'UP'], visual: { type: 'art', svg_file: '@lib/arm.svg', view: '130 84 765 150', w: 1000 } }] }));
+  const st = run([process.execPath, path.join(HERE, 'render.mjs'), proj, '--stills']);
+  if (!/drawing warning\(s\)/.test(st) || !/art\/flat\.svg: flat clip-art/.test(st)) throw new Error('--stills did not check the drawing');
+  if (/@lib\/arm\.svg:/.test(st)) throw new Error('library arm flagged in --stills');
+  run([process.execPath, path.join(HERE, 'render.mjs'), proj, '--at', '0.5,3']);
+  const dir = path.join(proj, 'build', 'stills');
+  for (const f of ['01.png', '02.png', 'at-0.5s.png', 'at-3s.png']) if (!fs.existsSync(path.join(dir, f))) throw new Error('missing still ' + f + ' (have ' + fs.readdirSync(dir).join(', ') + ')');
+  // "view" crops the drawing: the same scene without it must look different
+  const p2 = path.join(tmpProj, 'artchk2'); fs.mkdirSync(p2, { recursive: true });
+  fs.writeFileSync(path.join(p2, 'reel.json'), JSON.stringify({ scenes: [{ id: 'a', duration: 2, headline: ['FLAT'], visual: { type: 'art', svg_file: '@lib/arm.svg', w: 700 } },
+    { id: 'b', duration: 2, headline: ['CLOSE', 'UP'], visual: { type: 'art', svg_file: '@lib/arm.svg', w: 1000 } }] }));
+  run([process.execPath, path.join(HERE, 'render.mjs'), p2, '--at', '3']);
+  if (fs.readFileSync(path.join(dir, 'at-3s.png')).equals(fs.readFileSync(path.join(p2, 'build', 'stills', 'at-3s.png')))) throw new Error('"view" made no difference');
+  return 'v1-style art flagged 3 ways, artkit demo + library clean, --stills checks, view crop, at-<t>s.png kept beside 01.png';
+});
+t('3D close-ups render (three.js, when installed)', () => {
+  const o = path.join(tmpProj, 'three', 'cells.png');
+  const r = spawnSync(process.execPath, [path.join(HERE, 'three-render.mjs'), '@three/cells', o, '--w', '400', '--h', '300'], { encoding: 'utf8', cwd: ROOT, maxBuffer: 16 << 20 });
+  if (r.status === 2 && /not installed/.test(r.stderr)) return 'skipped: three.js not installed (that is a download, the user\'s call)';
+  if (r.status !== 0) throw new Error((r.stderr || r.stdout).slice(-400));
+  const a = spawnSync('ffmpeg', ['-v', 'error', '-i', o, '-vf', 'alphaextract,scale=1:1', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], { maxBuffer: 1 << 20 }).stdout?.[0];
+  if (!(a > 10 && a < 245)) throw new Error('expected a transparent PNG with cells on it (mean alpha ' + a + ')');
+  const s2 = spawnSync(process.execPath, [path.join(HERE, 'three-render.mjs'), '@three/skin', path.join(tmpProj, 'three', 'skin.png'), '--w', '400', '--h', '300', '--bg', 'F1EBDF'], { encoding: 'utf8', cwd: ROOT });
+  if (s2.status !== 0) throw new Error('skin template failed: ' + (s2.stderr || '').slice(-300));
+  return 'cells (transparent) + skin (paper background)';
+});
+t('ink auto keeps dark hair, caption band covers art and compare labels, cut-ins split long shots', () => {
+  const proj = path.join(tmpProj, 'why04'); fs.mkdirSync(path.join(proj, 'art'), { recursive: true }); fs.mkdirSync(path.join(proj, 'build'), { recursive: true });
+  fs.writeFileSync(path.join(proj, 'art', 'mic.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 600"><clipPath id="c"><rect x="40" y="10" width="120" height="580" rx="40"/></clipPath><g clip-path="url(#c)"><rect width="200" height="600" fill="url(#kit-metal)"/></g><rect x="40" y="10" width="120" height="580" rx="40" fill="none" stroke="#2b2420" stroke-width="6"/></svg>');
+  fs.writeFileSync(path.join(proj, 'art', 'head.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><clipPath id="h"><circle cx="200" cy="220" r="150"/></clipPath><g clip-path="url(#h)"><rect width="400" height="400" fill="url(#kit-skin)"/></g><path d="M60 200 C 60 60, 340 60, 340 200 L 300 150 L 100 150 Z" fill="#3B2A22"/><circle cx="150" cy="240" r="12" fill="#111"/><circle cx="250" cy="240" r="12" fill="#111"/><circle cx="200" cy="220" r="150" fill="none" stroke="#111" stroke-width="6"/></svg>');
+  const LONG = 'This is a long line that keeps going on and on so the scene lasts well over five seconds on screen today friends';
+  const reel = { title: 'w4', subtitles: { burn: true }, scenes: [
+    { id: 'mic', vo: 'The studio mic sits here and it is tall.', headline: ['THE', 'MIC'], visual: { type: 'art', svg_file: 'art/mic.svg', w: 420, y: 1020 } },
+    { id: 'cmp', vo: 'What the mic hears versus what you hear.', headline: ['TWO', 'VOICES'], visual: { type: 'compare', left: { svg_file: 'art/mic.svg', label: 'WHAT THE MIC HEARS', w: 120 }, right: { svg_file: 'art/mic.svg', label: 'WHAT YOU HEAR', w: 120 } } },
+    { id: 'hair', theme: 'dark', vo: 'Your head bone carries it.', headline: ['HEAD', 'BONE'], visual: { type: 'art', svg_file: 'art/head.svg', ink: 'auto', w: 700 } },
+    { id: 'stamped', vo: LONG, headline: ['STAMP'], overlays: [{ type: 'stamp', text: 'TRUE', at: '50%' }] },
+    { id: 'plain', vo: LONG, headline: ['PLAIN'] }] };
+  fs.writeFileSync(path.join(proj, 'reel.json'), JSON.stringify(reel));
+  const tm = {}; for (const x of reel.scenes) { const w = x.vo.split(/\s+/); tm[x.id] = { file: 'build/none.mp3', duration: w.length * 0.37 + 0.3, words: w.map((q, i) => ({ w: q, s: i * 0.37, e: i * 0.37 + 0.32 })) }; }
+  fs.writeFileSync(path.join(proj, 'build', 'timings.json'), JSON.stringify({ scenes: tm }));
+  const r = spawnSync(process.execPath, [path.join(HERE, 'render.mjs'), proj, '--stills'], { encoding: 'utf8', cwd: ROOT, maxBuffer: 64 << 20 });
+  const all = (r.stdout || '') + (r.stderr || '');
+  if (r.status !== 0) throw new Error('render failed: ' + all.slice(-300));
+  if (!/mic: "art art\/mic\.svg" → subtitle band/.test(all)) throw new Error('art in the caption band not flagged');
+  if (!/cmp: "WHAT THE MIC HEARS" → subtitle band/.test(all)) throw new Error('compare label in the caption band not flagged');
+  if (/hair:.*low contrast/.test(all)) throw new Error('dark hair with a light outline flagged as low contrast');
+  if (/- stamped:/.test(all) || !/- plain:/.test(all)) throw new Error('a mid-line stamp should split the shot (and only that scene)');
+  // pixels: hair stays brown, eyes stay dark, the outline turns light (still 03, art centred at x 540)
+  const px = (x, y) => spawnSync('ffmpeg', ['-v', 'error', '-i', path.join(proj, 'build', 'stills', '03.png'), '-vf', `crop=4:4:${x - 2}:${y - 2},scale=1:1`, '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], { maxBuffer: 1 << 20 }).stdout?.[0];
+  const hair = px(540, 1020), eye = px(453, 1247), line = Math.max(...[946, 950, 954].map(y => px(540, y)));
+  if (!(hair < 90)) throw new Error('dark hair turned light (' + hair + ')');
+  if (!(eye < 70)) throw new Error('eye on the skin turned light (' + eye + ')');
+  if (!(line > 150)) throw new Error('outline on the dark page stayed dark (' + line + ')');
+  return 'mic + compare label in the band, hair not flagged, stamp splits the shot';
+});
+t('localize: late punch words get punch_at, new beats from the lines file, beats block for long scenes', () => {
+  const srcP = path.join(tmpProj, 'loc-src'), out = path.join(tmpProj, 'loc-src-ur'); fs.mkdirSync(srcP, { recursive: true });
+  fs.writeFileSync(path.join(srcP, 'reel.json'), JSON.stringify({ title: 'Voice', scenes: [
+    { id: 'hook', vo: 'Why does your voice sound weird on a mic?', headline: ['WHY', 'MIC'] },
+    { id: 'long', vo: 'Because inside your head the bones carry the low notes to your ears and nobody else ever hears that part at all', headline: ['BONES'] }] }));
+  const lp = path.join(tmpProj, 'lines.ur.json');
+  fs.writeFileSync(lp, JSON.stringify({
+    hook: { vo: 'آپ کی آواز عجیب کیوں لگتی ہے جب سنیں MIC', headline: ['KYUN', 'MIC'] },
+    long: { vo: 'کیونکہ آپ کے سر کے اندر ہڈیاں نیچے سر کانوں تک لے جاتی ہیں اور یہ حصہ کوئی اور کبھی نہیں سنتا بالکل بھی نہیں', beats: [{ at: 'word:ہڈیاں', visual: { type: 'art', svg_file: '@lib/skull.svg' } }] } }));
+  const r = spawnSync(process.execPath, [path.join(HERE, 'localize.mjs'), srcP, '--lang', 'ur', '--lines', lp, '--out', out], { encoding: 'utf8', cwd: ROOT });
+  const log = (r.stdout || '') + (r.stderr || '');
+  if (r.status !== 0) throw new Error('localize failed: ' + log.slice(-300));
+  const o = JSON.parse(fs.readFileSync(path.join(out, 'reel.json'), 'utf8')), hook = o.scenes.find(x => x.id === 'hook'), lg = o.scenes.find(x => x.id === 'long');
+  if (hook.punch_at !== 0.6 || !/punch line said late in 1 line/.test(log)) throw new Error('late punch word not given punch_at: ' + hook.punch_at);
+  if (!lg.beats || lg.beats.length !== 1 || lg.beats[0].visual.svg_file !== '@lib/skull.svg') throw new Error('new beat from the lines file not added');
+  // the beats block: the long scene without its beat, voiced slowly, gets a ready lines.ur.json block
+  delete lg.beats; fs.writeFileSync(path.join(out, 'reel.json'), JSON.stringify(o));
+  fs.mkdirSync(path.join(out, 'build'), { recursive: true });
+  const tm = {}; for (const x of o.scenes) { const w = x.vo.split(/\s+/); tm[x.id] = { file: 'build/none.mp3', duration: w.length * 0.45 + 0.3, words: w.map((q, i) => ({ w: q, s: i * 0.45, e: i * 0.45 + 0.4 })) }; }
+  fs.writeFileSync(path.join(out, 'build', 'timings.json'), JSON.stringify({ scenes: tm }));
+  const st = spawnSync(process.execPath, [path.join(HERE, 'render.mjs'), out, '--stills'], { encoding: 'utf8', cwd: ROOT, maxBuffer: 64 << 20 });
+  if (st.status !== 0) throw new Error('render failed: ' + (st.stderr || '').slice(-300));
+  const bf = path.join(out, 'build', 'beats.ur.json');
+  if (!fs.existsSync(bf)) throw new Error('no beats.ur.json block written');
+  const b = JSON.parse(fs.readFileSync(bf, 'utf8'));
+  if (!b.long?.beats?.[0]?.at) throw new Error('beats block has no "at" for the long scene: ' + JSON.stringify(b));
+  return `punch_at 0.6 on a verb-final line, beat added, block → ${b.long.beats[0].at}`;
 });
 const { pickStyle } = await import('./style.mjs');
 t('auto style picks a look from the topic', () => {

@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL, fileURLToPath } from 'node:url';
+import { lintSvg, overflowProbe, overflowMessage } from './artlint.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -70,7 +71,15 @@ for (let i = 0; i < shots.length; i++) {
   await page.evaluate(x => window.__seek(x), shots[i]);
   await page.screenshot({ path: path.join(tmp, String(i + 1).padStart(3, '0') + '.png'), clip: { x: 0, y: 380, width: 1080, height: 1400 } });
 }
+// drawing checks: flat clip-art, text inside the art, ink past the viewBox (cut off in a reel)
+const warns = [];
+for (const f of files) if (f.endsWith('.svg')) {
+  const svg = fs.readFileSync(f, 'utf8'), name = path.basename(f);
+  warns.push(...lintSvg(svg, name));
+  const m = overflowMessage(name, await page.evaluate(overflowProbe, svg)); if (m) warns.push(m);
+}
 await browser.close();
+if (warns.length) { console.warn(`! ${warns.length} drawing warning(s):`); for (const w of warns) console.warn('   - ' + w); }
 const cols = parseInt(opt('cols', String(Math.min(4, shots.length))), 10), rows = Math.ceil(shots.length / cols);
 const out = path.resolve(opt('out', path.join(tmp, 'sheet.png')));
 const r = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-framerate', '1', '-start_number', '1', '-i', path.join(tmp, '%03d.png'),

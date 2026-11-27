@@ -22,9 +22,12 @@
 ## Drawing objects (SVG, no API needed)
 
 **1. Check the library first.** `assets/art/` has ready, shaded pieces. Use them with
-`"svg_file": "@lib/<name>.svg"`: arm (reaching), brain, dna, eye, glass (of water), heart,
-magnifier, neuron, skull, syringe, virus. Reuse beats redraw. When you draw something new and good,
-save it to the library too.
+`"svg_file": "@lib/<name>.svg"`: arm (reaching), arm-goosebumps (the same arm with goosebumps and
+raised hairs), brain, cat, cat-puffed (scared: arched back, fur on end), dna, eye, glass (of water),
+heart, magnifier, mouse, neuron, skull, syringe, virus. Reuse beats redraw. When you draw something
+new and good, save it to the library too.
+The arm is long and thin (the forearm is about 100 units tall in a 900-wide drawing): for a close-up,
+crop it with `"view": "130 84 765 150"` (forearm and hand) and a large `w`.
 
 **2. Draw in layers.** This is what separates an "engraving" from clip art (see `assets/art/brain.svg`):
 
@@ -59,6 +62,27 @@ emphasis; dark-theme art needs light outlines; complex objects are built from si
 (ellipses + béziers); silhouettes are fine for people and animals, while anatomy reads best as cutaways.
 For geometric or repeating art (helixes, spikes, grids, cell clusters), write a small script that
 generates the SVG instead of hand-placing coordinates.
+
+**Organic shapes: `scripts/artkit.py`.** Hand-placed béziers give lumpy animals. Write a small
+Python script in the project (`art/make_art.py`) that imports the kit helpers:
+
+```python
+import sys; sys.path.insert(0, r"<skill>/scripts")
+from artkit import *
+body = [(150, 250), (300, 200), (450, 230), (500, 320), (300, 370), (160, 330)]   # a few points
+d = furry_path(body, amp=14, seed=4, skip=lambda x, y: y > 330)                 # fur, smooth belly
+save("art/critter.svg", shaded("body", d, "#7D8798",
+     shade=[(380, 360, 200, 80, "kit-hatch"), (420, 380, 120, 50, "kit-hatch-r")],
+     highlight=(280, 230, 110, 22)), fit_viewbox(body, pad=40))
+```
+
+`smooth_path(pts)` draws a smooth closed outline through a few points (Catmull-Rom). `furry_path`
+adds fur tufts along the outside, and `skip(x, y)` keeps the belly or face smooth. `tube(centre, w0, w1)`
+gives tapered legs, arms and tails, and `furry_path(tube(...))` gives a bottle-brush tail. `shaded()` does
+the whole layer stack (clip, base, hatched shadow, highlight, details, outline). Furry outlines get
+a thinner ink line (3.6) without `kit-rough`, or they turn into a heavy black smudge.
+`python scripts/artkit.py --demo out.svg` draws a sample that uses all of them. Leave room for fur,
+whiskers and strokes in the viewBox (`fit_viewbox(..., pad=)`): art-preview warns when ink runs past it.
 
 **Entrances for art**: `"enter": "sketch"` draws the whole illustration in by hand (outline, then
 colour), which works great for the first appearance of a key object. `spring`/`swing` suit small props,
@@ -116,6 +140,38 @@ node scripts/art-preview.mjs <project>/art/gen
 
 Supplied images work the same way: `"image": "art/my-photo.png"` with `"blend": "multiply"` (white
 background) or `"screen"` (black background).
+
+## 3D close-ups (three.js)
+
+SVG is best for characters, objects and diagrams. Use 3D for **surfaces, depth and macro views**:
+skin texture, goosebumps, cells drifting in blood, terrain, a crystal turning in the light. These
+look flat or fake when drawn by hand. Render a still with `scripts/three-render.mjs` and use the PNG
+as the art `image`, with an `svg_file` as the fallback:
+
+```bash
+node scripts/three-render.mjs @three/skin <project>/art/skin-raised.png --bg F1EBDF
+node scripts/three-render.mjs @three/skin <project>/art/skin-relaxed.png --bg F1EBDF --set raised=0
+node scripts/three-render.mjs @three/cells <project>/art/cells.png --set n=18
+node scripts/art-preview.mjs <project>/art
+```
+
+```json
+{ "type": "art", "image": "art/skin-raised.png", "svg_file": "@lib/arm-goosebumps.svg", "feather": true, "w": 900 }
+```
+
+- **Templates** (`assets/three/`): `skin` (goosebump skin; `raised=0`, `skin=`, `hair=`) and
+  `cells` (red blood cells; `n=`, `color=`, `seed=`, `spread=`). Each lists its options at the top.
+  For something new, copy a template: it loads three from `__THREE__`, reads `w`/`h`/`bg` from the
+  query string and sets `document.title = 'done'` when rendered.
+- **Match the drawings**: light from the upper left, `MeshStandardMaterial` (toon shading makes
+  banding artifacts on rounded bumps) and an ink outline (an inverted hull: a slightly larger copy
+  with `side: BackSide` in `#2b2420`).
+- **Dark scenes**: dark details (hairs, pores) vanish on a transparent PNG over the dark page. Render on
+  the paper colour (`--bg F1EBDF`) and use `"feather": true` (plus `"halftone": false` in the collage
+  look), which looks like a magnifier view.
+- **three.js is not installed with the skill.** The script finds it in `scripts/node_modules`, the
+  global npm folder or `~/node_modules`. If it's missing, installing it (`cd scripts && npm install three`)
+  is a download, so ask the user first and fall back to SVG meanwhile.
 
 ## Colour tokens
 

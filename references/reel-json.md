@@ -100,7 +100,7 @@ looped, frame-exact; `rate`, `from`, `loop`), `video_prompt` (a clip to make in 
 `backing` (`block` · `disc` · `torn` · `none`,
 a paint shape behind the art; `backing_color`, `backing_rot`, `backing_scale`), `halftone` (false to skip the dots),
 `image_provider` (`cloudflare`/`gemini`),
-`feather` (soft oval edge). `"ink": "auto"` on an `svg_file` drawing: on dark scenes its near-black lines, fills and labels take the page's light ink (no pale copy needed); dark details drawn on a light shape of the drawing (eyes on a white ghost, text on a pale card) stay dark. `--stills` flags labels in a drawing that blend into the page. Photo scenes: `bg_prompt`, `bg_style`, `bg_seed`.
+`feather` (soft oval edge), `view` (`"x y w h"`: crop a drawing to part of itself, e.g. `"view": "130 84 765 150"` on `@lib/arm.svg` for a forearm close-up). `"ink": "auto"` on an `svg_file` drawing: on dark scenes its near-black lines, fills and labels take the page's light ink (no pale copy needed); dark details drawn on a light shape of the drawing (eyes on a white ghost or on skin, text on a pale card) stay dark, and large filled areas (dark hair, a black coat) keep their colour. `--stills` flags labels in a drawing that blend into the page. Photo scenes: `bg_prompt`, `bg_style`, `bg_seed`.
 Keys: `x`(540) `y`(1180) `w`(820) `motion`: `float`(default) · `hover` (insects) · `kenburns` ·
 `kenout` · `drift` (`dx`,`dy`) · `pulse` · `spin` · `shiver` · `flutter` (paper sway; default for prints) · `none`. `shadow` (ground shadow, default
 true). `blend`: `multiply` (white-background PNGs on paper) / `screen` (black-background PNGs on dark).

@@ -14,6 +14,7 @@ import { once } from 'node:events';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { gpuPref, browserGpuArgs, pickEncoder as pickEncoderFor } from './gpu.mjs';
 import { alignWords } from './align.mjs';
+import { lintSvg, overflowProbe, overflowMessage } from './artlint.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -184,6 +185,7 @@ function subtitleChunks() {
 
 // ---------- resolve assets (svg_file -> inline svg with scoped ids, image paths -> file urls) ----------
 let svgN = 0;
+const ART_FILES = new Map();     // drawings used by the reel → checked by --stills (flat, text inside, cut off)
 function scopeSvg(svg) {
   const k = ++svgN;
   svg = svg.replace(/<\?xml[^>]*>/, '').replace(/<!DOCTYPE[^>]*>/i, '');
@@ -211,7 +213,8 @@ function resolveAssets(o) {
     } else if (k === 'svg_file') {
       const p = String(o[k]).startsWith('@lib/') ? path.join(LIB, o[k].slice(5)) : path.resolve(proj, o[k]);
       if (!fs.existsSync(p)) { console.error('Missing svg_file: ' + p); process.exit(1); }
-      o.svg = scopeSvg(fs.readFileSync(p, 'utf8')); delete o.svg_file;
+      const raw = fs.readFileSync(p, 'utf8'); ART_FILES.set(String(o[k]), raw);
+      o.svg = scopeSvg(raw); o._src = String(o[k]); delete o.svg_file;
     } else if ((k === 'image' || k === 'bg_image' || k === 'video') && typeof o[k] === 'string' && !/^(https?|data|file):/.test(o[k])) {
       const p = String(o[k]).startsWith('@lib/') ? path.join(LIB, o[k].slice(5)) : path.resolve(proj, o[k]);
       if (!fs.existsSync(p)) { console.error('Missing image: ' + p); process.exit(1); }
@@ -434,6 +437,16 @@ async function openWorkers(n) {
 
 // ---------- engagement check (rules + sources: references/engagement.md) ----------
 // Measurable things that move retention. It can't promise virality; it catches what reliably loses viewers.
+// overlays that pop in mid-shot (a lens, a stamp, a chip…) are a new thing to look at: a cut-in. A shot is only as
+// long as its longest stretch without a beat, a cut or a cut-in.
+const CUT_IN = new Set(['lens', 'stamp', 'chip', 'callout', 'art', 'labfile', 'terminal', 'counter', 'tag']);
+function longestStretch(x, end = x.end) {
+  const ts = (x.overlays || []).filter(o => CUT_IN.has(o.type) && o.at != null).map(o => atTime(x, o.at))
+    .filter(t => t > x.start + 0.5 && t < end - 0.5).sort((a, b) => a - b);
+  let prev = x.start, m = 0;
+  for (const t of [...ts, end]) { m = Math.max(m, t - prev); prev = t; }
+  return m;
+}
 function engagementCheck() {
   const out = [], add = (ok, rule, detail, fix) => out.push({ ok, rule, detail, fix: ok ? undefined : fix });
   const main = scenes.filter(x => !x._beatOf), first = main[0] || {};
@@ -453,13 +466,13 @@ function engagementCheck() {
   // 4. pacing: a new visual every 2.5–4 s, nothing held longer than 5 s (8 s on 16:9 long-form)
   const ordered = [...scenes].sort((a, b) => a.start - b.start);
   const isHold = x => x.hold === true || (x.overlays || []).some(o => o.type === 'countdown');        // play-along stills and "think" pauses are held on purpose
-  const shotsAll = ordered.map((x, i, arr) => ({ d: (i + 1 < arr.length ? arr[i + 1].start : TOTAL) - x.start, id: x.id, hold: isHold(x) }))
+  const shotsAll = ordered.map((x, i, arr) => { const end = i + 1 < arr.length ? arr[i + 1].start : TOTAL; return { d: end - x.start, run: longestStretch(x, end), id: x.id, hold: isHold(x) }; })
     .filter((o, i) => o.d > 0.05 && !(i === ordered.length - 1 && (WIDE || ordered[i].visual?.type === 'endcard')));   // end card holds on purpose
-  const shots = shotsAll.map(o => o.d), free = shotsAll.filter(o => !o.hold), longestShot = free.reduce((a, b) => (b.d > a.d ? b : a), { d: 0, id: '' });
+  const shots = shotsAll.map(o => o.d), free = shotsAll.filter(o => !o.hold), longestShot = free.reduce((a, b) => (b.run > a.run ? b : a), { run: 0, id: '' });
   const cap = WIDE ? 8 : 5, nHold = shotsAll.filter(o => o.hold && o.d > cap + 0.5).length;
-  const avg = shots.reduce((a, b) => a + b, 0) / Math.max(1, shots.length), longest = longestShot.d;
+  const avg = shots.reduce((a, b) => a + b, 0) / Math.max(1, shots.length), longest = longestShot.run;
   add(avg >= 2 && avg <= (WIDE ? 6 : 4.5), 'Visual changes every 2.5–4 s', `average ${avg.toFixed(1)} s per visual`, avg < 2 ? 'slow down: under 2 s per shot lowers retention (too fast to follow)' : 'add "beats" (a new visual mid-line) so something changes every 2.5–4 s');
-  add(longest <= cap + 0.5, `No visual held over ${cap} s`, `longest ${longest.toFixed(1)} s: ${longestShot.id}${nHold ? ` (${nHold} intentional hold${nHold > 1 ? 's' : ''} not counted)` : ''}`, 'split the longest scene with beats or a cut-in (lens, chip, stamp)');
+  add(longest <= cap + 0.5, `No visual held over ${cap} s`, `longest ${longest.toFixed(1)} s: ${longestShot.id}${nHold ? ` (${nHold} intentional hold${nHold > 1 ? 's' : ''} not counted)` : ''}`, 'split the longest scene with beats, or a cut-in (lens, chip, stamp) that appears mid-line ("at": "word:…")');
   // 5. length
   if (!WIDE) add(TOTAL >= 30 && TOTAL <= 90, 'Length 30–90 s (best 45–60)', `${TOTAL.toFixed(0)} s`, TOTAL > 180 ? 'over 3:00 is not shown to non-followers on Reels and is the Shorts maximum: cut it down' : TOTAL < 30 ? 'very short: data favour 30–60 s for reach' : 'aim for 45–60 s; trim weaker beats');
   // 6. narration pace
@@ -532,9 +545,10 @@ if (flag('cover')) { const c = await makeCover(); await browser.close(); FINISHE
 // ---------- QA modes ----------
 if (flag('stills') || opt('at')) {
   const dir = path.join(build, 'stills'); fs.mkdirSync(dir, { recursive: true });
-  for (const f of fs.readdirSync(dir)) if (f.endsWith('.png')) fs.rmSync(path.join(dir, f), { force: true });
+  // --at frames are named by time (at-3.2s.png) and don't replace the --stills set (01.png …), or the other way round
+  for (const f of fs.readdirSync(dir)) if (f.endsWith('.png') && (opt('at') ? /^at-/.test(f) : !/^at-/.test(f))) fs.rmSync(path.join(dir, f), { force: true });
   const shots = opt('at')
-    ? opt('at').split(',').map(Number).map((tt, i) => ({ tt, name: `${String(i + 1).padStart(2, '0')}`, id: tt + 's' }))
+    ? opt('at').split(',').map(Number).filter(Number.isFinite).map(tt => ({ tt, name: `at-${+tt.toFixed(2)}s`, id: tt + 's' }))
     : scenes.map((s, i) => {
         let tt = Math.min(s.end - 0.05, s.start + Math.max(s.dur * 0.82, s.dur - 0.35));
         if (data.subs?.length) {      // burned captions: pick a moment inside the scene's last caption, so stills show them
@@ -545,9 +559,15 @@ if (flag('stills') || opt('at')) {
       });
   for (const sh of shots) fs.writeFileSync(path.join(dir, sh.name + '.png'), await grab(sh.tt, 'png'));
   const safe = opt('at') ? [] : await page.evaluate(() => window.__safeCheck());
+  const artWarn = [];
+  if (!opt('at')) for (const [name, raw] of ART_FILES) {
+    artWarn.push(...lintSvg(raw, name));
+    const m = overflowMessage(name, await page.evaluate(overflowProbe, raw).catch(() => null)); if (m) artWarn.push(m);
+  }
   await browser.close();
+  if (artWarn.length) { console.warn(`! ${artWarn.length} drawing warning(s):`); for (const w of artWarn) console.warn('   - ' + w); }
   const maxScene = reel.max_scene_seconds || (WIDE ? Math.max(8, SETTINGS.content?.max_scene_seconds || 0) : SETTINGS.content?.max_scene_seconds || 5);
-  const long = scenes.filter(x => !x._beatOf && x.visual?.type !== 'endcard' && x.hold !== true && !(x.overlays || []).some(o => o.type === 'countdown') && x.dur > maxScene && !scenes.some(y => y._beatOf === x.id));
+  const long = scenes.filter(x => !x._beatOf && x.visual?.type !== 'endcard' && x.hold !== true && !(x.overlays || []).some(o => o.type === 'countdown') && longestStretch(x) > maxScene && !scenes.some(y => y._beatOf === x.id));
   if (safe.length) { console.warn(`! ${safe.length} layout warning(s): platform UI zones (covered by buttons/captions on Instagram/TikTok), cut-off, overlapping or low-contrast elements:`); for (const w of safe) console.warn(`   - ${w.scene}: "${w.what}" → ${w.zone}`); }
   // headline punch line that lands late: line 1 sits alone on screen until its first word is spoken
   const latePunch = [];
@@ -566,15 +586,27 @@ if (flag('stills') || opt('at')) {
   if (latePunch.length) { console.warn(`! ${latePunch.length} headline punch line(s) land late:`); for (const w of latePunch) console.warn('   - ' + w); }
   if (long.length) {
     console.warn(`! ${long.length} scene(s) longer than ${maxScene}s on one visual (add "beats" for a new visual mid-line; the voice doesn't change):`);
+    const block = {};
     for (const x of long) {
       const mid = x.dur / 2, w = [...(x.words || [])].filter(q => q.s > 1.2 && q.s < x.dur - 1.2 && nzw(q.w).length >= 3).sort((p, q) => Math.abs(p.s - mid) - Math.abs(q.s - mid))[0];
       const uniq = w && x.words.filter(q => { const m = nzw(q.w), n = nzw(w.w); return m === n || (m.startsWith(n) && n.length >= 3); })[0] === w;
-      console.warn(`   - ${x.id}: ${x.dur.toFixed(1)}s${w && uniq ? ` → e.g. "beats": [{ "at": "word:${String(w.w).replace(/[^\p{L}\p{N}'-]/gu, '')}", "visual": {…} }]  (${w.s.toFixed(1)} s in)` : ` → e.g. "beats": [{ "at": "50%", "visual": {…} }]`}`);
+      const at = w && uniq ? `word:${String(w.w).replace(/[^\p{L}\p{N}'-]/gu, '')}` : '50%';
+      block[x.id] = { beats: [...(x.beats || []).map(() => ({})), { at, visual: {} }] };
+      console.warn(`   - ${x.id}: ${x.dur.toFixed(1)}s → e.g. "beats": [{ "at": "${at}", "visual": {…} }]${w && uniq ? `  (${w.s.toFixed(1)} s in)` : ''}`);
+    }
+    // a localized project (localize.mjs copies lines.<lang>.json in): the same beats, ready for the lines file
+    const linesFile = fs.readdirSync(proj).find(f => /^lines\.[a-z-]+\.json$/i.test(f));
+    if (linesFile) {
+      const bf = path.join(build, linesFile.replace(/^lines\./, 'beats.'));
+      fs.writeFileSync(bf, JSON.stringify(block, null, 1) + '\n');
+      console.warn(`   → as a ${linesFile} block: ${bf}\n     fill in each "visual", merge it into the source's ${linesFile} and run localize.mjs again (beats added to reel.json directly are lost when localize runs again)`);
     }
   }
   const cols = Math.min(6, shots.length), rows = Math.ceil(shots.length / cols);
   const contact = path.join(build, 'contact.jpg');
-  ff(['-framerate', '1', '-start_number', '1', '-i', path.join(dir, '%02d.png'), '-vf', `scale=300:-1,tile=${cols}x${rows}:padding=6:color=white`, '-frames:v', '1', '-update', '1', contact]);
+  const list = path.join(build, 'contact.txt');     // the frames of this run, in order (01.png … or at-<t>s.png)
+  fs.writeFileSync(list, shots.map(s => `file '${path.join(dir, s.name + '.png').replace(/\\/g, '/').replace(/'/g, "'\\''")}'\nduration 1`).join('\n') + '\n');
+  ff(['-f', 'concat', '-safe', '0', '-i', list, '-vf', `scale=300:-1,tile=${cols}x${rows}:padding=6:color=white`, '-frames:v', '1', '-update', '1', contact]);
   const chs = chaptersText(), eng = opt('at') ? null : engagementCheck();
   // burned captions: the caption on screen in each still, so wrong caption text shows up without opening images
   const capAt = tt => { const c = (data.subs || []).find(x => tt >= x.t0 && tt < x.t1 + 0.12); return c ? ` | caption: "${c.words.map(w => w.w).join(' ')}"` : ''; };

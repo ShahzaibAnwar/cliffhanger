@@ -112,7 +112,10 @@ const LIB_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'a
 const LIB_WORDS = [['heart', /\bheart|cardi/], ['brain', /\bbrain|cerebr|neuro(?!n)/], ['neuron', /\bneuron|nerve cell|axon|synap/],
   ['eye', /\beye|retina|pupil|iris/], ['skull', /\bskull|skeleton|bone|death/], ['dna', /\bdna|gene|helix|chromosom/],
   ['virus', /\bvirus|viral|germ|bacteri|pathogen|infect|microb/], ['syringe', /\bsyringe|needle|inject|vaccin/],
-  ['glass', /\bglass|water|drink|thirst/], ['magnifier', /\bmagnif|lens|investigat|clue/], ['arm', /\barm\b|hand|wrist|skin|reach/]];
+  ['glass', /\bglass|water|drink|thirst/], ['magnifier', /\bmagnif|lens|investigat|clue/],
+  ['cat-puffed', /\b(scared|angry|puffed|hiss\w*|frightened|startled)\b.{0,24}\bcats?\b|\bcats?\b.{0,24}\b(scared|puffed|hiss\w*|arch\w*|fur on end)/],
+  ['cat', /\bcats?\b|kitten|feline/], ['mouse', /\bmouse|\bmice\b|\brats?\b|rodent/],
+  ['arm-goosebumps', /goose ?bump|goose ?flesh|shiver|hairs? (stand|rais)/], ['arm', /\barm\b|hand|wrist|skin|reach/]];
 export function libraryFallback(prompt) {
   const t = String(prompt || '').toLowerCase();
   for (const [name, re] of LIB_WORDS) if (re.test(t) && fs.existsSync(path.join(LIB_DIR, name + '.svg'))) return '@lib/' + name + '.svg';

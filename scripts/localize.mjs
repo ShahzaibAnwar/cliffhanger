@@ -63,7 +63,8 @@ function autoPos(sceneId, vo, word) {                 // relative position of an
   return i >= 0 ? i / Math.max(1, toks.length) : 0.4;
 }
 let explicit = 0, auto = 0, overridden = 0;
-const missing = [], warnings = [], noAerab = [];
+const missing = [], warnings = [], noAerab = [], earlyPunch = [];
+let addedBeats = 0;
 const TTS = opt('tts') ? read(path.resolve(opt('tts'))) : {};
 const norm2 = w => String(w).toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '');   // the engine's word match
 for (const s of reel.scenes) {
@@ -94,7 +95,7 @@ for (const s of reel.scenes) {
   if (['ur', 'ar', 'fa'].includes(lang) && /[\u0600-\u06FF]/.test(s.vo_tts || L.vo) && !/[\u064B-\u0652\u0670]/.test(s.vo_tts || L.vo)) noAerab.push(s.id);
   // text the viewer reads, for this language / channel: the scene, and each of its beats ("beats": [{…}, {…}] by position)
   const applyText = (tgt, Lx, where) => {
-    for (const k of ['headline', 'section', 'chapter']) if (Lx[k] !== undefined) { tgt[k] = Lx[k]; overridden++; }
+    for (const k of ['headline', 'section', 'chapter', 'punch_at', 'headline_static']) if (Lx[k] !== undefined) { tgt[k] = Lx[k]; overridden++; }
     if (isObj(Lx.visual)) { tgt.visual = merge(tgt.visual || {}, Lx.visual); overridden++; }
     if (Lx.overlays) {
       const ov = Array.isArray(tgt.overlays) ? tgt.overlays : [];
@@ -111,9 +112,21 @@ for (const s of reel.scenes) {
   applyText(s, L, s.id);
   if (Array.isArray(L.beats)) L.beats.forEach((Lb, i) => {
     if (!isObj(Lb) || !Object.keys(Lb).length) return;
-    if (!s.beats?.[i]) { warnings.push(`${s.id}: beat ${i} doesn't exist (the scene has ${s.beats?.length || 0})`); return; }
+    if (!s.beats?.[i]) {        // a new beat for this language (translations run longer): needs "at" and a "visual"
+      const n = s.beats?.length || 0;
+      if (i === n && Lb.at != null && isObj(Lb.visual) && Object.keys(Lb.visual).length) { (s.beats = s.beats || []).push(Lb); addedBeats++; return; }
+      warnings.push(`${s.id}: beat ${i} doesn't exist (the scene has ${n})${i === n ? '; a new beat needs "at" and a "visual"' : ''}`); return;
+    }
     applyText(s.beats[i], Lb, `${s.id} beat ${i}`);
   });
+  // verb-final languages (Urdu, Hindi…) often say the punch word at the end of the line: without punch_at, line 1
+  // of the headline would sit alone until then. Show the punch line early unless the lines file decides.
+  const HL = Array.isArray(s.headline) ? s.headline : null, ai = s.accent_line != null ? s.accent_line : 1;
+  if (HL && HL.length >= 2 && HL[ai] && s.punch_at == null && !s.headline_static) {
+    const vt = String(L.vo).split(/\s+/).filter(Boolean).map(norm2), first = norm2(String(HL[ai]).split(/\s+/)[0]);
+    const at = first ? vt.findIndex(m => m && (m === first || (m.startsWith(first) && first.length >= 3) || (first.startsWith(m) && m.length >= 4))) : -1;
+    if (at >= 0 && at / Math.max(1, vt.length) > 0.5) { s.punch_at = 0.6; earlyPunch.push(s.id); }
+  }
   // a cue must point at one place: the engine takes the cue's first word and the first spoken word that matches it
   const toks = String(L.vo).split(/\s+/).filter(Boolean), tn = toks.map(norm2);
   const hits = w => { const n = norm2(w); return n ? tn.map((m, i) => (m && (m === n || (m.startsWith(n) && n.length >= 3) || (n.startsWith(m) && m.length >= 4)) ? i : -1)).filter(i => i >= 0) : []; };
@@ -152,6 +165,8 @@ for (const s of reel.scenes) {
   });
 }
 if (noAerab.length) warnings.push(`${noAerab.length} line(s) have no aerab (${noAerab.join(', ')}): homographs like جلد may be misread; give them vo_tts with zer/zabar/pesh (--tts tts.${lang}.json)`);
+if (earlyPunch.length) console.log(`  punch line said late in ${earlyPunch.length} line(s) (${earlyPunch.join(', ')}): "punch_at": 0.6 shows it early (set "punch_at" or "headline_static" in lines.${lang}.json to choose)`);
+if (addedBeats) console.log(`  ${addedBeats} new beat(s) from lines.${lang}.json`);
 if (warnings.length) { console.warn(`! ${warnings.length} warning(s):`); for (const w of warnings) console.warn('   - ' + w); }
 console.log(`${out}\n  ${reel.scenes.length} scenes · cues: ${explicit} mapped by you, ${auto} placed automatically · ${overridden} text override(s)${changed.length ? ` · reel: ${[...new Set(changed)].join(', ')}` : ''}`);
 console.log(`  voice ${voiceId}: ${voiceFrom}`);

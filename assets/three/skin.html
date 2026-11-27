@@ -1,0 +1,64 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:transparent;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"__THREE__"}}</script>
+</head><body>
+<script type="module">
+// Macro view of skin with goosebumps: a gently curved patch of skin, each bump with a hair standing up.
+// Render:  node scripts/three-render.mjs @three/skin out.png [--bg F1EBDF] [--set raised=0]
+// Query:   raised=0 (flat skin, hairs lying down) · skin=EDB896 · hair=3A2A22 · cy=3.4 · cz=8.6 (camera)
+// MeshStandardMaterial, not MeshToonMaterial: toon bands make teardrop artifacts on the bumps.
+import * as THREE from 'three';
+try {
+  const q = new URLSearchParams(location.search);
+  const raised = q.get('raised') !== '0';
+  const W = +(q.get('w') || 1200), H = +(q.get('h') || 800);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(1); renderer.setSize(W, H);
+  if (q.get('bg')) renderer.setClearColor('#' + q.get('bg'), 1); else renderer.setClearColor(0, 0);
+  document.body.appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  const cam = new THREE.PerspectiveCamera(30, W / H, 0.1, 100);
+  cam.position.set(0, +(q.get('cy') || 3.4), +(q.get('cz') || 8.6)); cam.lookAt(0, -0.1, 0);
+
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const bumps = [];                                       // bump centres on a jittered grid
+  for (let i = 0; i < 9; i++) for (let j = 0; j < 6; j++)
+    bumps.push([-3.6 + i * 0.9 + (j % 2) * 0.45 + (rnd() - .5) * .25, -1.9 + j * 0.78 + (rnd() - .5) * .2]);
+
+  // skin: a plane bent like a forearm, displaced by the bumps
+  const geo = new THREE.PlaneGeometry(8.4, 5, 240, 150); geo.rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position, bumpH = raised ? 0.3 : 0.0, bumpR = 0.3;
+  const heightAt = (x, z) => {
+    let h = 0;
+    for (const [bx, bz] of bumps) h = Math.max(h, bumpH * Math.exp(-((x - bx) ** 2 + (z - bz) ** 2) / (bumpR * bumpR)));
+    return h - 0.08 * z * z;
+  };
+  for (let k = 0; k < pos.count; k++) pos.setY(k, heightAt(pos.getX(k), pos.getZ(k)));
+  geo.computeVertexNormals();
+  scene.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: '#' + (q.get('skin') || 'EDB896'), roughness: .75 })));
+
+  // hairs: one per bump, standing when raised, lying flat when relaxed
+  const hairMat = new THREE.MeshStandardMaterial({ color: '#' + (q.get('hair') || '3A2A22'), roughness: .6 });
+  for (const [bx, bz] of bumps) {
+    const len = 0.55 + rnd() * 0.25;
+    const hair = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.026, len, 6), hairMat);
+    hair.geometry.translate(0, len / 2, 0);
+    hair.position.set(bx, heightAt(bx, bz) - 0.02, bz);
+    if (raised) hair.rotation.set((rnd() - .5) * .3, 0, (rnd() - .5) * .35);
+    else hair.rotation.set(0, 0, -1.35 + (rnd() - .5) * .1);
+    scene.add(hair);
+  }
+
+  // ink outline: inverted hull of the skin surface, like the drawings' outline
+  const hull = new THREE.Mesh(geo.clone(), new THREE.MeshBasicMaterial({ color: '#2b2420', side: THREE.BackSide }));
+  const hp = hull.geometry.attributes.position, hn = hull.geometry.attributes.normal;
+  for (let k = 0; k < hp.count; k++) hp.setXYZ(k, hp.getX(k) + hn.getX(k) * .035, hp.getY(k) + hn.getY(k) * .035 - .012, hp.getZ(k) + hn.getZ(k) * .035);
+  scene.add(hull);
+
+  const sun = new THREE.DirectionalLight('#fff', 3.2); sun.position.set(-7, 3.5, 3); scene.add(sun);   // upper left
+  scene.add(new THREE.AmbientLight('#fff', 0.55));
+  renderer.render(scene, cam);
+  document.title = 'done';
+} catch (e) { document.title = 'error: ' + e.message; }
+</script></body></html>

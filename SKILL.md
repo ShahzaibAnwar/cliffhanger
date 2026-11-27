@@ -133,10 +133,17 @@ Create the project folder: `reel.json`, `art/`. Schema and every component are i
 - Art: follow `references/visual-style.md` → "Drawing objects". First reuse the library
   (`"svg_file": "@lib/heart.svg"`; list it with `ls "$SKILL_DIR/assets/art"`). Draw new objects in
   layers (silhouette clip → kit gradient → hatched shadow side → highlight → `class="draw"` details →
-  rough ink outline). If the user supplies images or an image tool is available, use PNG cutouts.
+  rough ink outline). Animals, fur, limbs, tails and other organic shapes: generate them with
+  `python "$SKILL_DIR/scripts/artkit.py"` helpers (spline silhouettes, fur tufts, tapered tubes,
+  `shaded()` for the whole layer stack) instead of hand-placing béziers. Textured surfaces and macro
+  close-ups (skin, cells, terrain) can be rendered in 3D (`visual-style.md` → "3D close-ups").
+  If the user supplies images or an image tool is available, use PNG cutouts.
 - **Art review (required for new drawings):**
   `node "$SKILL_DIR/scripts/art-preview.mjs" <project>/art --dark --sketch`, then Read the sheet and
-  fix weak drawings before building scenes. Save strong new pieces to `assets/art/` for reuse.
+  fix weak drawings before building scenes. Fix every drawing warning it prints: **flat clip-art**
+  (solid fills, no kit shading or clip), **text inside the art** (use overlays), and **ink past the
+  viewBox** (cut off in the reel; it suggests the viewBox to use). `--stills` repeats these checks for
+  every drawing in the reel. Save strong new pieces to `assets/art/` for reuse.
   AI images are auto-checked: boxes, frames, uncut backgrounds and missing subjects are re-rolled
   automatically (`images.max_rerolls`); stray captions are removed. Still review the sheet.
 - Motion: settings give every reel transitions (auto glitch/whip on theme changes), a slow camera
@@ -288,8 +295,14 @@ Keep technical words in English where people say them that way.
   replaces them per scene: `"headline"`, `"section"`, `"visual"` (merged, e.g. the end card's `kicker`/`title`/`next`),
   `"overlays"` (by position; `false` leaves one out), and the same inside `"beats"` (by position). localize lists
   what still shows the source's words.
-- **Longer lines:** translations usually run longer, so a scene may now hold one visual over 5 s. `--stills` names
-  each one with a ready beat (`"at": "word:…"` near the middle); beats only add a visual, so no new voiceover.
+- **Longer lines:** translations usually run longer (Urdu about 20%), so a scene may now hold one visual over 5 s.
+  `--stills` names each one with a ready beat (`"at": "word:…"` near the middle) and, in a localized project, writes
+  them as a block for the lines file (`build/beats.ur.json`): fill in each `"visual"`, merge it into `lines.ur.json`
+  and run localize again. A beat in the lines file past the source's beats is added as a new beat (it needs `"at"`
+  and a `"visual"`). Beats only add a visual, so no new voiceover.
+- **Punch lines in verb-final languages:** when the headline's punch word comes in the second half of the translated
+  line (Urdu, Hindi), localize sets `"punch_at": 0.6` so the punch line shows early instead of line 1 sitting alone;
+  `"punch_at"` or `"headline_static"` in the lines file overrides it.
 - **Another channel:** a top-level `"reel"` block in `lines.<lang>.json` (or `--brand brand.json`, one file per
   channel) sets `brand`, `series`, `cover`, `css`, `title`… With `--out` in the other channel's folder, the voice
   comes from that folder's `series.json` (then the source's, then your default; `--voice` always wins).

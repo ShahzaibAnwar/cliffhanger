@@ -202,12 +202,19 @@
   // ghost, a letter on a grey square), or null when el sits straight on the page. Shapes in defs / clip paths aren't painted.
   const SHAPES = 'path,circle,ellipse,rect,polygon,polyline,line,text';
   const NOPAINT = 'defs,clipPath,mask,pattern,marker,symbol';
+  const paintLum = f => {                            // a colour, or a gradient (kit-skin, kit-metal…) as the average of its stops
+    const L = lumOf(f); if (L != null) return L;
+    const m = /url\(["']?#([^"')]+)/.exec(String(f || '')), g = m && document.getElementById(m[1]);
+    if (!g || !/gradient/i.test(g.tagName)) return null;   // patterns (hatching) are mostly see-through
+    const ls = [...g.querySelectorAll('stop')].map(st => lumOf(getComputedStyle(st).stopColor)).filter(v => v != null);
+    return ls.length ? ls.reduce((x, y) => x + y, 0) / ls.length : null;
+  };
   const underLum = (el, svgEl, pageL) => {          // semi-transparent shapes (soft shadows) are blended with what's below
     const r = el.getBoundingClientRect(), a = r.width * r.height; let L0 = null;
     for (const b of svgEl.querySelectorAll(SHAPES)) {
       if (b === el) break;                                        // only shapes painted before (underneath) it
       if (b.closest(NOPAINT)) continue;
-      const cs = getComputedStyle(b), L = lumOf(cs.fill); if (L == null) continue;
+      const cs = getComputedStyle(b), L = paintLum(cs.fill); if (L == null) continue;
       const q = b.getBoundingClientRect();
       if (!(q.width * q.height > Math.max(a, 1) * 1.1 && r.left >= q.left - 1 && r.right <= q.right + 1 && r.top >= q.top - 1 && r.bottom <= q.bottom + 1)) continue;
       const op = Math.max(0, Math.min(1, parseFloat(cs.opacity || 1) * parseFloat(cs.fillOpacity || 1)));
@@ -230,6 +237,7 @@
   function obj(spec, parent, defs) {
     const o = Object.assign({ x: ART_X, y: ART_Y, w: WIDE ? 760 : 820, rot: 0, motion: 'float', enter: D.art_enter || 'fadeUp', at: 0.05, dur: 0.6, shadow: true }, defs || {}, spec);
     const wrap = h('div', 'obj', parent);
+    if (o._src) wrap.dataset.src = o._src;
     wrap.style.left = o.x + 'px'; wrap.style.top = o.y + 'px'; wrap.style.width = o.w + 'px';
     if (o.z) wrap.style.zIndex = o.z;
     if (o.feather && o.image) wrap.classList.add('feather');
@@ -251,7 +259,9 @@
     if (finish === 'collage') wrap.classList.add('finish-collage');
     if (o.blend && finish !== 'collage') wrap.style.mixBlendMode = o.blend;    // collage cut-outs are opaque paper
     const inner = h('div', 'inner', wrap);
-    const content = o.svg || (o.video ? `<video src="${o.video}" muted playsinline preload="auto"></video>` : o.image ? `<img src="${o.image}" alt="">` : (o.html || ''));
+    // "view": "x y w h" crops a drawing to part of itself (e.g. the forearm of @lib/arm.svg for a close-up)
+    const svgIn = o.svg && o.view ? o.svg.replace(/(<svg\b[^>]*?\bviewBox=")[^"]*"/i, `$1${String(o.view).replace(/[^\d\s.,-]/g, '')}"`) : o.svg;
+    const content = svgIn || (o.video ? `<video src="${o.video}" muted playsinline preload="auto"></video>` : o.image ? `<img src="${o.image}" alt="">` : (o.html || ''));
     const clean = h('div', 'clean', inner, content);
     if (o.video) {             // moving art: seeked to the exact frame time by __seek (deterministic, parallel-safe)
       const v = clean.querySelector('video');
@@ -270,11 +280,16 @@
       const cs = getComputedStyle(S._el), ink = cs.getPropertyValue(S.theme === 'dark' ? '--dark-ink' : '--ink').trim(), iL = lumCss(ink);
       if (iL == null || iL < 0.5) return;                        // the page's ink is dark, so the page is light: nothing to swap
       wrap.querySelectorAll('.clean svg').forEach(svgEl => {
-        const swap = [];                                          // decide first, then recolour (later checks read the original colours)
-        svgEl.querySelectorAll(SHAPES).forEach(el => {
+        const swap = [], sv = svgEl.getBoundingClientRect(), svA = sv.width * sv.height, svM = Math.min(sv.width, sv.height);
+        svgEl.querySelectorAll(SHAPES).forEach(el => {           // decide first, then recolour (later checks read the original colours)
           if (el.closest(NOPAINT)) return;
-          const st = getComputedStyle(el), ks = ['fill', 'stroke'].filter(k => { const L = lumOf(st[k]); return L != null && L < 0.03; });
-          const u = ks.length ? underLum(el, svgEl, S.theme === 'dark' ? 0.02 : 0.8) : null;
+          const st = getComputedStyle(el); let ks = ['fill', 'stroke'].filter(k => { const L = lumOf(st[k]); return L != null && L < 0.03; });
+          const r = el.getBoundingClientRect(), area = r.width * r.height;
+          if (ks.includes('fill') && el.tagName.toLowerCase() !== 'text') {      // a large, wide filled area (dark hair, a black coat) is colour, not ink: keep it
+            if (svA && area > 0.04 * svA && Math.min(r.width, r.height) > 0.06 * svM) ks = ks.filter(k => k !== 'fill');
+          }
+          // small details (eyes, labels) drawn on a light shape stay dark; big outlines run along the page, so they swap
+          const u = ks.length && (!svA || area < 0.25 * svA) ? underLum(el, svgEl, S.theme === 'dark' ? 0.02 : 0.8) : null;
           if (ks.length && !(u != null && u >= 0.35)) swap.push([el, ks]);   // eyes on a white ghost stay dark
         });
         for (const [el, ks] of swap) for (const k of ks) el.style[k] = ink;
@@ -1239,7 +1254,8 @@
       s._el.querySelectorAll('.obj .clean svg').forEach(svgEl => {
         let tot = 0, closeA = 0, n = 0, sn = 0, sc = 0;
         [...svgEl.querySelectorAll('path,circle,ellipse,rect,polygon,polyline,line')].slice(0, 300).forEach(el => {
-          const cs = getComputedStyle(el), L = lumOf(cs.fill), Ls = lumOf(cs.stroke);
+          if (el.closest(NOPAINT)) return;
+          const cs = getComputedStyle(el), L = paintLum(cs.fill), Ls = lumOf(cs.stroke);
           if (Ls != null && parseFloat(cs.strokeWidth) > 0) { sn++; if (near(Ls)) sc++; }
           if (L == null) return;
           const r = el.getBoundingClientRect(), a = r.width * r.height; if (!a) return;
@@ -1264,15 +1280,20 @@
       if (subsEl && D.subs.some(c => c.t0 + 0.06 >= s.start && c.t0 + 0.06 < s.end)) {      // overlays fighting with subtitles (scenes without narration show none)
         const sy = s._subY || SUBY, band = { x0: 60, x1: W - 60, y0: sy - 4, y1: sy + (SUB.size || 60) * 2.4 };
         const boxes = [...s._el.querySelectorAll('.hl,.ov,.term,.labfile,.stat .num')].filter(e => getComputedStyle(e).opacity !== '0').map(e => ({ e, r: e.getBoundingClientRect() })).filter(o => o.r.width);
-        s._el.querySelectorAll('.ov,.term,.labfile').forEach(el => {
+        const art = [...s._el.querySelectorAll('.obj')].filter(w => !w.closest('.ov') && getComputedStyle(w).opacity !== '0' && s.theme !== 'photo')
+          .map(w => w.querySelector('.clean > svg, .clean > img, .clean > video')).filter(Boolean);
+        [...s._el.querySelectorAll('.ov,.term,.labfile,.cmp-lab'), ...art].forEach(el => {
           const r = el.getBoundingClientRect(); if (!r.width || hit(r, band) <= 0) return;
+          const isArt = !!el.closest('.obj') && !el.closest('.ov');
+          if (isArt && Math.min(r.bottom, band.y1) - Math.max(r.top, band.y0) < 14) return;   // a shadow or outline edge is fine
           let tip = '';                                       // nearest free spot above the captions (clear of headline and other labels)
           for (let d = Math.ceil((r.bottom - band.y0 + 16) / 10) * 10; d <= 1100; d += 10) {
             const m = { left: r.left, right: r.right, top: r.top - d, bottom: r.bottom - d };
             if (m.top < (WIDE ? 40 : 130)) break;
             if (!boxes.some(o => o.e !== el && !el.contains(o.e) && !o.e.contains(el) && hit(m, { x0: o.r.left - 8, y0: o.r.top - 8, x1: o.r.right + 8, y1: o.r.bottom + 8 }) > 0)) { tip = `: move it up ${d} px (y − ${d})`; break; }
           }
-          out.push({ scene: s.id, zone: 'subtitle band' + tip, what: (el.innerText || el.className).replace(/\s+/g, ' ').trim().slice(0, 40) });
+          out.push({ scene: s.id, zone: 'subtitle band' + (isArt && !tip ? ': move it up (y) or make it smaller (w)' : tip),
+            what: isArt ? 'art' + (el.closest('.obj').dataset.src ? ' ' + el.closest('.obj').dataset.src : '') : (el.innerText || el.className).replace(/\s+/g, ' ').trim().slice(0, 40) });
         });
       }
     }

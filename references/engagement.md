@@ -19,7 +19,7 @@ Research summary dated November 2026.
 
 **Pacing**
 4. ✓ A new visual (cut, illustration or large motion) every 2.5–4 s; nothing held over 5 s (8 s on 16:9
-   long-form); average shot not under 2 s. Measured TikToks average one cut per ~2.7 s; in a 242-viewer
+   long-form; a beat, or a cut-in such as a lens, stamp or chip popping in mid-line, starts a new stretch); average shot not under 2 s. Measured TikToks average one cut per ~2.7 s; in a 242-viewer
    experiment, ~1.9 s per shot cancelled the gain in continued watching, which peaked at 3–5 s. [S] (DH)
 5. Connect consecutive shots (same object, a word that bridges): unrelated cuts cost attention and recall. [S] (L)
 

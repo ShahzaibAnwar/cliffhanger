@@ -1,0 +1,52 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:transparent;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"__THREE__"}}</script>
+</head><body>
+<script type="module">
+// A drift of red blood cells (biconcave discs), seen up close.
+// Render:  node scripts/three-render.mjs @three/cells out.png [--bg F1EBDF] [--set n=18,color=C8302A]
+// Query:   n=14 (cells) · color=C8302A · seed=3 · spread=1 (how far apart)
+import * as THREE from 'three';
+try {
+  const q = new URLSearchParams(location.search);
+  const W = +(q.get('w') || 1200), H = +(q.get('h') || 800);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(1); renderer.setSize(W, H);
+  if (q.get('bg')) renderer.setClearColor('#' + q.get('bg'), 1); else renderer.setClearColor(0, 0);
+  document.body.appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  const cam = new THREE.PerspectiveCamera(32, W / H, 0.1, 100);
+  cam.position.set(0, 0, 14); cam.lookAt(0, 0, 0);
+
+  let seed = +(q.get('seed') || 3); const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  // biconcave disc: a lathe profile, thick rim and a dimple in the middle
+  const top = [];
+  for (let i = 0; i <= 48; i++) {
+    const r = Math.sin(i / 48 * Math.PI / 2);
+    top.push([r, 0.5 * Math.sqrt(Math.max(0, 1 - r * r)) * (0.25 + 1.2 * r * r)]);   // thin centre, fat rounded rim
+  }
+  // lathe profiles run bottom → top (y rising) so the faces point outward
+  const prof = [...top.map(([r, y]) => new THREE.Vector2(r, -y)), ...top.slice(0, -1).reverse().map(([r, y]) => new THREE.Vector2(r, y))];
+  const geo = new THREE.LatheGeometry(prof, 64); geo.computeVertexNormals();
+  const mat = new THREE.MeshStandardMaterial({ color: '#' + (q.get('color') || 'C8302A'), roughness: .5 });
+  const ink = new THREE.MeshBasicMaterial({ color: '#2b2420', side: THREE.BackSide });
+
+  const n = +(q.get('n') || 14), spread = +(q.get('spread') || 1), aspect = W / H;
+  for (let k = 0; k < n; k++) {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(geo, mat));
+    const hull = new THREE.Mesh(geo, ink); hull.scale.setScalar(1.045); g.add(hull);
+    const z = -rnd() * 6;
+    g.position.set((rnd() - .5) * 9 * aspect * .5 * spread, (rnd() - .5) * 5.2 * spread, z);   // kept inside the frame
+    g.rotation.set(rnd() * Math.PI, rnd() * Math.PI, rnd() * Math.PI);
+    g.scale.setScalar(0.9 + rnd() * 0.5);
+    scene.add(g);
+  }
+
+  const sun = new THREE.DirectionalLight('#fff', 3); sun.position.set(-6, 6, 8); scene.add(sun);   // upper left
+  scene.add(new THREE.AmbientLight('#fff', 0.6));
+  renderer.render(scene, cam);
+  document.title = 'done';
+} catch (e) { document.title = 'error: ' + e.message; }
+</script></body></html>
