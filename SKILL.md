@@ -293,6 +293,10 @@ Keep technical words in English where people say them that way.
 - **Another channel:** a top-level `"reel"` block in `lines.<lang>.json` (or `--brand brand.json`, one file per
   channel) sets `brand`, `series`, `cover`, `css`, `title`… With `--out` in the other channel's folder, the voice
   comes from that folder's `series.json` (then the source's, then your default; `--voice` always wins).
+- **Urdu / Arabic / Persian voice:** write every spoken line with aerab (zer, zabar, pesh) in that scene's `vo_tts`
+  (`--tts tts.ur.json`: scene id → marked line), keep `vo` plain: homographs like جلد (jild "skin" / jald "soon") are
+  otherwise misread, while captions and the .srt stay clean. localize checks each marked line strips back to `vo`;
+  voiceover.py lists lines without aerab before voicing (`voice.require_diacritics: ["ur"]` in settings stops instead).
 - **Cue words:** a cue uses its first word and the first spoken word that matches it; localize warns when that word
   appears more than once in the line (Urdu "دو" in both "دو ہزار دو" and "دوسرا"), so map it to a word said once.
 

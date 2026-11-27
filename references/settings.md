@@ -34,6 +34,7 @@ settings, `voiceover.py` retries automatically with a simpler request.
 | `voice.provider` | `auto` (ElevenLabs if key, else Edge) · `elevenlabs` · `edge` |
 | `voice.ask_each_reel` | Claude asks which saved voice to use before each voiceover |
 | `voice.only_my_voices` | refuse ElevenLabs voices that aren't in `voice.elevenlabs.voices` |
+| `voice.require_diacritics` | languages whose voice lines must carry aerab, e.g. `["ur"]`: voiceover.py stops before voicing a line without zer/zabar/pesh (otherwise it only warns; `--force-bare` voices them anyway) |
 | `voice.tighten` | `[tempo, keep]`, e.g. `[1.14, 0.24]`: run `tighten.py` after every voiceover (faster delivery, shorter pauses, pitch kept). Empty = `[1.14, 0.24]` on ElevenLabs, off on Edge; `false` = off. reel.json's `voice.tighten` wins |
 | `voice.elevenlabs.voices` | `[{voice_id, name, language, notes}]` |
 | `voice.elevenlabs.default_voice_id` | used when not asking / only one voice |

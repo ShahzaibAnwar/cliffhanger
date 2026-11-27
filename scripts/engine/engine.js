@@ -198,6 +198,23 @@
   let _probe = null;
   const lumCss = c => { if (!c) return null; if (!_probe) { _probe = h('i', '', stage); _probe.style.display = 'none'; } _probe.style.color = ''; _probe.style.color = c; return lumOf(getComputedStyle(_probe).color); };
   const contrast = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  // inside one drawing: the luminance of the topmost filled shape painted underneath el and around it (eyes on a white
+  // ghost, a letter on a grey square), or null when el sits straight on the page. Shapes in defs / clip paths aren't painted.
+  const SHAPES = 'path,circle,ellipse,rect,polygon,polyline,line,text';
+  const NOPAINT = 'defs,clipPath,mask,pattern,marker,symbol';
+  const underLum = (el, svgEl, pageL) => {          // semi-transparent shapes (soft shadows) are blended with what's below
+    const r = el.getBoundingClientRect(), a = r.width * r.height; let L0 = null;
+    for (const b of svgEl.querySelectorAll(SHAPES)) {
+      if (b === el) break;                                        // only shapes painted before (underneath) it
+      if (b.closest(NOPAINT)) continue;
+      const cs = getComputedStyle(b), L = lumOf(cs.fill); if (L == null) continue;
+      const q = b.getBoundingClientRect();
+      if (!(q.width * q.height > Math.max(a, 1) * 1.1 && r.left >= q.left - 1 && r.right <= q.right + 1 && r.top >= q.top - 1 && r.bottom <= q.bottom + 1)) continue;
+      const op = Math.max(0, Math.min(1, parseFloat(cs.opacity || 1) * parseFloat(cs.fillOpacity || 1)));
+      L0 = op >= 0.98 ? L : (L0 != null ? L0 : pageL) * (1 - op) + L * op;
+    }
+    return L0;
+  };
   // chips on a coloured background: dark text on light accents (violet, cyan…), light text on dark ones
   const inkChip = el => S._layout.push(() => { const L = lumOf(getComputedStyle(el).backgroundColor); if (L != null && L > 0.3) { el.style.color = '#16141A'; el.style.borderColor = 'rgba(0,0,0,.35)'; } });
 
@@ -252,9 +269,15 @@
     if (o.ink === 'auto' && o.svg) S._layout.push(() => {       // black-ink drawings on a dark page: near-black lines and fills take the page's ink colour
       const cs = getComputedStyle(S._el), ink = cs.getPropertyValue(S.theme === 'dark' ? '--dark-ink' : '--ink').trim(), iL = lumCss(ink);
       if (iL == null || iL < 0.5) return;                        // the page's ink is dark, so the page is light: nothing to swap
-      wrap.querySelectorAll('.clean svg path,.clean svg circle,.clean svg ellipse,.clean svg rect,.clean svg polygon,.clean svg polyline,.clean svg line,.clean svg text').forEach(el => {
-        const st = getComputedStyle(el);
-        for (const k of ['fill', 'stroke']) { const L = lumOf(st[k]); if (L != null && L < 0.03) el.style[k] = ink; }
+      wrap.querySelectorAll('.clean svg').forEach(svgEl => {
+        const swap = [];                                          // decide first, then recolour (later checks read the original colours)
+        svgEl.querySelectorAll(SHAPES).forEach(el => {
+          if (el.closest(NOPAINT)) return;
+          const st = getComputedStyle(el), ks = ['fill', 'stroke'].filter(k => { const L = lumOf(st[k]); return L != null && L < 0.03; });
+          const u = ks.length ? underLum(el, svgEl, S.theme === 'dark' ? 0.02 : 0.8) : null;
+          if (ks.length && !(u != null && u >= 0.35)) swap.push([el, ks]);   // eyes on a white ghost stay dark
+        });
+        for (const [el, ks] of swap) for (const k of ks) el.style[k] = ink;
       });
     });
     const sketch = o.enter === 'sketch' && !!o.svg;
@@ -1222,6 +1245,13 @@
           const r = el.getBoundingClientRect(), a = r.width * r.height; if (!a) return;
           n++; tot += a; if (near(L)) closeA += a;
         });
+        // text labels drawn straight on the page (not on a shape of the drawing) disappear even when the big fills read fine
+        const lost = [...svgEl.querySelectorAll('text')].filter(el => {     // compared with what's under it: a shape of the drawing, or the page
+          const L = lumOf(getComputedStyle(el).fill); if (L == null || !el.textContent.trim() || el.closest(NOPAINT)) return false;
+          const u = underLum(el, svgEl, bgL), ref = u != null ? u : bgL;
+          return (Math.max(L, ref) + 0.05) / (Math.min(L, ref) + 0.05) < 1.6;
+        });
+        if (lost.length) out.push({ scene: s.id, zone: `${lost.length} label(s) in the drawing blend into the page ("${lost.slice(0, 3).map(e => e.textContent.trim().slice(0, 16)).join('", "')}"): add "ink": "auto", or recolour them`, what: 'illustration' });
         if (n + sn < 4 || !tot) return;
         if (closeA / tot > 0.6 && (!sn || sc / sn > 0.6)) out.push({ scene: s.id, zone: 'low contrast with the page (art may vanish): add "ink": "auto" to the art, use the paper theme, or lighter art', what: 'illustration' });
       });

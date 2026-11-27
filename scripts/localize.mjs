@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* One-command language versions.
-     node localize.mjs <source-project> --lang ur --lines lines.ur.json [--out <dir>] [--voice <elevenlabs id>] [--brand brand.json]
+     node localize.mjs <source-project> --lang ur --lines lines.ur.json [--out <dir>] [--voice <elevenlabs id>] [--brand brand.json] [--tts tts.ur.json]
 
    lines.<lang>.json (Claude writes it):  { "<scene id>": { "vo": "...", "roman": "...", "cues": { "frozen": "جم" } }, ... }
    Another channel or brand: a top-level "reel" block is merged into reel.json (brand, series, cover, css, look,
@@ -8,6 +8,9 @@
    kicker/title/next…), "overlays" (by position: [{ "text": "…" }, {}, { "kicker": "…", "text": "…" }] or { "2": {…} }; false leaves one out),
    and "beats": [{ "headline": …, "overlays": […], "visual": {…} }, …] (by position) for the text inside beats.
    --brand brand.json: the same as a "reel" block, kept in one file per channel (lines' own "reel" block wins).
+   --tts tts.ur.json: { "<scene id>": "<the line with aerab>" } → each scene's vo_tts (what the voice reads; captions
+   keep vo). Each is checked to strip back to the same words as vo. Urdu / Arabic / Persian lines without aerab are
+   listed (homographs like جلد, jild / jald, get misread).
    - vo:    the spoken line in the target language (native script; English terms in Latin are fine)
    - roman: optional romanised line → out/<slug>-roman.srt
    - cues:  optional, English cue word → target word. Cue words you don't map are placed automatically at the
@@ -60,7 +63,8 @@ function autoPos(sceneId, vo, word) {                 // relative position of an
   return i >= 0 ? i / Math.max(1, toks.length) : 0.4;
 }
 let explicit = 0, auto = 0, overridden = 0;
-const missing = [], warnings = [];
+const missing = [], warnings = [], noAerab = [];
+const TTS = opt('tts') ? read(path.resolve(opt('tts'))) : {};
 const norm2 = w => String(w).toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '');   // the engine's word match
 for (const s of reel.scenes) {
   const L = lines[s.id];
@@ -78,7 +82,16 @@ for (const s of reel.scenes) {
   };
   for (const k of ['headline_at', 'punch_at', 'visual', 'overlays', 'sfx', 'ambience', 'beats', 'subtitles']) if (s[k] !== undefined) s[k] = remap(s[k]);
   s.vo = L.vo; if (L.roman) s.vo_roman = L.roman; else delete s.vo_roman;
-  if (L.vo_tts) s.vo_tts = L.vo_tts; else delete s.vo_tts;
+  const tts = TTS[s.id] ?? L.vo_tts;
+  if (tts) {
+    s.vo_tts = tts;
+    // the marked line must say the same words as vo: strip aerab, tatweel and punctuation, then compare word by word
+    const bare = t => String(t).replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, '').normalize('NFC').split(/\s+/).map(w => w.replace(/[^\p{L}\p{N}]+/gu, '')).filter(Boolean);
+    const A = bare(L.vo), B = bare(tts);
+    const k = A.findIndex((w, i) => w !== B[i]);
+    if (k >= 0 || A.length !== B.length) { const i = k >= 0 ? k : Math.min(A.length, B.length); warnings.push(`${s.id}: vo_tts doesn't match vo at word ${i + 1}: "${A[i] ?? '(end)'}" in vo, "${B[i] ?? '(end)'}" in vo_tts (fine if respelled on purpose for the voice; otherwise a word is missing or changed)`); }
+  } else delete s.vo_tts;
+  if (['ur', 'ar', 'fa'].includes(lang) && /[\u0600-\u06FF]/.test(s.vo_tts || L.vo) && !/[\u064B-\u0652\u0670]/.test(s.vo_tts || L.vo)) noAerab.push(s.id);
   // text the viewer reads, for this language / channel: the scene, and each of its beats ("beats": [{…}, {…}] by position)
   const applyText = (tgt, Lx, where) => {
     for (const k of ['headline', 'section', 'chapter']) if (Lx[k] !== undefined) { tgt[k] = Lx[k]; overridden++; }
@@ -138,6 +151,7 @@ for (const s of reel.scenes) {
     (b.overlays || []).forEach((o, i) => { if ((o.text || o.kicker) && !(isObj(bov[i]) && Object.keys(bov[i]).length)) kept.push(`${s.id} beat ${bi} ${o.type}`); });
   });
 }
+if (noAerab.length) warnings.push(`${noAerab.length} line(s) have no aerab (${noAerab.join(', ')}): homographs like جلد may be misread; give them vo_tts with zer/zabar/pesh (--tts tts.${lang}.json)`);
 if (warnings.length) { console.warn(`! ${warnings.length} warning(s):`); for (const w of warnings) console.warn('   - ' + w); }
 console.log(`${out}\n  ${reel.scenes.length} scenes · cues: ${explicit} mapped by you, ${auto} placed automatically · ${overridden} text override(s)${changed.length ? ` · reel: ${[...new Set(changed)].join(', ')}` : ''}`);
 console.log(`  voice ${voiceId}: ${voiceFrom}`);

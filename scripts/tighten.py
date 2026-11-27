@@ -9,6 +9,11 @@ voiceover.py regenerates come back without the marker and are backed up fresh.
 ElevenLabs pacing is usually too slow for reels: 1.10-1.16 with keep 0.22-0.28 is the usual range.
 Set voice.tighten = [tempo, keep] (settings or reel.json) to have voiceover.py run this automatically."""
 import json, os, re, shutil, subprocess, sys
+for _s in (sys.stdout, sys.stderr):          # Urdu / Hindi scene names must not crash a cp1252 Windows console
+    try:
+        _s.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 
 def dur_of(p):

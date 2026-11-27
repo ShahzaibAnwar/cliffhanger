@@ -186,6 +186,24 @@ t('hold scenes and carried overlays', () => {
   if (/end: "GOOSEBUMPSXX[^"]*" → off canvas/.test(all)) throw new Error('long end-card title runs off the frame');
   return 'chip carried while the visual stays, hold not counted as too long, long end-card title fits';
 });
+t('ink auto keeps dark details on light shapes; page labels are checked', () => {
+  const proj = path.join(tmpProj, 'ink'); fs.mkdirSync(path.join(proj, 'art'), { recursive: true });
+  // a white "ghost" with a big dark eye in its middle, and a dark label on the page under it
+  fs.writeFileSync(path.join(proj, 'art', 'ghost.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 260"><rect x="20" y="20" width="160" height="160" fill="#FFFFFF"/><rect x="60" y="60" width="80" height="80" fill="#111111"/><text x="100" y="240" text-anchor="middle" font-size="36" fill="#111111">FEAR</text></svg>');
+  const sc = ink => ({ id: ink ? 'inked' : 'plain', theme: 'dark', duration: 2, camera: 'none', headline: ['GHOST'], visual: { type: 'art', svg_file: 'art/ghost.svg', w: 400, x: 540, y: 960, enter: 'none', at: 0, motion: 'none', shadow: false, ...(ink ? { ink: 'auto' } : {}) } });
+  fs.writeFileSync(path.join(proj, 'reel.json'), JSON.stringify({ film_fx: false, scenes: [sc(true), sc(false)] }));
+  const r = spawnSync(process.execPath, [path.join(HERE, 'render.mjs'), proj, '--stills'], { encoding: 'utf8', cwd: ROOT, maxBuffer: 64 << 20 });
+  const all = (r.stdout || '') + (r.stderr || '');
+  if (r.status !== 0) throw new Error('render failed: ' + all.slice(-300));
+  if (!/plain: "illustration" → 1 label\(s\) in the drawing blend into the page \("FEAR"\)/.test(all)) throw new Error('dark label on a dark page not flagged');
+  if (/inked: "illustration" → .*label/.test(all)) throw new Error('ink auto did not lighten the page label');
+  // the eye sits at the centre of the art: it must still be dark after ink auto (the ghost keeps its face)
+  const px = spawnSync('ffmpeg', ['-v', 'error', '-i', path.join(proj, 'build', 'stills', '01.png'), '-vf', 'crop=4:4:538:' + (960 - 2 - 0) + ',scale=1:1', '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], { maxBuffer: 1 << 20 });
+  const v = px.stdout?.[0];
+  if (v == null) throw new Error('could not read the still');
+  if (v > 90) throw new Error(`the eye on the white shape was recoloured (brightness ${v})`);
+  return `eye stays dark (brightness ${v}), page label lightened, label check fires without ink`;
+});
 t('caption styles: own class names, a gap between words', () => {
   const css = fs.readFileSync(path.join(HERE, 'engine', 'engine.css'), 'utf8');
   // the caption box carries the style name as a class ("subs tape"): a bare .tape{…} rule elsewhere would restyle it
@@ -196,6 +214,29 @@ t('caption styles: own class names, a gap between words', () => {
   }
   if (!/\.subs i\{[^}]*display:inline-block[^}]*margin:0 \.1/.test(css)) throw new Error('caption words lost their margin (the outline paints over a plain space)');
   return 'no clashes; words keep a margin';
+});
+t('Urdu aerab: missing marks found, marked text checked against vo', () => {
+  // voiceover.py: which lines would be voiced without aerab (no audio is made here)
+  const py = process.platform === 'win32' ? 'python' : 'python3';
+  const scenes = [{ id: 'bare', vo: 'یہ جلد ہے' }, { id: 'marked', vo: 'یہ جلد ہے', vo_tts: 'یہ جِلْد ہے' }, { id: 'en', vo: 'Skin' }];
+  const r = spawnSync(py, ['-c', `import json,sys; sys.path.insert(0, ${JSON.stringify(HERE)}); import voiceover; print(json.dumps(voiceover.lines_without_aerab(json.loads(sys.stdin.read()))))`], { input: JSON.stringify(scenes), encoding: 'utf8', env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
+  if (r.status !== 0) throw new Error(r.stderr.slice(-300));
+  if (JSON.parse(r.stdout).join() !== 'bare') throw new Error('expected only "bare", got ' + r.stdout);
+  // localize --tts: the marked line must strip back to vo
+  const ws = path.join(tmpProj, 'aerab'), srcP = path.join(ws, 'ep'); fs.mkdirSync(srcP, { recursive: true });
+  fs.writeFileSync(path.join(srcP, 'reel.json'), JSON.stringify({ title: 'Skin', scenes: [{ id: 'a', vo: 'This is skin.' }, { id: 'b', vo: 'Soon.' }, { id: 'c', vo: 'Plain.' }] }));
+  const lp = path.join(ws, 'lines.ur.json'), tp = path.join(ws, 'tts.ur.json');
+  fs.writeFileSync(lp, JSON.stringify({ a: { vo: 'یہ جلد ہے۔' }, b: { vo: 'جلد آئے گا۔' }, c: { vo: 'سادہ۔' } }));
+  fs.writeFileSync(tp, JSON.stringify({ a: 'یہ جِلْد ہے۔', b: 'جَلْد آئیں گے۔' }));
+  const L = spawnSync(process.execPath, [path.join(HERE, 'localize.mjs'), srcP, '--lang', 'ur', '--lines', lp, '--tts', tp, '--voice', 'test-voice', '--out', path.join(ws, 'ep-ur')], { encoding: 'utf8', cwd: ROOT });
+  const all = (L.stdout || '') + (L.stderr || '');
+  if (L.status !== 0) throw new Error(all.slice(-300));
+  const o = JSON.parse(fs.readFileSync(path.join(ws, 'ep-ur', 'reel.json'), 'utf8'));
+  if (o.scenes[0].vo_tts !== 'یہ جِلْد ہے۔' || o.scenes[0].vo !== 'یہ جلد ہے۔') throw new Error('vo_tts / vo not set as expected');
+  if (/a: vo_tts doesn't match/.test(all)) throw new Error('a matching marked line was reported');
+  if (!/b: vo_tts doesn't match vo at word 2: "آئے" in vo, "آئیں" in vo_tts/.test(all)) throw new Error('a mismatched marked line was not reported\n' + all);
+  if (!/1 line\(s\) have no aerab \(c\)/.test(all)) throw new Error('the line without aerab was not listed');
+  return 'bare line found; --tts applied; mismatch at word 2 reported';
 });
 t('localize: channel block, text overrides, cue warnings, destination voice', () => {
   const ws1 = path.join(tmpProj, 'loc-a'), ws2 = path.join(tmpProj, 'loc-b'), srcP = path.join(ws1, 'ep1');

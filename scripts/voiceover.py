@@ -13,7 +13,7 @@ Provider is chosen by reel.json -> voice.provider: "elevenlabs" | "edge" | "auto
 "auto" uses ElevenLabs when ELEVENLABS_API_KEY is set, otherwise free Microsoft Edge neural voices.
 Writes build/vo/<scene>.mp3 and build/timings.json  {provider, scenes:{id:{file,duration,words:[{w,s,e}]}}}
 """
-import asyncio, base64, hashlib, json, os, subprocess, sys, time, urllib.request, urllib.error
+import asyncio, base64, hashlib, json, os, re, subprocess, sys, time, urllib.request, urllib.error
 
 ELEVEN_DEFAULT_VOICE = "nPczCjzI2devNBz1zQrb"   # "Brian" premade: deep, documentary narrator
 ELEVEN_DEFAULT_MODEL = "eleven_multilingual_v2"
@@ -227,6 +227,17 @@ def list_voices(which, lang):
             print(f"{v['ShortName']:<36} {v['Gender']:<7} {', '.join(v.get('VoiceTag', {}).get('VoicePersonalities', []))}")
 
 
+def lines_without_aerab(scenes):
+    """Scene ids whose spoken text (vo_tts, else vo) is in Arabic script with no zer / zabar / pesh / shadd at all."""
+    out = []
+    for i, s in enumerate(scenes):
+        text = (s.get("vo") or "").strip()
+        say = s.get("vo_tts") or text
+        if text and re.search(r"[؀-ۿ]", say) and not re.search(r"[ً-ْٰ]", say):
+            out.append(s.get("id") or f"s{i+1}")
+    return out
+
+
 def main():
     for stream in (sys.stdout, sys.stderr):      # Windows consoles default to cp1252
         try:
@@ -284,6 +295,17 @@ def main():
     scenes = reel["scenes"]
     out = {"provider": provider, "scenes": {}}
     lines = [(s.get("id") or f"s{i+1}", (s.get("vo") or "").strip()) for i, s in enumerate(scenes)]
+    # Urdu / Arabic / Persian: without aerab (zer, zabar, pesh…) the voice guesses homographs (جلد = jild "skin" or jald
+    # "soon"). Checked before any audio is made; settings voice.require_diacritics: ["ur"] makes it an error.
+    lang = (pcfg.get("language_code") or reel.get("lang") or str(pcfg.get("voice", ""))[:2]).lower()[:2]
+    if lang in ("ur", "ar", "fa"):
+        bare = lines_without_aerab(scenes)
+        if bare:
+            msg = (f"{lang}: {len(bare)} line(s) have no aerab ({', '.join(bare)}): homographs like جلد may be misread. "
+                   f"Add each scene's \"vo_tts\" with zer/zabar/pesh (captions keep \"vo\").")
+            if lang in (svoice.get("require_diacritics") or []) and "--force-bare" not in a:
+                die(msg + " (settings voice.require_diacritics; --force-bare to voice them anyway)")
+            print("! " + msg)
     total = 0.0
     for i, (sid, text) in enumerate(lines):
         if not text:
